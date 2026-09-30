@@ -1,0 +1,55 @@
+# EAS Build 用 ignore（.gitignore とほぼ同じだが .env は除外しない）
+# Expo 公式: Maps API キーを prebuild で読むため .env を EAS に含める必要がある
+# https://docs.expo.dev/versions/v57.0.0/sdk/map-view/
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files — .env は Maps キーのため EAS に含める（.env.local は除外）
+.env*.local
+
+# Firebase ネイティブ設定（コンソールからダウンロード。秘密情報を含む場合あり）
+# EAS では File secret / 環境変数で別途渡す想定
+google-services.json
+GoogleService-Info.plist
+
+# Firebase Admin SDK サービスアカウント（絶対にコミットしない）
+server/secrets/
+*-firebase-adminsdk-*.json
+
+# API の予約リマインド用ローカル保存
+server/data/
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders（EAS が prebuild で生成）
+/ios
+/android

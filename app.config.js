@@ -1,14 +1,23 @@
 /**
  * Expo 設定（Google Maps / 位置情報 / ネイティブ認証）
  *
- * Google Maps API キーは必ず環境変数 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY から読む。
- * ハードコードしないこと。.env に設定し、Google Cloud Console で
- * Maps SDK for Android / iOS を有効化してください。
+ * Google Maps API キーは環境変数から読む（ハードコード禁止）。
+ * 優先順:
+ *   1) EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+ *   2) GOOGLE_MAPS_API_KEY（EAS Secret 用エイリアス）
+ *
+ * EAS Build では .env が .gitignore 対象のため届かないことがある。
+ * → プロジェクト直下の .easignore で .env を許可するか、
+ *   `eas secret:create --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY --value ...`
+ *   で Secret を登録すること。
+ * キーが空のまま prebuild すると react-native-maps が
+ * AndroidManifest の com.google.android.geo.API_KEY を削除し、
+ * 実機で「API key not found」クラッシュになる。
  */
 const fs = require('fs');
 const path = require('path');
 
-/** prebuild 時にも .env の EXPO_PUBLIC_* が確実に入るようにする */
+/** prebuild / EAS 時にも .env の値が確実に入るようにする */
 function loadEnvFile() {
   try {
     const envPath = path.join(__dirname, '.env');
@@ -26,7 +35,9 @@ function loadEnvFile() {
       ) {
         val = val.slice(1, -1);
       }
-      if (key && process.env[key] == null) {
+      // 未設定または空文字のときは .env の値で埋める
+      // （EAS が空文字を渡すと従来の == null 判定では上書きできなかった）
+      if (key && !String(process.env[key] ?? '').trim()) {
         process.env[key] = val;
       }
     }
@@ -37,12 +48,27 @@ function loadEnvFile() {
 loadEnvFile();
 
 const GOOGLE_MAPS_API_KEY = String(
-  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
+    process.env.GOOGLE_MAPS_API_KEY ||
+    '',
 ).trim();
-if (!GOOGLE_MAPS_API_KEY) {
-  console.warn(
-    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY が未設定です。.env に設定してください。地図・Places が動きません。',
+
+const isNativeBuildContext =
+  process.env.EAS_BUILD === 'true' ||
+  process.env.CI === 'true' ||
+  process.argv.some((arg) =>
+    /(?:^|\/)(prebuild|run:android|run:ios)(?:$|:)/.test(arg),
   );
+
+if (!GOOGLE_MAPS_API_KEY) {
+  const message =
+    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY（または GOOGLE_MAPS_API_KEY）が未設定です。' +
+    ' .env に設定するか、EAS Secret に登録してください。' +
+    ' 未設定のまま Android ビルドすると Maps が「API key not found」でクラッシュします。';
+  if (isNativeBuildContext) {
+    throw new Error(message);
+  }
+  console.warn(message);
 }
 function reversedGoogleIosScheme(clientId) {
   const id = String(clientId || '').trim();
