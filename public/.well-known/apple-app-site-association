@@ -1,0 +1,41 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "APPLE_TEAM_ID.com.spotto.app",
+        "paths": [
+          "/event/*",
+          "/club/*",
+          "/ticket/*",
+          "/chat/*"
+        ]
+      },
+      {
+        "appIDs": ["APPLE_TEAM_ID.com.spotto.app"],
+        "components": [
+          { "/": "/event/*", "comment": "Event detail" },
+          { "/": "/club/*", "comment": "Club detail" },
+          { "/": "/ticket/*", "comment": "Ticket detail" },
+          { "/": "/chat/*", "comment": "Chat room" },
+          {
+            "/": "/terms",
+            "exclude": true,
+            "comment": "Legal pages stay in browser"
+          },
+          {
+            "/": "/privacy",
+            "exclude": true
+          },
+          {
+            "/": "/tokushoho",
+            "exclude": true
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["APPLE_TEAM_ID.com.spotto.app"]
+  }
+}

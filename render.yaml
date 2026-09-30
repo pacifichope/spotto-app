@@ -1,0 +1,82 @@
+# Render Blueprint — spotto API（常時稼働向け）
+# https://render.com/docs/blueprint-spec
+#
+# 使い方:
+#   1) このリポジトリを GitHub/GitLab に push
+#   2) Render Dashboard → New → Blueprint → このリポジトリを選択
+#   3) sync: false の環境変数を Dashboard で入力
+#   4) デプロイ後の URL をアプリの EXPO_PUBLIC_API_BASE_URL に設定
+#
+# 常時稼働: plan は starter 以上（free はアイドルでスリープします）
+
+services:
+  - type: web
+    name: spotto-api
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
+      - key: HOST
+        value: "0.0.0.0"
+      # CORS（本番ドメインに絞る場合は置き換え）
+      - key: CORS_ORIGIN
+        value: "*"
+
+      # Stripe（モードとキーは揃える）
+      - key: EXPO_PUBLIC_STRIPE_MODE
+        value: test
+      - key: STRIPE_SECRET_KEY_TEST
+        sync: false
+      - key: STRIPE_SECRET_KEY_LIVE
+        sync: false
+      - key: EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+        sync: false
+      - key: EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
+        sync: false
+
+      # Supabase
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # Firebase Admin（JSON を1行文字列で。ファイルパスは使わない）
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+
+      # LINE Login（Custom Token 交換）
+      - key: EXPO_PUBLIC_LINE_CHANNEL_ID
+        sync: false
+      - key: LINE_CHANNEL_ID
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+
+      # メール（お問い合わせ / 通知）
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: noreply@spotto.fun
+      - key: RESEND_FROM_NAME
+        value: spotto
+      - key: CONTACT_INBOX
+        value: support@spotto.fun
+
+      # 運営・Cron（任意）
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: PAYOUT_NOTIFY_FUNCTION_URL
+        sync: false
+      - key: PAYOUT_NOTIFY_SECRET
+        sync: false

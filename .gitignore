@@ -31,7 +31,19 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+
+# Firebase ネイティブ設定（コンソールからダウンロード。秘密情報を含む場合あり）
+google-services.json
+GoogleService-Info.plist
+
+# Firebase Admin SDK サービスアカウント（絶対にコミットしない）
+server/secrets/
+*-firebase-adminsdk-*.json
+
+# API の予約リマインド用ローカル保存
+server/data/
 
 # typescript
 *.tsbuildinfo

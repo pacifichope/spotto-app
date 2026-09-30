@@ -1,0 +1,35 @@
+-- 主催者売上 QA 用シード（任意）
+-- HOST_ID / EVENT_ID / BUYER_ID を実値に置き換えてから実行してください。
+-- BUYER_ID は RLS 上「ログイン中ユーザー」である必要があるため、
+-- 通常はアプリの「テスト売上を記録」または参加者アカウントの決済を推奨します。
+--
+-- 前提: apply_event_ticket_sales*.sql / Firebase RLS 適用済み
+
+-- 例: 過去イベント向けの確定売上 1 件
+-- insert into public.event_ticket_sales (
+--   event_id,
+--   buyer_id,
+--   host_id,
+--   amount_yen,
+--   refunded_yen,
+--   payment_intent_id,
+--   status,
+--   paid_at,
+--   event_title,
+--   event_date,
+--   event_ends_at
+-- ) values (
+--   'EVENT_ID'::uuid,           -- または text ID の場合はそのまま
+--   'BUYER_ID',
+--   'HOST_ID',                  -- トリガーが events.host_id で上書きする場合あり
+--   1000,
+--   0,
+--   'demo_seed_' || gen_random_uuid()::text,
+--   'paid',
+--   now(),
+--   '売上テストイベント',
+--   (current_date - 1),         -- 昨日開催 → 当月集計・確定扱い
+--   ((current_date - 1)::text || 'T23:59:59')::timestamp at time zone 'Asia/Tokyo'
+-- );
+
+select 1;

@@ -1,70 +1,124 @@
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { ChatIcon } from '@/components/icons';
+import { theme } from '@/constants/theme';
+import { formatUnreadBadge } from '@/lib/chats';
+import { useAuth } from '@/lib/authContext';
+import { useChats } from '@/lib/chatsContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { isReady, isLoggedIn } = useAuth();
+  const { unreadCount } = useChats();
+  const messagesBadge = formatUnreadBadge(isLoggedIn ? unreadCount : 0);
+
+  // 認証判定が終わるまで待つ（前回ルート復元でホームが先に出るのを防ぐ）
+  if (!isReady) {
+    return (
+      <View style={styles.boot}>
+        <ActivityIndicator color={theme.colors.primaryDark} size="large" />
+      </View>
+    );
+  }
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.iconInactive,
         headerShown: useClientOnlyValue(false, true),
-      }}>
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+        },
+        tabBarLabelStyle: {
+          fontWeight: '700',
+          fontSize: 11,
+        },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
-          title: 'Tab One',
+          title: 'ホーム',
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
+                ios: 'house.fill',
+                android: 'home',
+                web: 'home',
               }}
               tintColor={color}
-              size={28}
+              size={26}
             />
           ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
-                {({ pressed }) => (
-                  <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-                    size={25}
-                    tintColor={Colors[colorScheme].text}
-                    style={{ opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'メッセージ',
+          headerShown: false,
+          tabBarBadge: messagesBadge,
+          tabBarBadgeStyle: {
+            backgroundColor: theme.colors.danger,
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: '800',
+            minWidth: 16,
+            height: 16,
+            lineHeight: 16,
+          },
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{
+                ios: 'bubble.left.fill',
+                android: 'chat',
+                web: 'chat',
+              }}
+              tintColor={color}
+              size={26}
+              fallback={<ChatIcon size={22} color={String(color)} />}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="mypage"
+        options={{
+          title: 'マイページ',
+          headerShown: false,
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{
+                ios: 'person.fill',
+                android: 'person',
+                web: 'person',
+              }}
+              tintColor={color}
+              size={26}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
+          href: null,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  boot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+});

@@ -1,0 +1,243 @@
+/**
+ * Google → Firebase Auth（ネイティブ）
+ * Supabase signInWithIdToken は使わない。
+ */
+import '@/lib/firebaseNativeInit';
+
+import { Platform } from 'react-native';
+
+import type { AuthUser } from '@/lib/auth';
+import { readPublicEnv } from '@/lib/env';
+import { authUserFromFirebaseUser } from '@/lib/firebaseAuthSession';
+import {
+  ensureNativeFirebaseApp,
+  isNativeFirebaseLinked,
+} from '@/lib/firebaseNativeInit';
+import { SOCIAL_LOGIN_USER_ERRORS } from '@/lib/socialLoginErrors';
+
+export type FirebaseGoogleSignInResult =
+  | { ok: true; user: AuthUser }
+  | { ok: false; error: string; cancelled?: boolean };
+
+let googleConfigured = false;
+
+function googleWebClientId() {
+  return readPublicEnv('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+}
+
+function googleIosClientId() {
+  return (
+    readPublicEnv('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID') || googleWebClientId()
+  );
+}
+
+function loadGoogleSignIn() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
+}
+
+function loadAuthModular(): {
+  getAuth: () => unknown;
+  GoogleAuthProvider: {
+    credential: (
+      idToken: string | null,
+      accessToken?: string | null,
+    ) => unknown;
+  };
+  signInWithCredential: (
+    auth: unknown,
+    credential: unknown,
+  ) => Promise<{ user: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null; providerData?: Array<{ providerId?: string | null }> } }>;
+} | null {
+  if (Platform.OS === 'web') return null;
+  if (!isNativeFirebaseLinked()) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('@react-native-firebase/auth');
+  } catch {
+    return null;
+  }
+}
+
+function ensureGoogleConfigured(): FirebaseGoogleSignInResult | null {
+  const webClientId = googleWebClientId();
+  if (!webClientId) {
+    if (__DEV__) {
+      console.warn(
+        '[auth] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID が未設定です（Firebase Google ログイン）',
+      );
+    }
+    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
+  }
+
+  if (!googleConfigured) {
+    const { GoogleSignin } = loadGoogleSignIn();
+    const iosClientId = googleIosClientId();
+    GoogleSignin.configure({
+      webClientId,
+      iosClientId: iosClientId || undefined,
+      offlineAccess: false,
+    });
+    if (__DEV__) {
+      console.log('[auth] GoogleSignin.configure (Firebase)', {
+        webClientIdPrefix: webClientId.split('-')[0],
+        hasIosClientId: Boolean(iosClientId),
+      });
+    }
+    googleConfigured = true;
+  }
+  return null;
+}
+
+function mapGoogleError(error: unknown): FirebaseGoogleSignInResult {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error &&
+          'message' in error &&
+          typeof (error as { message?: unknown }).message === 'string'
+        ? String((error as { message: string }).message)
+        : String(error || '');
+  const code =
+    typeof error === 'object' &&
+    error &&
+    'code' in error &&
+    (error as { code?: unknown }).code != null
+      ? String((error as { code: unknown }).code)
+      : '';
+  const blob = `${code} ${message}`.toLowerCase();
+
+  if (/cancel|キャンセル|sign_in_cancelled/i.test(blob)) {
+    return {
+      ok: false,
+      error: SOCIAL_LOGIN_USER_ERRORS.cancelled,
+      cancelled: true,
+    };
+  }
+  if (
+    /developer_error|api_exception:\s*10\b|\bcode[=: ]*10\b|error.?code.?10/i.test(
+      blob,
+    )
+  ) {
+    if (__DEV__) {
+      console.warn(
+        '[auth] Google DEVELOPER_ERROR: webClientId / SHA-1 / package を google-services.json と揃えてください。',
+      );
+    }
+  }
+  return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
+}
+
+/**
+ * Google Sign-In SDK で ID トークンを取得し、Firebase Auth に signInWithCredential する。
+ */
+export async function signInWithGoogleFirebase(): Promise<FirebaseGoogleSignInResult> {
+  if (Platform.OS === 'web') {
+    return {
+      ok: false,
+      error: SOCIAL_LOGIN_USER_ERRORS.google,
+    };
+  }
+
+  try {
+    const configError = ensureGoogleConfigured();
+    if (configError) return configError;
+
+    const appReady = await ensureNativeFirebaseApp();
+    if (!appReady) {
+      if (__DEV__) {
+        console.warn(
+          '[auth] Firebase DEFAULT アプリ未初期化。google-services.json / Dev Client を確認してください。',
+        );
+      }
+      return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
+    }
+
+    const authMod = loadAuthModular();
+    if (!authMod) {
+      if (__DEV__) {
+        console.warn(
+          '[auth] @react-native-firebase/auth が未リンクです。Dev Client を再ビルドしてください。',
+        );
+      }
+      return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
+    }
+
+    const { GoogleSignin, isSuccessResponse, statusCodes } = loadGoogleSignIn();
+
+    try {
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices({
+          showPlayServicesUpdateDialog: true,
+        });
+      }
+
+      // 既存セッションがあると signIn がスキップされることがあるためクリア
+      try {
+        if (GoogleSignin.getCurrentUser()) {
+          await GoogleSignin.signOut();
+        }
+      } catch {
+        // ignore
+      }
+
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse(response)) {
+        return {
+          ok: false,
+          error: SOCIAL_LOGIN_USER_ERRORS.cancelled,
+          cancelled: true,
+        };
+      }
+
+      let idToken = response.data.idToken;
+      let accessToken: string | null | undefined;
+      try {
+        const tokens = await GoogleSignin.getTokens();
+        idToken = idToken || tokens.idToken;
+        accessToken = tokens.accessToken;
+      } catch {
+        // idToken だけで続行
+      }
+
+      if (!idToken) {
+        if (__DEV__) {
+          console.warn('[auth] Google Sign-In: idToken が空です');
+        }
+        return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
+      }
+
+      const credential = authMod.GoogleAuthProvider.credential(
+        idToken,
+        accessToken ?? null,
+      );
+      const userCredential = await authMod.signInWithCredential(
+        authMod.getAuth(),
+        credential,
+      );
+
+      return {
+        ok: true,
+        user: authUserFromFirebaseUser(userCredential.user, 'google'),
+      };
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[auth] Firebase Google sign-in', error);
+      }
+      // statusCodes は map 内で cancel 判定に使う
+      void statusCodes;
+      return mapGoogleError(error);
+    }
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[auth] signInWithGoogleFirebase', error);
+    }
+    return mapGoogleError(error);
+  }
+}
+
+export function isFirebaseGoogleAuthReady(): boolean {
+  if (Platform.OS === 'web') return false;
+  return Boolean(googleWebClientId() && loadAuthModular());
+}

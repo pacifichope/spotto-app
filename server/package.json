@@ -1,0 +1,15 @@
+{
+  "name": "spotto-api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "health": "node -e \"fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/health').then(r=>r.json()).then(console.log)\""
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0"
+  }
+}
