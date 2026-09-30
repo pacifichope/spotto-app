@@ -1,9 +1,9 @@
 /**
  * Expo 設定（Google Maps / 位置情報 / ネイティブ認証）
  *
- * Google Maps API キーは環境変数 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY を推奨。
- * 未設定の場合はプレースホルダーを使うため、実機で地図タイルを出す前に
- * Google Cloud Console で Maps SDK for Android / iOS を有効化しキーを入れてください。
+ * Google Maps API キーは必ず環境変数 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY から読む。
+ * ハードコードしないこと。.env に設定し、Google Cloud Console で
+ * Maps SDK for Android / iOS を有効化してください。
  */
 const fs = require('fs');
 const path = require('path');
@@ -36,10 +36,14 @@ function loadEnvFile() {
 }
 loadEnvFile();
 
-const GOOGLE_MAPS_API_KEY =
-  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
-  'AIzaSyAlPycGeb_W8H8mw0ELQgx312MMcOmL6xY';
-
+const GOOGLE_MAPS_API_KEY = String(
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+).trim();
+if (!GOOGLE_MAPS_API_KEY) {
+  console.warn(
+    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY が未設定です。.env に設定してください。地図・Places が動きません。',
+  );
+}
 function reversedGoogleIosScheme(clientId) {
   const id = String(clientId || '').trim();
   const suffix = '.apps.googleusercontent.com';
