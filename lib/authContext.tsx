@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Alert } from 'react-native';
 
 import LoginModal from '@/components/LoginModal';
 import PersonalProfileModal from '@/components/PersonalProfileModal';
@@ -42,6 +43,7 @@ import {
   unregisterDevicePushToken,
 } from '@/lib/pushNotifications';
 import { fetchRemoteProfileForUser } from '@/lib/sessionHydration';
+import { setSessionExpiredHandler } from '@/lib/sessionExpiry';
 import { userFacingSocialLoginError } from '@/lib/socialLoginErrors';
 import { useUserProfile } from '@/lib/userProfileContext';
 import {
@@ -280,6 +282,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
   }, [applySession, clearSessionLocalState, hydrateSessionData]);
+
+  // API 401 / JWT 失効時: ローカルセッションを破棄して再ログインを促す
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      if (!userRef.current) return;
+      resetAccountData();
+      clearSessionLocalState();
+      setIsGuestBrowsing(true);
+      pendingResume.current = null;
+      pendingAfterProfile.current = null;
+      setProfileSetupVisible(false);
+      void signOutFirebaseAuth();
+      Alert.alert(
+        'ログインの有効期限が切れました',
+        'セキュリティのため再ログインが必要です。',
+        [
+          {
+            text: 'ログイン',
+            onPress: () => {
+              setLoginReason(undefined);
+              setLoginVisible(true);
+            },
+          },
+          { text: '閉じる', style: 'cancel' },
+        ],
+      );
+    });
+    return () => setSessionExpiredHandler(null);
+  }, [clearSessionLocalState, resetAccountData]);
 
   const closeLogin = useCallback(() => {
     pendingResume.current = null;

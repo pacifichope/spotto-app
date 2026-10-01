@@ -14,7 +14,6 @@ import type {
 } from '@/components/eventsMapTypes';
 import EventMapPin from '@/components/EventMapPin';
 import MapClusterMarker from '@/components/MapClusterMarker';
-import { SAMPLE_EVENTS } from '@/lib/events';
 import {
   clusterEventsForRegion,
   regionForClusterEvents,
@@ -44,7 +43,7 @@ function toPercent(
 
 const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   {
-    events = SAMPLE_EVENTS,
+    events = [],
     selectedId,
     joinedIds,
     onSelectEvent,

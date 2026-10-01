@@ -23,7 +23,7 @@ import type {
   EventsMapRef,
   MapCameraRegion,
 } from '@/components/eventsMapTypes';
-import { SAMPLE_EVENTS, type SportEvent } from '@/lib/events';
+import { type SportEvent } from '@/lib/events';
 import {
   CLUSTER_DISABLE_LAT_DELTA,
   clusterEventsForRegion,
@@ -61,7 +61,7 @@ function shouldKeepForcePoints(
 
 const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   {
-    events = SAMPLE_EVENTS,
+    events = [],
     selectedId,
     joinedIds,
     onSelectEvent,

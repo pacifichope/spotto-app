@@ -429,6 +429,11 @@ export default function EventList({
       keyExtractor={(item, index) => item?.id || `event-${index}`}
       style={styles.list}
       showsVerticalScrollIndicator={false}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={7}
+      removeClippedSubviews
+      updateCellsBatchingPeriod={50}
       ListHeaderComponent={ListHeaderComponent}
       ListFooterComponent={ListFooterComponent}
       contentContainerStyle={[

@@ -197,6 +197,10 @@ export default function EventChatModal({
             ref={listRef}
             data={messages}
             keyExtractor={(item) => item.id}
+            initialNumToRender={20}
+            maxToRenderPerBatch={16}
+            windowSize={9}
+            removeClippedSubviews
             ListHeaderComponent={
               <View style={styles.notice}>
                 <Text style={styles.noticeText}>

@@ -190,6 +190,11 @@ export async function sendPushToUsers(input: {
       timeoutMs: 12_000,
     });
     if (!response.ok) {
+      if (response.status === 401) {
+        void import('@/lib/sessionExpiry').then((m) =>
+          m.notifySessionExpired(`push:${response.status}`),
+        );
+      }
       throw new Error(`HTTP ${response.status}`);
     }
     return { ok: true };

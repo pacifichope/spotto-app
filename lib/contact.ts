@@ -249,6 +249,11 @@ export async function submitContact(
       });
       clearTimeout(timer);
       if (!response.ok) {
+        if (response.status === 401) {
+          void import('@/lib/sessionExpiry').then((m) =>
+            m.notifySessionExpired(`contact:${response.status}`),
+          );
+        }
         throw new Error(`HTTP ${response.status}`);
       }
       return { ok: true, channel: 'api' };

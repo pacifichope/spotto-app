@@ -14,12 +14,15 @@ async function probeOnline(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3500);
-    await fetch('https://clients3.google.com/generate_204', {
-      method: 'HEAD',
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    return true;
+    try {
+      await fetch('https://clients3.google.com/generate_204', {
+        method: 'HEAD',
+        signal: controller.signal,
+      });
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
     return false;
   }

@@ -35,8 +35,9 @@ export function isSupabaseConfigured() {
   return Boolean(getSupabaseUrl() && getSupabaseAnonKey());
 }
 
-/** 開発用: EXPO_PUBLIC_AUTH_MOCK=1 で SNS ログインをダミー成功にする */
+/** 開発用: EXPO_PUBLIC_AUTH_MOCK=1 で SNS ログインをダミー成功にする（本番では無効） */
 export function isAuthMockEnabled() {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) return false;
   const raw = readPublicEnv('EXPO_PUBLIC_AUTH_MOCK').trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes';
 }

@@ -2,6 +2,7 @@ import '@/lib/polyfills/webcrypto';
 // RNFB deprecation 抑制は Auth モジュール読み込みより前に実行する
 import '@/lib/firebaseNativeInit';
 import '@/lib/registerMapsFabricEvents';
+import '@/lib/silenceProdConsole';
 import 'react-native-gesture-handler';
 
 import { useFonts } from 'expo-font';
@@ -17,6 +18,7 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import 'react-native-reanimated';
 
 import AppProviders from '@/components/AppProviders';
+import ConnectionBanner from '@/components/ConnectionBanner';
 import { theme } from '@/constants/theme';
 import { useNotificationDeepLinks } from '@/lib/notificationDeepLink';
 
@@ -66,6 +68,7 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={DefaultTheme}>
       <StatusBar style="dark" />
+      <ConnectionBanner />
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

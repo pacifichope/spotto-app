@@ -549,6 +549,10 @@ export default function ChatRoomScreen({
         contentContainerStyle={
           messages.length === 0 ? styles.threadEmpty : styles.threadContent
         }
+        initialNumToRender={20}
+        maxToRenderPerBatch={16}
+        windowSize={9}
+        removeClippedSubviews
         onContentSizeChange={() => scrollToLatest(false)}
         onLayout={() => scrollToLatest(false)}
         keyboardShouldPersistTaps="handled"

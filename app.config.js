@@ -94,6 +94,29 @@ const lineChannelId = String(
   process.env.EXPO_PUBLIC_LINE_CHANNEL_ID || '',
 ).trim();
 
+/** 本番 EAS プロファイルでは cleartext（HTTP）を無効化 */
+const isProductionEasProfile =
+  String(process.env.EAS_BUILD_PROFILE || '').trim() === 'production';
+const allowCleartextTraffic = !isProductionEasProfile;
+
+const API_BASE_URL = String(
+  process.env.EXPO_PUBLIC_API_BASE_URL || '',
+).trim();
+if (isProductionEasProfile && !API_BASE_URL) {
+  console.warn(
+    '[app.config] 本番ビルドで EXPO_PUBLIC_API_BASE_URL が未設定です。' +
+      '決済・通知・LINE 認証などが失敗します。EAS Secret に本番 HTTPS URL を設定してください。',
+  );
+}
+if (
+  isProductionEasProfile &&
+  API_BASE_URL &&
+  /^http:\/\//i.test(API_BASE_URL)
+) {
+  console.warn(
+    '[app.config] 本番ビルドの EXPO_PUBLIC_API_BASE_URL が http:// です。HTTPS を推奨します。',
+  );
+}
 const googleServicesJsonPath = path.join(__dirname, 'google-services.json');
 const googleServicesPlistPath = path.join(__dirname, 'GoogleService-Info.plist');
 const hasGoogleServicesJson = fs.existsSync(googleServicesJsonPath);
@@ -122,7 +145,15 @@ const plugins = [
     {
       image: './assets/images/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#ffffff',
+      backgroundColor: '#E6F4FE',
+    },
+  ],
+  [
+    'expo-secure-store',
+    {
+      configureAndroidBackup: true,
+      faceIDPermission:
+        'ログイン情報を保護するために、Face ID の使用を許可してください。',
     },
   ],
   [
@@ -254,6 +285,8 @@ const config = {
     },
     config: {
       googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+      // SecureStore / 標準暗号のみ → 輸出コンプライアンス質問を簡略化
+      usesNonExemptEncryption: false,
     },
     infoPlist: {
       CFBundleDisplayName: 'spotto',
@@ -270,12 +303,12 @@ const config = {
       LSApplicationQueriesSchemes: ['lineauth2'],
       NSLocationWhenInUseUsageDescription:
         '周辺のスポーツイベントを地図に表示するために、現在地を使用します。',
-      NSLocationAlwaysAndWhenInUseUsageDescription:
-        '周辺のスポーツイベントを地図に表示するために、現在地を使用します。',
       NSPhotoLibraryUsageDescription:
         'プロフィール写真やイベントの写真を選ぶために、フォトライブラリへのアクセスが必要です。',
       NSCameraUsageDescription:
         'イベントの写真を撮影するためにカメラへのアクセスが必要です。',
+      NSFaceIDUsageDescription:
+        'ログイン情報を保護するために、Face ID の使用を許可してください。',
       // 開発中の LAN HTTP（http://192.168.x.x:8787）を許可
       NSAppTransportSecurity: {
         NSAllowsLocalNetworking: true,
@@ -291,8 +324,8 @@ const config = {
     ...(hasGoogleServicesJson
       ? { googleServicesFile: './google-services.json' }
       : {}),
-    // ローカル API（http://LAN_IP:8787）への cleartext 通信を許可
-    usesCleartextTraffic: true,
+    // 本番では cleartext 無効。開発 / preview はローカル API 用に許可
+    usesCleartextTraffic: allowCleartextTraffic,
     intentFilters: [
       // カスタムスキーム: spotto://event/...
       {
@@ -370,6 +403,9 @@ const config = {
       'ACCESS_COARSE_LOCATION',
       'ACCESS_FINE_LOCATION',
       'INTERNET',
+      'CAMERA',
+      'READ_MEDIA_IMAGES',
+      'READ_EXTERNAL_STORAGE',
     ],
     config: {
       googleMaps: {

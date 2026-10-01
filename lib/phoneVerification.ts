@@ -8,13 +8,17 @@ import {
   isFirebasePhoneAuthAvailable,
   sendFirebasePhoneOtp,
 } from '@/lib/firebasePhoneAuth';
-import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import {
-  formatPhoneAuthError,
   formatPhoneDisplay,
   isValidOtpCode,
   normalizePhoneToE164,
 } from '@/lib/phoneVerificationShared';
+import {
+  deleteSecureItem,
+  getSecureItem,
+  setSecureItem,
+} from '@/lib/secureStorage';
+import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
 export type PhoneVerificationRecord = {
   userId: string;
@@ -23,7 +27,9 @@ export type PhoneVerificationRecord = {
   verifiedAt: number;
 };
 
-const STORAGE_KEY = '@spotto/phone-verification';
+/** SecureStore 用。旧 `@spotto/phone-verification` は移行時に読む */
+const STORAGE_KEY = 'spotto.phone-verification';
+const STORAGE_LEGACY_KEYS = ['@spotto/phone-verification'];
 
 export {
   extractPhoneAuthErrorRaw,
@@ -41,19 +47,6 @@ export {
   validatePhoneInput,
 } from '@/lib/phoneVerificationShared';
 
-type AsyncStorageType =
-  typeof import('@react-native-async-storage/async-storage').default;
-
-function getAsyncStorage(): AsyncStorageType | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@react-native-async-storage/async-storage')
-      .default as AsyncStorageType;
-  } catch {
-    return null;
-  }
-}
-
 export function isFirebasePhoneConfigured() {
   return isFirebasePhoneAuthAvailable();
 }
@@ -61,10 +54,9 @@ export function isFirebasePhoneConfigured() {
 async function loadPhoneVerificationLocal(
   userId: string,
 ): Promise<PhoneVerificationRecord | null> {
-  const storage = getAsyncStorage();
-  if (!storage || !userId.trim()) return null;
+  if (!userId.trim()) return null;
   try {
-    const raw = await storage.getItem(STORAGE_KEY);
+    const raw = await getSecureItem(STORAGE_KEY, STORAGE_LEGACY_KEYS);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PhoneVerificationRecord>;
     if (
@@ -210,8 +202,11 @@ export async function loadPhoneVerification(
 async function savePhoneVerificationLocal(
   record: PhoneVerificationRecord,
 ): Promise<void> {
-  const storage = getAsyncStorage();
-  await storage?.setItem(STORAGE_KEY, JSON.stringify(record));
+  await setSecureItem(
+    STORAGE_KEY,
+    JSON.stringify(record),
+    STORAGE_LEGACY_KEYS,
+  );
 }
 
 export async function savePhoneVerification(
@@ -223,8 +218,7 @@ export async function savePhoneVerification(
 
 export async function clearPhoneVerification(): Promise<void> {
   clearFirebasePhonePending();
-  const storage = getAsyncStorage();
-  await storage?.removeItem(STORAGE_KEY);
+  await deleteSecureItem(STORAGE_KEY, STORAGE_LEGACY_KEYS);
 }
 
 export type PhoneOtpChannel = 'firebase';

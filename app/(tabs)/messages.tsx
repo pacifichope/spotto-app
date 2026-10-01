@@ -196,15 +196,25 @@ export default function MessagesScreen() {
         contentContainerStyle={
           rows.length === 0 ? styles.emptyWrap : styles.list
         }
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        removeClippedSubviews
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <EmptyStateIcon>
               <ChatIcon size={28} color={theme.colors.iconEmpty} />
             </EmptyStateIcon>
-            <Text style={styles.emptyTitle}>まだトークはありません</Text>
+            <Text style={styles.emptyTitle}>
+              {currentUserId
+                ? 'まだトークはありません'
+                : 'ログインするとトークが表示されます'}
+            </Text>
             <Text style={styles.emptyBody}>
-              イベントに参加するか、主催者にメッセージを送ると、ここにトークルームが表示されます。
+              {currentUserId
+                ? 'イベントに参加するか、主催者にメッセージを送ると、ここにトークルームが表示されます。'
+                : '参加中・主催中のイベントのメッセージは、ログイン後にここに表示されます。'}
             </Text>
           </View>
         }

@@ -220,7 +220,10 @@ function hostedIdsFromEvents(
 
 export function EventsProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
-  const [events, setEvents] = useState<SportEvent[]>(SAMPLE_EVENTS);
+  // 本番は空配列スタート（リモート取得までサンプルを出さない）
+  const [events, setEvents] = useState<SportEvent[]>(() =>
+    __DEV__ ? SAMPLE_EVENTS.slice() : [],
+  );
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
   const [hostedIds, setHostedIds] = useState<Set<string>>(() => new Set());
   const [eventPayments, setEventPayments] = useState<
@@ -469,8 +472,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       joinedRef.current = new Set();
       setJoinedIds(new Set());
 
-      eventsRef.current = SAMPLE_EVENTS.slice();
-      setEvents(SAMPLE_EVENTS.slice());
+      eventsRef.current = __DEV__ ? SAMPLE_EVENTS.slice() : [];
+      setEvents(__DEV__ ? SAMPLE_EVENTS.slice() : []);
       hydrateDoneRef.current = true;
 
       if (isSupabaseConfigured()) {
@@ -1303,7 +1306,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   const resetAccountData = useCallback(() => {
     const previousUserId = currentUserIdRef.current;
-    const nextEvents = SAMPLE_EVENTS.slice();
+    const nextEvents = __DEV__ ? SAMPLE_EVENTS.slice() : [];
     const nextJoined = new Set<string>();
     const nextFavorites = new Set<string>();
     const nextHosted = new Set<string>();

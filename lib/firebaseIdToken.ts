@@ -58,6 +58,16 @@ export async function getFirebaseIdToken(
     if (__DEV__) {
       console.warn('[auth] getFirebaseIdToken', error);
     }
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      /user-token-expired|auth\/user-token-expired|auth\/invalid-user-token|auth\/user-disabled/i.test(
+        message,
+      )
+    ) {
+      void import('@/lib/sessionExpiry').then((m) =>
+        m.notifySessionExpired(message),
+      );
+    }
     return null;
   }
 }

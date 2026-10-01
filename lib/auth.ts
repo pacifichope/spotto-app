@@ -2,6 +2,11 @@ import {
   authenticateSocial,
   isSocialConfigured,
 } from '@/lib/socialAuth';
+import {
+  deleteSecureItem,
+  getSecureItem,
+  setSecureItem,
+} from '@/lib/secureStorage';
 import { deleteRemoteSupabaseAccount } from '@/lib/supabaseAccountDeletion';
 
 export type SocialProvider = 'line' | 'google' | 'apple';
@@ -31,8 +36,11 @@ type StoredAccount = AuthUser & {
   password: string;
 };
 
-const SESSION_KEY = '@spotto/auth-session';
-const ACCOUNTS_KEY = '@spotto/auth-accounts';
+/** SecureStore 用（`/` `@` 不可）。旧 AsyncStorage キーは移行時に読む */
+const SESSION_KEY = 'spotto.auth-session';
+const SESSION_LEGACY_KEYS = ['@spotto/auth-session'];
+const ACCOUNTS_KEY = 'spotto.auth-accounts';
+const ACCOUNTS_LEGACY_KEYS = ['@spotto/auth-accounts'];
 
 export const AUTH_REASON_COPY: Record<
   AuthReason,
@@ -68,28 +76,13 @@ export const AUTH_REASON_COPY: Record<
   },
 };
 
-type AsyncStorageType =
-  typeof import('@react-native-async-storage/async-storage').default;
-
-function getAsyncStorage(): AsyncStorageType | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@react-native-async-storage/async-storage')
-      .default as AsyncStorageType;
-  } catch {
-    return null;
-  }
-}
-
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
 async function readAccounts(): Promise<StoredAccount[]> {
-  const storage = getAsyncStorage();
-  if (!storage) return [];
   try {
-    const raw = await storage.getItem(ACCOUNTS_KEY);
+    const raw = await getSecureItem(ACCOUNTS_KEY, ACCOUNTS_LEGACY_KEYS);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -108,8 +101,11 @@ async function readAccounts(): Promise<StoredAccount[]> {
 }
 
 async function writeAccounts(accounts: StoredAccount[]) {
-  const storage = getAsyncStorage();
-  await storage?.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  await setSecureItem(
+    ACCOUNTS_KEY,
+    JSON.stringify(accounts),
+    ACCOUNTS_LEGACY_KEYS,
+  );
 }
 
 export function toPublicUser(account: StoredAccount): AuthUser {
@@ -123,10 +119,8 @@ export function toPublicUser(account: StoredAccount): AuthUser {
 }
 
 export async function loadAuthSession(): Promise<AuthUser | null> {
-  const storage = getAsyncStorage();
-  if (!storage) return null;
   try {
-    const raw = await storage.getItem(SESSION_KEY);
+    const raw = await getSecureItem(SESSION_KEY, SESSION_LEGACY_KEYS);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<AuthUser>;
     if (
@@ -156,13 +150,11 @@ export async function loadAuthSession(): Promise<AuthUser | null> {
 }
 
 export async function saveAuthSession(user: AuthUser | null) {
-  const storage = getAsyncStorage();
-  if (!storage) return;
   if (!user) {
-    await storage.removeItem(SESSION_KEY);
+    await deleteSecureItem(SESSION_KEY, SESSION_LEGACY_KEYS);
     return;
   }
-  await storage.setItem(SESSION_KEY, JSON.stringify(user));
+  await setSecureItem(SESSION_KEY, JSON.stringify(user), SESSION_LEGACY_KEYS);
 }
 
 export function loginMethodLabel(provider?: AuthUser['provider']) {

@@ -221,6 +221,11 @@ export async function createPaymentSession(
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      void import('@/lib/sessionExpiry').then((m) =>
+        m.notifySessionExpired(`payments:${response.status}`),
+      );
+    }
     let detail = '';
     try {
       const payload = JSON.parse(responseText) as { error?: string };
