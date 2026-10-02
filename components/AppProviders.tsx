@@ -11,6 +11,7 @@ import { ClubsProvider } from '@/lib/clubsContext';
 import { CreateEventAccessProvider } from '@/lib/createEventAccessContext';
 import { EventsProvider } from '@/lib/eventsContext';
 import { PhoneVerificationProvider } from '@/lib/phoneVerificationContext';
+import { HomeBrowseProvider } from '@/lib/homeBrowseContext';
 import { UserProfileProvider } from '@/lib/userProfileContext';
 
 export default function AppProviders({ children }: { children: ReactNode }) {
@@ -23,9 +24,11 @@ export default function AppProviders({ children }: { children: ReactNode }) {
               <ChatsProvider>
                 <AuthProvider>
                   <PhoneVerificationProvider>
-                    <CreateEventAccessProvider>
-                      {children}
-                    </CreateEventAccessProvider>
+                    <HomeBrowseProvider>
+                      <CreateEventAccessProvider>
+                        {children}
+                      </CreateEventAccessProvider>
+                    </HomeBrowseProvider>
                   </PhoneVerificationProvider>
                 </AuthProvider>
               </ChatsProvider>

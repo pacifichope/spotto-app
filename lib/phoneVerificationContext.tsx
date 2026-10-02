@@ -68,9 +68,29 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
   }, [user?.id]);
 
   useEffect(() => {
+    let cancelled = false;
     setIsReady(false);
-    void refreshPhoneVerification();
-  }, [refreshPhoneVerification, isLoggedIn]);
+    void (async () => {
+      try {
+        if (!user?.id) {
+          if (!cancelled) {
+            setRecord(null);
+            setIsReady(true);
+          }
+          return;
+        }
+        const next = await loadPhoneVerification(user.id);
+        if (cancelled) return;
+        setRecord(next);
+        setIsReady(true);
+      } catch {
+        if (!cancelled) setIsReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isLoggedIn]);
 
   const clearLocalPhoneVerification = useCallback(async () => {
     await clearPhoneVerification();

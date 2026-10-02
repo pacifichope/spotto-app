@@ -609,6 +609,65 @@ export function filterEventsByArea(
   }
 }
 
+/**
+ * マップ表示範囲（リージョン）内のイベント。
+ * リストとマップの地理コンテキストを一致させるために使う。
+ */
+export function filterEventsByMapRegion(
+  events: SportEvent[] | null | undefined,
+  region?: MapRegion | null,
+  options?: { padRatio?: number },
+): SportEvent[] {
+  const source = Array.isArray(events) ? events : [];
+  if (source.length === 0) return [];
+  if (
+    !region ||
+    !Number.isFinite(region.latitude) ||
+    !Number.isFinite(region.longitude) ||
+    !Number.isFinite(region.latitudeDelta) ||
+    !Number.isFinite(region.longitudeDelta)
+  ) {
+    return source;
+  }
+
+  const pad = Math.max(0, options?.padRatio ?? 0.1);
+  const latHalf = Math.max(region.latitudeDelta, 0.01) * (0.5 + pad * 0.5);
+  const lngHalf = Math.max(region.longitudeDelta, 0.01) * (0.5 + pad * 0.5);
+  const minLat = region.latitude - latHalf;
+  const maxLat = region.latitude + latHalf;
+  const minLng = region.longitude - lngHalf;
+  const maxLng = region.longitude + lngHalf;
+
+  return source.filter((event) => {
+    if (
+      !Number.isFinite(event?.latitude) ||
+      !Number.isFinite(event?.longitude)
+    ) {
+      return false;
+    }
+    return (
+      event.latitude >= minLat &&
+      event.latitude <= maxLat &&
+      event.longitude >= minLng &&
+      event.longitude <= maxLng
+    );
+  });
+}
+
+/** マップ中心から表示用のエリア名（パン後のリストヘッダー用） */
+export function labelForMapRegion(region?: MapRegion | null): string | null {
+  if (
+    !region ||
+    !Number.isFinite(region.latitude) ||
+    !Number.isFinite(region.longitude)
+  ) {
+    return null;
+  }
+  const prefectureId = nearestPrefectureId(region.latitude, region.longitude);
+  if (!prefectureId) return null;
+  return getPrefectureById(prefectureId).shortLabel;
+}
+
 /** @deprecated filterEventsByArea を使ってください */
 export function filterEventsBySelection(
   events: SportEvent[] | null | undefined,

@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCHEME="${IOS_SCHEME:-spotto}"
-BUNDLE_ID="${IOS_BUNDLE_ID:-com.spotto.app}"
+BUNDLE_ID="${IOS_BUNDLE_ID:-com.taiki.spotto}"
 SIM_NAME="${IOS_SIMULATOR:-iPhone 17}"
 DERIVED="$ROOT/ios/build/DerivedData"
 APP="$DERIVED/Build/Products/Debug-iphonesimulator/${SCHEME}.app"

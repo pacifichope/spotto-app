@@ -2,9 +2,7 @@
  * Supabase Third-Party Auth 用: Firebase JWT に role=authenticated を付与。
  * サインイン直後・起動時・DB アクセス前に呼び、成功後は ID トークンを force refresh する。
  */
-import { Platform } from 'react-native';
-
-import { getApiBaseUrl } from '@/lib/env';
+import { getApiBaseUrl, listApiBaseUrlCandidates } from '@/lib/env';
 import {
   firebaseJwtHasAuthenticatedRole,
   getFirebaseIdToken,
@@ -15,13 +13,7 @@ let inFlight: Promise<boolean> | null = null;
 let lastOkAt = 0;
 
 function candidateApiBases(primary: string): string[] {
-  const bases = [primary.replace(/\/$/, '')].filter(Boolean);
-  // Android 実機: LAN IP 不通時は adb reverse の localhost を試す
-  if (Platform.OS === 'android' && __DEV__) {
-    const local = 'http://localhost:8787';
-    if (!bases.includes(local)) bases.push(local);
-  }
-  return bases;
+  return listApiBaseUrlCandidates(primary);
 }
 
 function isConnectionError(error: unknown): boolean {
@@ -33,8 +25,10 @@ function isConnectionError(error: unknown): boolean {
     msg.includes('network') ||
     msg.includes('failed to fetch') ||
     msg.includes('econnrefused') ||
+    msg.includes('enotfound') ||
     msg.includes('timed out') ||
-    msg.includes('timeout')
+    msg.includes('timeout') ||
+    msg.includes('unreachable')
   );
 }
 

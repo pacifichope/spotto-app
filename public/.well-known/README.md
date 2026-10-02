@@ -17,7 +17,7 @@
 
 1. **Apple Team ID**  
    `apple-app-site-association` 内の `APPLE_TEAM_ID` を Apple Developer の Team ID に置換  
-   （例: `AB12CD34EF.com.spotto.app`）
+   （例: `AB12CD34EF.com.taiki.spotto`）
 
 2. **Android SHA-256**  
    `assetlinks.json` の指紋を置換  
@@ -44,7 +44,7 @@ npx uri-scheme open "spotto://event/demo-id" --ios
 # App Links（実機・検証済みドメイン）
 adb shell am start -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
-  -d "https://spotto.fun/event/demo-id" com.spotto.app
+  -d "https://spotto.fun/event/demo-id" com.taiki.spotto
 ```
 
 設定変更後は **ネイティブ再ビルド**（`eas build` / `npx expo prebuild`）が必要です。

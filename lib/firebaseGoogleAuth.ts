@@ -120,11 +120,19 @@ function mapGoogleError(error: unknown): FirebaseGoogleSignInResult {
       blob,
     )
   ) {
-    if (__DEV__) {
-      console.warn(
-        '[auth] Google DEVELOPER_ERROR: webClientId / SHA-1 / package を google-services.json と揃えてください。',
-      );
-    }
+    const webClientId = googleWebClientId();
+    console.warn(
+      '[auth] Google DEVELOPER_ERROR (code 10): OAuth クライアント設定不一致です。\n' +
+        '  1) EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID は google-services.json の client_type=3（Web）と同一か\n' +
+        '  2) Android / iOS の package・Bundle ID は com.taiki.spotto か\n' +
+        '  3) 署名 SHA-1（debug / EAS release / Play App Signing）を Firebase Android アプリに登録したか\n' +
+        '  → npm run check:firebase および docs/AUTH_TROUBLESHOOTING.md を参照\n' +
+        `  webClientIdPrefix=${webClientId ? webClientId.split('-')[0] : '(unset)'} code=${code}`,
+    );
+    return {
+      ok: false,
+      error: SOCIAL_LOGIN_USER_ERRORS.googleConfig,
+    };
   }
   return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.google };
 }

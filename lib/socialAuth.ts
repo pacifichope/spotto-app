@@ -18,7 +18,7 @@ export type SocialAuthResult =
   | { ok: false; error: string; cancelled?: boolean };
 
 const APP_SCHEME = 'spotto';
-const NATIVE_APP_ID = 'com.spotto.app';
+const NATIVE_APP_ID = 'com.taiki.spotto';
 
 const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',

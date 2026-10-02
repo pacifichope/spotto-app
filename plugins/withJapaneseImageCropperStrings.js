@@ -6,7 +6,7 @@ const {
   AndroidConfig,
   withStringsXml,
   createRunOncePlugin,
-} = require('@expo/config-plugins');
+} = require('expo/config-plugins');
 
 const CROP_STRINGS = [
   { name: 'crop_image_menu_crop', value: '切り抜き' },

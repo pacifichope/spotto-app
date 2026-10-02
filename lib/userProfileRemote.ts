@@ -78,12 +78,12 @@ export function remoteRowToProfile(
 }
 
 /** サインイン直後など、Firebase セッションがまだ載っていないことがあるので短く待つ */
-async function waitForAuthUser(userId: string, attempts = 8): Promise<boolean> {
+async function waitForAuthUser(userId: string, attempts = 4): Promise<boolean> {
   const { getCurrentFirebaseUid } = await import('@/lib/currentUser');
   for (let i = 0; i < attempts; i += 1) {
     const uid = await getCurrentFirebaseUid();
     if (uid === userId) return true;
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
   return false;
 }

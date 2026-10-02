@@ -7,6 +7,8 @@ export type MapPointCluster = {
   event: SportEvent;
   latitude: number;
   longitude: number;
+  /** 広域ズーム時は小さなドット */
+  appearance?: 'full' | 'dot';
 };
 
 export type MapGroupCluster = {
@@ -22,14 +24,30 @@ export type MapClusterItem = MapPointCluster | MapGroupCluster;
 
 /**
  * これ以下の latitudeDelta ではクラスタを作らず個別ピンのみ。
+ * （おおよそ数 km 四方＝街〜街区ズームでバッジを消す）
  */
-export const CLUSTER_DISABLE_LAT_DELTA = 0.028;
+export const CLUSTER_DISABLE_LAT_DELTA = 0.06;
+
+/** これ以上のズームでは必ず個別ピン（lngDelta ベース） */
+export const CLUSTER_DISABLE_ZOOM = 13;
+
+/**
+ * これ以上の latitudeDelta（広域〜全国）では個別ピンを出さずクラスタのみ。
+ * 日本列島が見えるスケールでもピンとバッジが重ならないようにする。
+ */
+export const CLUSTER_HIDE_SINGLETON_LAT_DELTA = 1.0;
+
+/** これ以上で「地方スケール」：単独はドット、近傍はクラスタ優先 */
+export const CLUSTER_DOT_LAT_DELTA = 0.45;
 
 /** 画面座標でのクラスタ半径（ビューポート短辺に対する割合） */
 const CLUSTER_RADIUS_RATIO = 0.075;
 
 /** クラスタタップ後、現在ズームの何割まで必ず寄せるか */
 const CLUSTER_TAP_ZOOM_FACTOR = 0.48;
+
+/** 広域で孤立点を近傍クラスタへ吸収する画面距離 */
+const SINGLETON_ABSORB_RADIUS = 0.12;
 
 type ProjectedPoint = {
   event: SportEvent;
@@ -49,6 +67,13 @@ function validCoord(event: SportEvent): { lat: number; lng: number } | null {
 export function zoomLevelFromRegion(region: MapCameraRegion): number {
   const lngDelta = Math.max(Number(region.longitudeDelta) || 0.1, 0.0001);
   return Math.log2(360 / lngDelta);
+}
+
+/** 個別ピンを出さない広域ズームか（クラスタのみ） */
+export function isClusterOnlyZoom(region: MapCameraRegion): boolean {
+  const latDelta = Math.max(Number(region.latitudeDelta) || 0.1, 0.0001);
+  const zoom = zoomLevelFromRegion(region);
+  return latDelta >= CLUSTER_HIDE_SINGLETON_LAT_DELTA || zoom < 8;
 }
 
 function projectToViewport(
@@ -112,13 +137,145 @@ function clusterByScreenOverlap(
   return [...groups.values()];
 }
 
-function toPointItem(p: ProjectedPoint): MapPointCluster {
+/** 緯度経度グリッドで近傍イベントをまとめる（広域ズーム用） */
+function clusterByGeoGrid(
+  points: ProjectedPoint[],
+  cellDeg: number,
+): ProjectedPoint[][] {
+  if (points.length === 0) return [];
+  const cell = Math.max(cellDeg, 0.05);
+  const groups = new Map<string, ProjectedPoint[]>();
+  for (const point of points) {
+    const key = `${Math.floor(point.lat / cell)}:${Math.floor(point.lng / cell)}`;
+    const list = groups.get(key);
+    if (list) list.push(point);
+    else groups.set(key, [point]);
+  }
+  return [...groups.values()];
+}
+
+function groupCentroid(group: ProjectedPoint[]) {
+  let x = 0;
+  let y = 0;
+  for (const p of group) {
+    x += p.x;
+    y += p.y;
+  }
+  const n = Math.max(group.length, 1);
+  return { x: x / n, y: y / n };
+}
+
+/**
+ * 孤立点を画面上の近傍クラスタへ吸収。
+ * 広域で「クラスタの上に単独ピン」が乗るのを防ぐ。
+ */
+function absorbSingletonsIntoClusters(
+  groups: ProjectedPoint[][],
+  absorbRadius: number,
+  hideUnabsorbed: boolean,
+): ProjectedPoint[][] {
+  const multis = groups.filter((g) => g.length >= 2).map((g) => [...g]);
+  const singles = groups.filter((g) => g.length === 1);
+  if (singles.length === 0) return multis.length > 0 ? multis : groups;
+
+  if (multis.length === 0) {
+    return hideUnabsorbed ? [] : singles;
+  }
+
+  const r2 = absorbRadius * absorbRadius;
+  const leftover: ProjectedPoint[][] = [];
+
+  for (const solo of singles) {
+    const p = solo[0];
+    if (!p) continue;
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < multis.length; i += 1) {
+      const c = groupCentroid(multis[i]!);
+      const dx = p.x - c.x;
+      const dy = p.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= r2 && d2 < bestDist) {
+        bestDist = d2;
+        bestIdx = i;
+      }
+    }
+    if (bestIdx >= 0) {
+      multis[bestIdx]!.push(p);
+    } else if (!hideUnabsorbed) {
+      leftover.push(solo);
+    }
+  }
+
+  return [...multis, ...leftover];
+}
+
+/**
+ * 画面上で近接したクラスタ同士を再結合（グリッド境界の割れ対策）
+ */
+function mergeNearbyGroups(
+  groups: ProjectedPoint[][],
+  radius: number,
+): ProjectedPoint[][] {
+  const n = groups.length;
+  if (n <= 1) return groups;
+
+  const centroids = groups.map((g) => groupCentroid(g));
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (i: number): number => {
+    let p = i;
+    while (parent[p] !== p) p = parent[p]!;
+    let cur = i;
+    while (parent[cur] !== cur) {
+      const next = parent[cur]!;
+      parent[cur] = p;
+      cur = next;
+    }
+    return p;
+  };
+  const unite = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[rb] = ra;
+  };
+
+  const r2 = radius * radius;
+  for (let i = 0; i < n; i += 1) {
+    const a = centroids[i]!;
+    for (let j = i + 1; j < n; j += 1) {
+      const b = centroids[j]!;
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      if (dx * dx + dy * dy <= r2) unite(i, j);
+    }
+  }
+
+  const buckets = new Map<number, ProjectedPoint[]>();
+  for (let i = 0; i < n; i += 1) {
+    const root = find(i);
+    const list = buckets.get(root) ?? [];
+    const seen = new Set(list.map((p) => p.event.id));
+    for (const p of groups[i]!) {
+      if (seen.has(p.event.id)) continue;
+      seen.add(p.event.id);
+      list.push(p);
+    }
+    buckets.set(root, list);
+  }
+  return [...buckets.values()];
+}
+
+function toPointItem(
+  p: ProjectedPoint,
+  appearance: 'full' | 'dot' = 'full',
+): MapPointCluster {
   return {
     type: 'point',
     id: `point:${p.event.id}`,
     event: p.event,
     latitude: p.lat,
     longitude: p.lng,
+    appearance,
   };
 }
 
@@ -146,12 +303,13 @@ function toClusterItem(group: ProjectedPoint[]): MapGroupCluster {
 
 /**
  * 同じイベントが point と cluster の両方に出ないよう排他する。
- * - 先に point になった event.id を記録
- * - cluster にその id が含まれる場合はクラスタを解体して point へ展開
+ * preferClusters: 広域時はポイントよりクラスタを優先（重なりでクラスタを解体しない）
  */
 export function enforceExclusiveClusterItems(
   items: MapClusterItem[],
+  options?: { preferClusters?: boolean },
 ): MapClusterItem[] {
+  const preferClusters = Boolean(options?.preferClusters);
   const pointIds = new Set<string>();
   for (const item of items) {
     if (item.type === 'point') pointIds.add(item.event.id);
@@ -159,6 +317,52 @@ export function enforceExclusiveClusterItems(
 
   const out: MapClusterItem[] = [];
   const emittedPointIds = new Set<string>();
+  const emittedInCluster = new Set<string>();
+
+  if (preferClusters) {
+    for (const item of items) {
+      if (item.type !== 'cluster') continue;
+      const uniqueEvents: SportEvent[] = [];
+      const seen = new Set<string>();
+      for (const event of item.events) {
+        if (seen.has(event.id) || emittedInCluster.has(event.id)) continue;
+        seen.add(event.id);
+        uniqueEvents.push(event);
+      }
+      if (uniqueEvents.length <= 1) {
+        continue;
+      }
+      for (const event of uniqueEvents) emittedInCluster.add(event.id);
+      const ids = uniqueEvents.map((e) => e.id).sort();
+      let sumLat = 0;
+      let sumLng = 0;
+      let n = 0;
+      for (const event of uniqueEvents) {
+        const coord = validCoord(event);
+        if (!coord) continue;
+        sumLat += coord.lat;
+        sumLng += coord.lng;
+        n += 1;
+      }
+      if (n === 0) continue;
+      out.push({
+        type: 'cluster',
+        id: `cluster:${ids.join('+')}`,
+        latitude: sumLat / n,
+        longitude: sumLng / n,
+        count: uniqueEvents.length,
+        events: uniqueEvents,
+      });
+    }
+    for (const item of items) {
+      if (item.type !== 'point') continue;
+      if (emittedInCluster.has(item.event.id)) continue;
+      if (emittedPointIds.has(item.event.id)) continue;
+      emittedPointIds.add(item.event.id);
+      out.push(item);
+    }
+    return out;
+  }
 
   for (const item of items) {
     if (item.type === 'point') {
@@ -170,7 +374,6 @@ export function enforceExclusiveClusterItems(
 
     const overlapsPoint = item.events.some((e) => pointIds.has(e.id));
     if (overlapsPoint) {
-      // 親クラスタは捨て、未出力のメンバーだけ個別ピンに
       for (const event of item.events) {
         if (emittedPointIds.has(event.id)) continue;
         const coord = validCoord(event);
@@ -182,12 +385,12 @@ export function enforceExclusiveClusterItems(
           event,
           latitude: coord.lat,
           longitude: coord.lng,
+          appearance: 'full',
         });
       }
       continue;
     }
 
-    // クラスタ内の重複 id も排除
     const uniqueEvents: SportEvent[] = [];
     const seen = new Set<string>();
     for (const event of item.events) {
@@ -207,6 +410,7 @@ export function enforceExclusiveClusterItems(
         event,
         latitude: coord.lat,
         longitude: coord.lng,
+        appearance: 'full',
       });
       continue;
     }
@@ -244,7 +448,12 @@ export type ClusterEventsOptions = {
 
 /**
  * 表示領域に応じてクラスタ / 個別ピンを返す。
- * 同一イベントが両方に出ることはない（forcePointIds・排他処理込み）。
+ *
+ * ルール:
+ * - 十分ズームイン → すべて個別スポーツピン
+ * - 広域（日本列島スケール等）→ クラスタのみ（個別ピンなし）
+ * - 中間 → 画面／グリッドでまとめ、単独はドット
+ * - 同一イベントがクラスタと個別ピンの両方に出ることはない
  */
 export function clusterEventsForRegion(
   events: SportEvent[],
@@ -254,8 +463,8 @@ export function clusterEventsForRegion(
   const list = Array.isArray(events) ? events : [];
   const latDelta = Math.max(Number(region.latitudeDelta) || 0.1, 0.0001);
   const forcePointIds = options?.forcePointIds ?? null;
+  const zoom = zoomLevelFromRegion(region);
 
-  // 同一 id の重複イベントは先勝ちで除外
   const seenIds = new Set<string>();
   const projected: ProjectedPoint[] = [];
   const forced: ProjectedPoint[] = [];
@@ -266,7 +475,7 @@ export function clusterEventsForRegion(
     const coord = validCoord(event);
     if (!coord) continue;
     const { x, y } = projectToViewport(coord.lat, coord.lng, region);
-    if (x < -0.2 || x > 1.2 || y < -0.2 || y > 1.2) continue;
+    if (x < -0.15 || x > 1.15 || y < -0.15 || y > 1.15) continue;
     const point: ProjectedPoint = {
       event,
       lat: coord.lat,
@@ -280,28 +489,74 @@ export function clusterEventsForRegion(
 
   const items: MapClusterItem[] = [];
 
-  // 強制個別ピンは常に point
-  for (const p of forced) items.push(toPointItem(p));
-
-  if (latDelta <= CLUSTER_DISABLE_LAT_DELTA) {
-    for (const p of projected) items.push(toPointItem(p));
+  // 十分ズームイン: クラスタなし・個別ピンのみ
+  if (latDelta <= CLUSTER_DISABLE_LAT_DELTA || zoom >= CLUSTER_DISABLE_ZOOM) {
+    for (const p of forced) items.push(toPointItem(p, 'full'));
+    for (const p of projected) items.push(toPointItem(p, 'full'));
     return enforceExclusiveClusterItems(items);
   }
 
-  const zoom = zoomLevelFromRegion(region);
-  const radius =
-    CLUSTER_RADIUS_RATIO * (zoom >= 12 ? 0.85 : zoom >= 10 ? 0.95 : 1.05);
+  const clusterOnly = isClusterOnlyZoom(region);
+  const regional =
+    !clusterOnly && (latDelta >= CLUSTER_DOT_LAT_DELTA || zoom < 10);
 
-  const groups = clusterByScreenOverlap(projected, radius);
-  for (const group of groups) {
-    if (group.length === 1) {
-      items.push(toPointItem(group[0]!));
-    } else {
-      items.push(toClusterItem(group));
-    }
+  // 広域では展開ピンも出さない（クラスタの上にスポーツピンが乗るのを防ぐ）
+  if (!clusterOnly) {
+    for (const p of forced) items.push(toPointItem(p, 'full'));
+  } else {
+    for (const p of forced) projected.push(p);
   }
 
-  return enforceExclusiveClusterItems(items);
+  const radius =
+    CLUSTER_RADIUS_RATIO *
+    (clusterOnly
+      ? 1.85
+      : regional
+        ? 1.35
+        : zoom >= 12
+          ? 0.45
+          : zoom >= 11
+            ? 0.65
+            : zoom >= 10
+              ? 0.9
+              : 1.1);
+
+  let groups: ProjectedPoint[][];
+  if (clusterOnly) {
+    const cellDeg = latDelta >= 4 ? 1.8 : latDelta >= 2 ? 1.2 : 0.85;
+    groups = clusterByGeoGrid(projected, cellDeg);
+    groups = mergeNearbyGroups(groups, radius);
+    groups = absorbSingletonsIntoClusters(
+      groups,
+      SINGLETON_ABSORB_RADIUS,
+      true,
+    );
+  } else if (regional) {
+    groups = clusterByGeoGrid(projected, zoom < 9 ? 0.4 : 0.22);
+    groups = mergeNearbyGroups(groups, radius * 0.9);
+    groups = absorbSingletonsIntoClusters(
+      groups,
+      SINGLETON_ABSORB_RADIUS * 0.85,
+      false,
+    );
+  } else {
+    groups = clusterByScreenOverlap(projected, radius);
+  }
+
+  for (const group of groups) {
+    if (group.length <= 1) {
+      const alone = group[0];
+      if (!alone) continue;
+      if (clusterOnly) continue;
+      items.push(toPointItem(alone, regional ? 'dot' : 'full'));
+      continue;
+    }
+    items.push(toClusterItem(group));
+  }
+
+  return enforceExclusiveClusterItems(items, {
+    preferClusters: clusterOnly || regional,
+  });
 }
 
 function allStillOneCluster(

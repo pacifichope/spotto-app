@@ -13,7 +13,8 @@
  * 2. 推奨設定
  *    - スコープは必要最小限（`profile` + `openid`）。`email` は審査・再同意の原因になりやすい
  *    - 友だち追加プロンプトが不要なら、チャネルの「友だち追加オプション」をオフ／コードで botPrompt を渡さない
- *    - iOS Bundle ID / Android パッケージはアプリと一致させる（本アプリは com.spotto.app）
+ *    - iOS Bundle ID / Android パッケージ: com.taiki.spotto
+ *    - iOS / Android URL scheme: line3rdp.com.taiki.spotto
  *    - Web の Callback URL は origin と一致させる
  * 3. セッション
  *    - アプリのログイン状態は Firebase Auth 永続化が本体。起動時は Firebase 復元で自動ログイン
@@ -25,7 +26,13 @@ import '@/lib/firebaseNativeInit';
 import { Platform } from 'react-native';
 
 import type { AuthUser } from '@/lib/auth';
-import { getApiBaseUrl, readPublicEnv } from '@/lib/env';
+import {
+  getApiBaseUrl,
+  isApiConnectionError,
+  listApiBaseUrlCandidates,
+  publicApiUrl,
+  readPublicEnv,
+} from '@/lib/env';
 import {
   authUserFromFirebaseUser,
   loadFirebaseAuthUser,
@@ -37,6 +44,7 @@ import {
   isNativeFirebaseLinked,
 } from '@/lib/firebaseNativeInit';
 import { SOCIAL_LOGIN_USER_ERRORS } from '@/lib/socialLoginErrors';
+import { probeSpottoApiBase } from '@/lib/spottoApiHealth';
 
 export type FirebaseLineSignInResult =
   | { ok: true; user: AuthUser }
@@ -67,9 +75,144 @@ function lineChannelId() {
 }
 
 function authApiBaseUrl() {
+  // AUTH 専用 → API ベース（開発時は LAN 置換、本番はそのまま）
   return (
-    readPublicEnv('EXPO_PUBLIC_AUTH_API_URL') || getApiBaseUrl()
+    publicApiUrl('', 'EXPO_PUBLIC_AUTH_API_URL') || getApiBaseUrl()
   ).replace(/\/$/, '');
+}
+
+async function postLineFirebaseExchange(
+  apiBase: string,
+  params: { accessToken: string; idToken?: string | null },
+): Promise<
+  | {
+      ok: true;
+      customToken: string;
+      uid: string;
+      profile: { name?: string; email?: string; imageUri?: string };
+    }
+  | { ok: false; error: string; retryable?: boolean }
+> {
+  const endpoint = `${apiBase.replace(/\/$/, '')}/auth/line-firebase`;
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        accessToken: params.accessToken,
+        idToken: params.idToken || undefined,
+      }),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      customToken?: string;
+      uid?: string;
+      profile?: { name?: string; email?: string; imageUri?: string };
+      error?: string;
+      message?: string;
+    };
+    if (!response.ok || !data.customToken) {
+      const isNotFound = response.status === 404;
+      console.error('[auth] /auth/line-firebase failed', {
+        status: response.status,
+        error: data.error || data.message,
+        apiBase,
+        endpoint,
+        hint: isNotFound
+          ? 'Render 上の API が古い／別サービスです。server/ を再デプロイし GET /health の service が spotto-api か確認してください。'
+          : undefined,
+      });
+      return {
+        ok: false,
+        error:
+          response.status === 503
+            ? '認証サーバーの Firebase Admin 設定を確認してください。'
+            : isNotFound
+              ? SOCIAL_LOGIN_USER_ERRORS.lineApiMissing
+              : SOCIAL_LOGIN_USER_ERRORS.line,
+        // 404=別ホスト／未デプロイの可能性 → 他 base を試す / 5xx も再試行
+        retryable:
+          isNotFound || response.status >= 500 || response.status === 0,
+      };
+    }
+    return {
+      ok: true,
+      customToken: data.customToken,
+      uid: data.uid || '',
+      profile: data.profile || {},
+    };
+  } catch (error) {
+    console.error('[auth] /auth/line-firebase network', {
+      apiBase,
+      endpoint,
+      error,
+    });
+    return {
+      ok: false,
+      error: SOCIAL_LOGIN_USER_ERRORS.line,
+      retryable: isApiConnectionError(error),
+    };
+  }
+}
+
+async function exchangeLineForFirebaseCustomToken(params: {
+  accessToken: string;
+  idToken?: string | null;
+}): Promise<
+  | {
+      ok: true;
+      customToken: string;
+      uid: string;
+      profile: { name?: string; email?: string; imageUri?: string };
+    }
+  | { ok: false; error: string }
+> {
+  const candidates = listApiBaseUrlCandidates(authApiBaseUrl());
+  if (candidates.length === 0) {
+    if (__DEV__) {
+      console.warn(
+        '[auth] LINE: 公開 API URL がありません。EXPO_PUBLIC_API_BASE_URL_REMOTE を設定してください。',
+      );
+    }
+    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
+  }
+
+  let lastError = SOCIAL_LOGIN_USER_ERRORS.line;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const apiBase = candidates[i]!;
+    if (__DEV__) {
+      console.log('[auth] LINE → Firebase exchange', {
+        apiBase,
+        attempt: i + 1,
+        of: candidates.length,
+      });
+    }
+
+    // 別サービスの 404 を避けるため、可能なら health で spotto-api を確認
+    const probe = await probeSpottoApiBase(apiBase);
+    if (!probe.ok) {
+      console.warn('[auth] LINE API probe skipped / failed', {
+        apiBase,
+        reason: probe.reason,
+        service: probe.health?.service,
+      });
+      // probe 失敗でも POST を試し、404 なら次候補へ
+      if (probe.reason === 'not-spotto-api') {
+        lastError = SOCIAL_LOGIN_USER_ERRORS.lineApiMissing;
+        continue;
+      }
+    }
+
+    const result = await postLineFirebaseExchange(apiBase, params);
+    if (result.ok) return result;
+    lastError = result.error;
+    // 接続失敗・404 のみ次の候補へ（その他 4xx は打ち切り）
+    if (!result.retryable) break;
+  }
+
+  return { ok: false, error: lastError };
 }
 
 function loadLineSdk() {
@@ -238,72 +381,6 @@ async function resolveCachedLineAccessToken(
     // 未ログイン or トークンなし
   }
   return null;
-}
-
-async function exchangeLineForFirebaseCustomToken(params: {
-  accessToken: string;
-  idToken?: string | null;
-}): Promise<
-  | {
-      ok: true;
-      customToken: string;
-      uid: string;
-      profile: { name?: string; email?: string; imageUri?: string };
-    }
-  | { ok: false; error: string }
-> {
-  const apiBase = authApiBaseUrl();
-  if (!apiBase) {
-    if (__DEV__) {
-      console.warn(
-        '[auth] LINE: EXPO_PUBLIC_API_BASE_URL（または AUTH_API_URL）が未設定です',
-      );
-    }
-    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
-  }
-
-  try {
-    const response = await fetch(`${apiBase}/auth/line-firebase`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        accessToken: params.accessToken,
-        idToken: params.idToken || undefined,
-      }),
-    });
-    const data = (await response.json().catch(() => ({}))) as {
-      customToken?: string;
-      uid?: string;
-      profile?: { name?: string; email?: string; imageUri?: string };
-      error?: string;
-    };
-    if (!response.ok || !data.customToken) {
-      console.error('[auth] /auth/line-firebase failed', {
-        status: response.status,
-        error: data.error,
-        apiBase,
-      });
-      return {
-        ok: false,
-        error:
-          response.status === 503
-            ? '認証サーバーの Firebase Admin 設定を確認してください。'
-            : SOCIAL_LOGIN_USER_ERRORS.line,
-      };
-    }
-    return {
-      ok: true,
-      customToken: data.customToken,
-      uid: data.uid || '',
-      profile: data.profile || {},
-    };
-  } catch (error) {
-    console.error('[auth] /auth/line-firebase network', error);
-    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
-  }
 }
 
 async function signInWithCustomTokenCrossPlatform(

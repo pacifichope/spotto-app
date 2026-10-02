@@ -13,7 +13,7 @@
 1. [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**
 2. このリポジトリを選択（ルートの `render.yaml` が検出される）
 3. `sync: false` の環境変数を入力して Apply
-4. デプロイ完了後、サービス URL（例: `https://spotto-api.onrender.com`）を控える
+4. デプロイ完了後、サービス URL（例: `https://spotto-api-rupy.onrender.com`）を控える
 
 ## 方法 B: 手動で Web Service
 
@@ -58,18 +58,44 @@ node -e "console.log(JSON.stringify(JSON.parse(require('fs').readFileSync('serve
 
 ## デプロイ確認
 
+**重要:** 別リポジトリ／古いイメージが同じホスト名に載っていると、`/health` が `{"status":"ok"}` のみで、`POST /auth/line-firebase` が **404** になります（LINE ログイン失敗の典型原因）。
+
 ```bash
 curl -sS https://<YOUR-SERVICE>.onrender.com/health | jq .
 ```
 
-`ok: true` と Stripe / Firebase の状態が出れば成功です。
+期待する応答（抜粋）:
+
+```json
+{
+  "ok": true,
+  "status": "ok",
+  "service": "spotto-api",
+  "auth": {
+    "lineFirebase": "POST /auth/line-firebase",
+    "firebaseAdmin": true
+  }
+}
+```
+
+認証ルートの存在確認:
+
+```bash
+curl -sS https://<YOUR-SERVICE>.onrender.com/auth/line-firebase | jq .
+# → methods: ["POST"], service: "spotto-api"
+```
+
+`service` が無い、または Nest 風の 404 が出る場合は **このリポジトリの `server/` を再デプロイ**してください（Blueprint または Root Directory=`server`）。
+
+詳細: [docs/AUTH_TROUBLESHOOTING.md](../docs/AUTH_TROUBLESHOOTING.md)
 
 ## アプリ側の設定
 
 `.env`（および EAS の環境変数）を更新:
 
 ```bash
-EXPO_PUBLIC_API_BASE_URL=https://<YOUR-SERVICE>.onrender.com
+EXPO_PUBLIC_API_BASE_URL_REMOTE=https://<YOUR-SERVICE>.onrender.com
+# 互換: EXPO_PUBLIC_API_BASE_URL も同じ HTTPS で可
 ```
 
 変更後は Expo を再起動。本番ビルドなら EAS の env も同様に更新して再ビルド。
@@ -79,3 +105,4 @@ EXPO_PUBLIC_API_BASE_URL=https://<YOUR-SERVICE>.onrender.com
 - `server/data/bookings.json` はインスタンスのローカルディスク上にあり、**再デプロイで消える**可能性があります。本格運用の予約データは Supabase 側を正としてください。
 - Free プランにするとスリープからのコールドスタートで数十秒かかることがあります。審査・実機検証では Starter 推奨です。
 - Stripe の Test / Live は `EXPO_PUBLIC_STRIPE_MODE` とキーのペアを揃えてください。
+- LINE: `LINE_CHANNEL_SECRET` と Firebase Admin（`FIREBASE_SERVICE_ACCOUNT_JSON`）が無いと `/auth/line-firebase` は 503 になります。

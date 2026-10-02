@@ -14,6 +14,8 @@ export type EventsMapProps = {
   selectedId: string | null;
   joinedIds?: Set<string>;
   onSelectEvent: (event: SportEvent | null) => void;
+  /** ユーザー操作後のカメラを親へ通知（リスト往復時の位置維持用） */
+  onRegionChangeComplete?: (region: MapCameraRegion) => void;
   /** マップの表示領域。react-native-maps の region に渡す */
   region?: MapCameraRegion | null;
   /** 初回描画用。region が来るまでのフォールバック */

@@ -7,6 +7,10 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       },
@@ -17,6 +21,10 @@
     "development-simulator": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com"
+      },
       "ios": {
         "simulator": true
       }
@@ -24,6 +32,10 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "env": {
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -33,7 +45,8 @@
       "channel": "production",
       "environment": "production",
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com"
       },
       "android": {
         "buildType": "app-bundle"

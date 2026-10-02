@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Marker, type MapMarkerProps } from 'react-native-maps';
 
 import { CyanPinFallback } from '@/components/MapPinFallback';
@@ -23,6 +23,9 @@ type CustomMapMarkerProps = Omit<MapMarkerProps, 'tracksViewChanges'> & {
   /** 強制的に tracksViewChanges を維持したい場合 */
   forceTracking?: boolean;
 };
+
+/** Android は SVG/影の描画が遅いので、早すぎる false で透明ピンになる */
+const SETTLE_MS = Platform.OS === 'android' ? 900 : 160;
 
 /**
  * カスタム View マーカー用ラッパー。
@@ -43,10 +46,22 @@ export default function CustomMapMarker({
   const [tracking, setTracking] = useState(true);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const generationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
+        settleTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     generationRef.current += 1;
-    setTracking(true);
+    if (mountedRef.current) setTracking(true);
     return () => {
       if (settleTimerRef.current) {
         clearTimeout(settleTimerRef.current);
@@ -63,10 +78,13 @@ export default function CustomMapMarker({
     // SVG / アイコン描画を待ってからスナップショット固定
     settleTimerRef.current = setTimeout(() => {
       requestAnimationFrame(() => {
-        if (generation !== generationRef.current) return;
-        setTracking(false);
+        requestAnimationFrame(() => {
+          if (!mountedRef.current) return;
+          if (generation !== generationRef.current) return;
+          setTracking(false);
+        });
       });
-    }, 160);
+    }, SETTLE_MS);
   }, []);
 
   return (

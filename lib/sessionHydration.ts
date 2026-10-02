@@ -49,8 +49,12 @@ export async function fetchRemoteProfileForUser(
 
   try {
     const localCached = await hydrateUserProfileForUser(authUser.id);
+    // リモート待ちの間も端末キャッシュ＋OAuth メタデータを先に画面へ出す
+    const localWithAuth = mergeAuthUserIntoProfile(localCached, authUser);
+    setUserProfile(localWithAuth, { userId: authUser.id });
+
     const mergedRemote = await syncProfileFromRemote(authUser.id, {
-      localFallback: localCached,
+      localFallback: localWithAuth,
     });
     const withAuth = mergeAuthUserIntoProfile(mergedRemote, authUser);
     const saved = setUserProfile(withAuth, { userId: authUser.id });

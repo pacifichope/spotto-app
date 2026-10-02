@@ -7,7 +7,7 @@
  * - JDK: 検出できた JDK 17 を org.gradle.java.home に書き、
  *   Studio / bare gradle でも CMake の restricted-method 失敗を避ける
  */
-const { withDangerousMod, createRunOncePlugin } = require('@expo/config-plugins');
+const { withDangerousMod, createRunOncePlugin } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -58,7 +58,7 @@ function upsertJdkHomeBlock(contents, jdkHome) {
 }
 
 /**
- * @param {import('@expo/config-plugins').ExportedConfig} config
+ * @param {import('expo/config-plugins').ExportedConfig} config
  * @param {{ version?: string }} [props]
  */
 function withAndroidGradlePin(config, props = {}) {

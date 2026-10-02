@@ -82,26 +82,133 @@ const googleReversedScheme = reversedGoogleIosScheme(
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 );
 
-const BUNDLE_ID = 'com.spotto.app';
+/** Android package / 共通アプリ ID（Google Play・Firebase・LINE Android） */
+const BUNDLE_ID = 'com.taiki.spotto';
+/** iOS Bundle ID（Apple Developer で確保済み・Android と同値） */
+const IOS_BUNDLE_ID = 'com.taiki.spotto';
 /** アプリ本体のカスタムスキーム（Expo Linking / createURL の唯一のプライマリ） */
 const APP_SCHEME = 'spotto';
 /** 共有・Universal Links 用ドメイン */
 const WEB_HOST = 'spotto.fun';
 const WEB_HOST_WWW = 'www.spotto.fun';
-/** LINE Login iOS: line3rdp.<bundle id>（LINE アプリからの復帰用） */
-const lineUrlScheme = `line3rdp.${BUNDLE_ID}`;
+/** LINE Login: line3rdp.<bundle id>（LINE アプリからの復帰用） */
+const lineUrlScheme = `line3rdp.${IOS_BUNDLE_ID}`;
 const lineChannelId = String(
   process.env.EXPO_PUBLIC_LINE_CHANNEL_ID || '',
 ).trim();
 
 /** 本番 EAS プロファイルでは cleartext（HTTP）を無効化 */
-const isProductionEasProfile =
-  String(process.env.EAS_BUILD_PROFILE || '').trim() === 'production';
+const easBuildProfile = String(process.env.EAS_BUILD_PROFILE || '').trim();
+const appEnv = String(process.env.APP_ENV || '').trim();
+const isProductionEasProfile = easBuildProfile === 'production';
+const isReleaseLikeEasProfile =
+  easBuildProfile === 'production' ||
+  easBuildProfile === 'preview' ||
+  appEnv === 'production' ||
+  appEnv === 'preview';
 const allowCleartextTraffic = !isProductionEasProfile;
 
-const API_BASE_URL = String(
-  process.env.EXPO_PUBLIC_API_BASE_URL || '',
-).trim();
+function isLocalOrLanApiUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return false;
+  try {
+    const { hostname } = new URL(value);
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '10.0.2.2' ||
+      hostname === '::1'
+    ) {
+      return true;
+    }
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function normalizeApiUrl(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/\/$/, '');
+}
+
+/** 実機 / EAS 向けデフォルト（localhost の代わり） */
+const DEFAULT_REMOTE_API_BASE_URL =
+  'https://spotto-api-rupy.onrender.com';
+
+/**
+ * EAS / 実機向けに API ベース URL を確定する。
+ * REMOTE を最優先。preview・production では localhost / LAN を拒否し HTTPS を焼く。
+ */
+function resolveApiUrlsForBuild() {
+  const configured = normalizeApiUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
+  const remote = normalizeApiUrl(process.env.EXPO_PUBLIC_API_BASE_URL_REMOTE);
+  const auth = normalizeApiUrl(process.env.EXPO_PUBLIC_AUTH_API_URL);
+
+  const pickPublicHttps = (...urls) =>
+    urls.find(
+      (url) =>
+        url &&
+        /^https:\/\//i.test(url) &&
+        !isLocalOrLanApiUrl(url),
+    ) || '';
+
+  // REMOTE 最優先
+  const preferredRemote =
+    pickPublicHttps(remote, auth, configured) ||
+    (!isLocalOrLanApiUrl(remote) && remote) ||
+    DEFAULT_REMOTE_API_BASE_URL;
+
+  if (isReleaseLikeEasProfile) {
+    const resolved =
+      pickPublicHttps(remote, auth, configured) ||
+      [remote, auth, configured].find(
+        (url) => url && !isLocalOrLanApiUrl(url),
+      ) ||
+      DEFAULT_REMOTE_API_BASE_URL;
+
+    if (isLocalOrLanApiUrl(configured) && resolved !== configured) {
+      console.log(
+        `[app.config] ローカル API_BASE_URL をスキップし、ビルドには ${resolved} を埋め込みます。`,
+      );
+    }
+
+    return {
+      apiBaseUrl: resolved,
+      apiBaseUrlRemote: pickPublicHttps(remote) || resolved,
+      authApiUrl: auth && !isLocalOrLanApiUrl(auth) ? auth : '',
+    };
+  }
+
+  // development / ローカル: シミュレータ用に localhost を残しつつ、REMOTE も焼く
+  return {
+    apiBaseUrl: configured || preferredRemote,
+    apiBaseUrlRemote:
+      pickPublicHttps(remote) || preferredRemote,
+    authApiUrl: auth,
+  };
+}
+
+const resolvedApiUrls = resolveApiUrlsForBuild();
+// Babel / Metro が process.env.EXPO_PUBLIC_* をインライン化するため、解決結果を書き戻す
+if (resolvedApiUrls.apiBaseUrl) {
+  process.env.EXPO_PUBLIC_API_BASE_URL = resolvedApiUrls.apiBaseUrl;
+}
+if (resolvedApiUrls.apiBaseUrlRemote) {
+  process.env.EXPO_PUBLIC_API_BASE_URL_REMOTE =
+    resolvedApiUrls.apiBaseUrlRemote;
+}
+if (resolvedApiUrls.authApiUrl) {
+  process.env.EXPO_PUBLIC_AUTH_API_URL = resolvedApiUrls.authApiUrl;
+}
+
+const API_BASE_URL = resolvedApiUrls.apiBaseUrl;
 if (isProductionEasProfile && !API_BASE_URL) {
   console.warn(
     '[app.config] 本番ビルドで EXPO_PUBLIC_API_BASE_URL が未設定です。' +
@@ -131,7 +238,9 @@ const extraUrlSchemes = [];
 if (googleReversedScheme) extraUrlSchemes.push(googleReversedScheme);
 if (lineUrlScheme) extraUrlSchemes.push(lineUrlScheme);
 // Google iOS クライアントが bundle id スキームを要求する場合がある
-if (!extraUrlSchemes.includes(BUNDLE_ID)) extraUrlSchemes.push(BUNDLE_ID);
+if (!extraUrlSchemes.includes(IOS_BUNDLE_ID)) {
+  extraUrlSchemes.push(IOS_BUNDLE_ID);
+}
 
 const iosUrlSchemes = [APP_SCHEME, ...extraUrlSchemes];
 
@@ -240,7 +349,7 @@ if (hasGoogleServicesJson || hasGoogleServicesPlist) {
 
 // Google Sign-In（Firebase なし）
 // - iOS: iosUrlScheme（逆引きクライアント ID）が必須
-// - Android: package=com.spotto.app + SHA-1 を Google Cloud の Android クライアントに登録
+// - Android: package=com.taiki.spotto + SHA-1 を Google Cloud の Android クライアントに登録
 //   SDK 側は webClientId で ID トークンを取得（EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID）
 if (googleReversedScheme) {
   plugins.push([
@@ -265,9 +374,15 @@ const config = {
   // Linking.createURL / Expo Router 用は単一スキームのみ（配列にすると警告＆競合）
   scheme: APP_SCHEME,
   userInterfaceStyle: 'light',
+  updates: {
+    url: 'https://u.expo.dev/ac4216cc-7c71-428c-8214-6f15e49208fc',
+  },
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
   ios: {
     supportsTablet: true,
-    bundleIdentifier: BUNDLE_ID,
+    bundleIdentifier: IOS_BUNDLE_ID,
     usesAppleSignIn: true,
     ...(hasGoogleServicesPlist
       ? { googleServicesFile: './GoogleService-Info.plist' }
@@ -280,7 +395,7 @@ const config = {
     // Google Sign-In (GIDSignIn) の Keychain エラー -34018 / Code=-2 対策
     entitlements: {
       'keychain-access-groups': [
-        `$(AppIdentifierPrefix)${BUNDLE_ID}`,
+        `$(AppIdentifierPrefix)${IOS_BUNDLE_ID}`,
       ],
     },
     config: {
@@ -393,10 +508,9 @@ const config = {
       ],
     },
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      // アイコン本体がグラデーション付きフルブリードのため、背景色は端の逃げ用
+      backgroundColor: '#4FC3DC',
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
-      monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
     permissions: [
@@ -434,9 +548,18 @@ const config = {
     webHost: WEB_HOST,
     lineChannelId: lineChannelId || undefined,
     androidPackage: BUNDLE_ID,
+    iosBundleId: IOS_BUNDLE_ID,
     googleAndroidClientId:
       String(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '').trim() ||
       undefined,
+    // ランタイム（lib/env.ts）が process.env 欠落時に読む
+    apiBaseUrl: resolvedApiUrls.apiBaseUrl || undefined,
+    apiBaseUrlRemote: resolvedApiUrls.apiBaseUrlRemote || undefined,
+    authApiUrl: resolvedApiUrls.authApiUrl || undefined,
+    useLocalApi:
+      String(process.env.EXPO_PUBLIC_USE_LOCAL_API || '').trim() || undefined,
+    easBuildProfile: easBuildProfile || undefined,
+    appEnv: appEnv || undefined,
   },
 };
 

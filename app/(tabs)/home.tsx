@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SymbolView } from 'expo-symbols';
 
 import AreaPickerModal from '@/components/AreaPickerModal';
 import BrandGradient from '@/components/BrandGradient';
@@ -29,62 +30,33 @@ import { theme } from '@/constants/theme';
 import {
   AREA_LABEL_LOCATING,
   AREA_LABEL_UNSET,
-  DEFAULT_AREA,
-  filterEventsByArea,
-  formatDetectedLabel,
+  filterEventsByMapRegion,
   getAreaLabel,
   getPrefectureById,
-  mapRegionForSelection,
-  matchPrefectureFromGeocode,
-  resolveSelectionCenter,
-  type AreaSelection,
+  labelForMapRegion,
 } from '@/lib/areas';
 import {
-  EMPTY_FILTERS,
   activeFilterCount,
   buildBrowseInterestProfile,
   filterActiveBrowseEvents,
   filterEventsByBrowse,
-  filterEventsWithinUpcomingDays,
   sortEventsByBrowse,
-  type EventFilters,
-  type SortKey,
 } from '@/lib/eventBrowse';
 import {
   eventMatchesCategory,
-  type CategoryId,
   type SportEvent,
 } from '@/lib/events';
 import { useEvents } from '@/lib/eventsContext';
 import { useBlocks } from '@/lib/blocksContext';
 import { useCreateEventAccess } from '@/lib/createEventAccessContext';
-import {
-  FALLBACK_REGION,
-  requestPermissionAndGetCoordinates,
-  resolveUserLocation,
-  reverseGeocodePlace,
-} from '@/lib/userLocation';
+import { useHomeBrowse } from '@/lib/homeBrowseContext';
 import { eventMatchesSearchQuery } from '@/lib/searchText';
-
-type ViewMode = 'map' | 'list';
-
-function eventsForSelectedArea(
-  events: SportEvent[],
-  area: AreaSelection | null,
-): SportEvent[] {
-  if (!area) return events;
-  if (typeof filterEventsByArea !== 'function') return events;
-  try {
-    return filterEventsByArea(events, area) ?? [];
-  } catch {
-    // 失敗時に全件（東京など）を出さない
-    return [];
-  }
-}
 
 /**
  * spotto ホーム
  * デフォルトはリスト（タイムライン）。マップはサブ機能として切替可能。
+ * 閲覧状態（カメラ・フィルター・エリア）は HomeBrowseProvider でタブ間も維持。
+ * リストの地理範囲はマップの mapRegion と連動する。
  */
 export default function SportsAppScreen() {
   const insets = useSafeAreaInsets();
@@ -94,26 +66,52 @@ export default function SportsAppScreen() {
     useEvents();
   const requestCreateAccess = useCreateEventAccess();
   const { filterEvents } = useBlocks();
+  const {
+    view,
+    setView,
+    mapRegion,
+    setMapRegion,
+    mapMovedByUser,
+    area,
+    userCoords,
+    locating,
+    category,
+    setCategory,
+    query,
+    setQuery,
+    sortKey,
+    setSortKey,
+    eventFilters,
+    setEventFilters,
+    selectedId,
+    setSelectedId,
+    areaPickerVisible,
+    setAreaPickerVisible,
+    applyArea,
+    resetToCurrentLocation,
+    consumePendingCameraFit,
+  } = useHomeBrowse();
+
   const safeJoinedIds =
     joinedIds instanceof Set ? joinedIds : new Set<string>();
   const safeNow =
     now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date();
 
-  const [view, setView] = useState<ViewMode>('list');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useTimedToast();
-  const [area, setArea] = useState<AreaSelection | null>(null);
-  const [areaPickerVisible, setAreaPickerVisible] = useState(false);
-  const [locating, setLocating] = useState(true);
-  const [mapRegion, setMapRegion] = useState(() => FALLBACK_REGION);
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryId>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('recommended');
-  const [eventFilters, setEventFilters] = useState<EventFilters>(EMPTY_FILTERS);
   const [sortPickerVisible, setSortPickerVisible] = useState(false);
   const [filterPickerVisible, setFilterPickerVisible] = useState(false);
+  /** 一度でもマップを開いたらアンマウントしない（カメラ状態をネイティブ側でも維持） */
+  const [mapMounted, setMapMounted] = useState(false);
   const shownEventsErrorRef = useRef<string | null>(null);
+  const homeMountedRef = useRef(true);
+
+  useEffect(() => {
+    homeMountedRef.current = true;
+    return () => {
+      homeMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!eventsError) {
@@ -136,80 +134,43 @@ export default function SportsAppScreen() {
 
   const topPad = insets.top + 8;
   const bottomPad = Math.max(insets.bottom, 10) + 8;
+  const mapAreaLabel = labelForMapRegion(mapRegion);
   const areaLabel = locating
     ? AREA_LABEL_LOCATING
-    : area
-      ? getAreaLabel(area)
-      : AREA_LABEL_UNSET;
+    : mapMovedByUser && mapAreaLabel
+      ? mapAreaLabel
+      : area
+        ? getAreaLabel(area)
+        : mapAreaLabel ?? AREA_LABEL_UNSET;
 
-  const applyArea = useCallback((next: AreaSelection) => {
-    setArea(next);
-    const region = mapRegionForSelection(next);
-    if (region) {
-      setMapRegion(region);
-      mapRef.current?.animateToRegion(region, 500);
-    }
-  }, []);
-
-  // 起動時に GPS を取得し、成功時は現在地エリアへ反映
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLocating(true);
-      setArea(null);
-      try {
-        const resolved = await resolveUserLocation();
-        if (cancelled) return;
-        if (!resolved) {
-          // 拒否・失敗時は未設定（San Francisco / 偽の現在地は出さない）
-          setArea(null);
-          setMapRegion(FALLBACK_REGION);
-          return;
-        }
-        const prefecture = matchPrefectureFromGeocode(resolved.place);
-        applyArea({
-          mode: 'nearby',
-          prefectureId: prefecture?.id ?? DEFAULT_AREA.prefectureId,
-          detectedLabel: formatDetectedLabel(resolved.place, prefecture),
-          latitude: resolved.coords.latitude,
-          longitude: resolved.coords.longitude,
-        });
-      } finally {
-        if (!cancelled) {
-          setLocating(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [applyArea]);
+    if (view === 'map') setMapMounted(true);
+  }, [view]);
+
+  // エリア明示変更時のみカメラを追従（パン位置は維持）
+  useEffect(() => {
+    const pending = consumePendingCameraFit();
+    if (!pending || !homeMountedRef.current) return;
+    mapRef.current?.animateToRegion(pending, 500);
+  }, [area, consumePendingCameraFit]);
 
   const handleSelectNearby = useCallback(async () => {
-    setLocating(true);
     try {
-      const coords = await requestPermissionAndGetCoordinates();
-      if (!coords) {
+      const ok = await resetToCurrentLocation();
+      if (!homeMountedRef.current) return;
+      if (!ok) {
         Alert.alert(
           '現在地を取得できません',
           '位置情報の許可をオンにすると、いまいる場所の周辺イベントを探せます。',
         );
         return;
       }
-      const place = await reverseGeocodePlace(coords);
-      const prefecture = matchPrefectureFromGeocode(place);
-      applyArea({
-        mode: 'nearby',
-        prefectureId: prefecture?.id ?? area?.prefectureId ?? DEFAULT_AREA.prefectureId,
-        detectedLabel: formatDetectedLabel(place, prefecture),
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
       setAreaPickerVisible(false);
-    } finally {
-      setLocating(false);
+    } catch {
+      if (!homeMountedRef.current) return;
+      Alert.alert('現在地を取得できません', '時間をおいて再度お試しください。');
     }
-  }, [applyArea, area?.prefectureId]);
+  }, [resetToCurrentLocation, setAreaPickerVisible]);
 
   const handleSelectPrefecture = useCallback(
     (prefectureId: string) => {
@@ -219,23 +180,55 @@ export default function SportsAppScreen() {
       });
       setAreaPickerVisible(false);
     },
-    [applyArea],
+    [applyArea, setAreaPickerVisible],
   );
 
+  const handleResetToLocation = useCallback(() => {
+    void (async () => {
+      try {
+        const ok = await resetToCurrentLocation();
+        if (!homeMountedRef.current) return;
+        if (!ok) {
+          Alert.alert(
+            '現在地を取得できません',
+            '位置情報の許可をオンにすると、いまいる場所の周辺へ戻れます。',
+          );
+        }
+      } catch {
+        if (!homeMountedRef.current) return;
+        Alert.alert('現在地を取得できません', '時間をおいて再度お試しください。');
+      }
+    })();
+  }, [resetToCurrentLocation]);
+
+  const mapBrowseCenter = useMemo(
+    () => ({
+      latitude: mapRegion.latitude,
+      longitude: mapRegion.longitude,
+    }),
+    [mapRegion.latitude, mapRegion.longitude],
+  );
+
+  /**
+   * リストの地理範囲 = マップの表示リージョン（最後に見ていた範囲）。
+   * GPS／エリア選択も applyArea 経由で mapRegion に反映されるため一致する。
+   */
   const areaEvents = useMemo(() => {
     const source = Array.isArray(events)
       ? events.filter((event) => event && typeof event.id === 'string' && event.id)
       : [];
     try {
-      const inArea = eventsForSelectedArea(source, area);
-      // 終了・中止はホームから除外（履歴はマイページの past* で表示）
-      const scoped = filterActiveBrowseEvents(inArea, safeNow);
+      const inRegion = filterEventsByMapRegion(source, mapRegion);
+      const scoped = filterActiveBrowseEvents(inRegion, safeNow);
       return typeof filterEvents === 'function' ? filterEvents(scoped) : scoped;
     } catch {
-      // エリア未適用の全件フォールバックはしない（別地域イベント混入防止）
-      return [];
+      try {
+        return filterActiveBrowseEvents(source, safeNow);
+      } catch {
+        return [];
+      }
     }
-  }, [events, area, safeNow, filterEvents]);
+  }, [events, mapRegion, safeNow, filterEvents]);
 
   const interestProfile = useMemo(
     () =>
@@ -270,10 +263,11 @@ export default function SportsAppScreen() {
 
       list = filterEventsByBrowse(list, eventFilters);
       return sortEventsByBrowse(list, sortKey, {
-        origin: resolveSelectionCenter(area),
+        origin: mapBrowseCenter,
         now: safeNow,
         interest: interestProfile,
-        areaMode: area?.mode ?? null,
+        // マップパン中は距離寄りの「現在地付近」扱いではなく中立
+        areaMode: mapMovedByUser ? null : area?.mode ?? null,
       });
     } catch {
       return areaEvents;
@@ -281,6 +275,8 @@ export default function SportsAppScreen() {
   }, [
     areaEvents,
     area,
+    mapMovedByUser,
+    mapBrowseCenter,
     category,
     query,
     sortKey,
@@ -289,35 +285,72 @@ export default function SportsAppScreen() {
     safeNow,
   ]);
 
-  /** マップ: 今日から1週間（7日間）以内の開催のみピン・プレビュー対象 */
-  const mapEvents = useMemo(
-    () => filterEventsWithinUpcomingDays(filteredEvents, 7, safeNow),
-    [filteredEvents, safeNow],
-  );
+  /**
+   * マップ用イベント:
+   * - ジャンル / 検索 / 絞り込み条件はリストと同一 state で連動
+   * - エリア（nearby / 都道府県）はリスト専用。マップは全国の該当イベントを表示
+   */
+  const mapEvents = useMemo(() => {
+    const source = Array.isArray(events)
+      ? events.filter((event) => event && typeof event.id === 'string' && event.id)
+      : [];
+    try {
+      let list = filterActiveBrowseEvents(source, safeNow);
+      if (typeof filterEvents === 'function') {
+        list = filterEvents(list);
+      }
+      list = list.filter((e) => {
+        try {
+          return eventMatchesCategory(e, category);
+        } catch {
+          return category === 'all';
+        }
+      });
+      const q = query.trim();
+      if (q) {
+        list = list.filter((e) => {
+          try {
+            return eventMatchesSearchQuery(e, q);
+          } catch {
+            return false;
+          }
+        });
+      }
+      return filterEventsByBrowse(list, eventFilters);
+    } catch {
+      return source;
+    }
+  }, [events, safeNow, filterEvents, category, query, eventFilters]);
 
   useEffect(() => {
     if (view !== 'map') return;
     if (selectedId && !mapEvents.some((event) => event.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [view, mapEvents, selectedId]);
+  }, [view, mapEvents, selectedId, setSelectedId]);
 
+  // リスト選択の整合のみ。マップは全国ピンなので nearby／カテゴリ対象外でもプレビューを消さない
   useEffect(() => {
+    if (view !== 'list') return;
     if (selectedId && !filteredEvents.some((event) => event.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [filteredEvents, selectedId]);
+  }, [view, filteredEvents, selectedId, setSelectedId]);
 
-  useEffect(() => {
-    if (view !== 'map') return;
-    const next = mapRegionForSelection(area) ?? FALLBACK_REGION;
-    setMapRegion(next);
-    mapRef.current?.animateToRegion(next, 400);
-  }, [view, area]);
+  const handleMapRegionChange = useCallback(
+    (next: typeof mapRegion) => {
+      if (!homeMountedRef.current) return;
+      setMapRegion(next);
+    },
+    [setMapRegion],
+  );
 
-  const handleSelectEvent = useCallback((event: SportEvent | null) => {
-    setSelectedId(event ? event.id : null);
-  }, []);
+  const handleSelectEvent = useCallback(
+    (event: SportEvent | null) => {
+      setSelectedId(event ? event.id : null);
+    },
+    [setSelectedId],
+  );
 
   const selectedMapEvent = useMemo(() => {
     if (view !== 'map' || !selectedId) return null;
@@ -383,11 +416,13 @@ export default function SportsAppScreen() {
           sortKey={sortKey}
           filterCount={activeFilterCount(eventFilters)}
           count={filteredEvents.length}
-          areaMode={area?.mode ?? null}
+          areaMode={mapMovedByUser ? null : area?.mode ?? null}
           prefectureLabel={
-            area?.mode === 'prefecture'
-              ? getPrefectureById(area.prefectureId).label
-              : null
+            mapMovedByUser
+              ? mapAreaLabel
+              : area?.mode === 'prefecture'
+                ? getPrefectureById(area.prefectureId).label
+                : null
           }
           onPressSort={() => setSortPickerVisible(true)}
           onPressFilter={() => setFilterPickerVisible(true)}
@@ -395,6 +430,8 @@ export default function SportsAppScreen() {
       </View>
     </View>
   );
+
+  const mapVisible = view === 'map';
 
   return (
     <View style={styles.root}>
@@ -404,28 +441,43 @@ export default function SportsAppScreen() {
         pointerEvents="none"
       />
 
-      {/* Map（表示中のみマウント → Apple Maps の SF デフォルトを回避） */}
-      {view === 'map' ? (
-        <View collapsable={false} style={styles.mapLayer}>
+      {/* 一度開いたマップは維持（リストへ戻ってもカメラ・ネイティブ状態を保持） */}
+      {mapMounted ? (
+        <View
+          collapsable={false}
+          style={[styles.mapLayer, !mapVisible && styles.mapLayerHidden]}
+          pointerEvents={mapVisible ? 'auto' : 'none'}
+        >
           <EventsMap
             ref={mapRef}
             events={mapEvents}
             selectedId={selectedId}
             joinedIds={safeJoinedIds}
             onSelectEvent={handleSelectEvent}
+            onRegionChangeComplete={handleMapRegionChange}
             region={mapRegion}
             initialRegion={mapRegion}
             showsUserLocation
-            userCoordinate={
-              area?.latitude != null && area?.longitude != null
-                ? { latitude: area.latitude, longitude: area.longitude }
-                : null
-            }
+            userCoordinate={userCoords}
           />
           <View
             style={[styles.mapTop, { paddingTop: topPad }]}
             pointerEvents="box-none"
           >
+            <HeaderRoundButton
+              onPress={handleResetToLocation}
+              accessibilityLabel="現在地へ戻る"
+            >
+              <SymbolView
+                name={{
+                  ios: 'location.fill',
+                  android: 'my_location',
+                  web: 'my_location',
+                }}
+                tintColor={theme.colors.onPrimary}
+                size={20}
+              />
+            </HeaderRoundButton>
             <HeaderRoundButton
               onPress={() => {
                 setSelectedId(null);
@@ -568,6 +620,9 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 1,
   },
+  mapLayerHidden: {
+    opacity: 0,
+  },
   mapTop: {
     position: 'absolute',
     top: 0,
@@ -577,6 +632,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'flex-start',
+    gap: 10,
   },
   emptyLoading: {
     alignItems: 'center',

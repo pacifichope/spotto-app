@@ -655,7 +655,7 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     sport: 'サッカー',
     emoji: '⚽️',
     location: '札幌・大通公園付近',
-    date: '2026-08-23',
+    date: '2026-08-27',
     time: '10:00',
     endTime: '12:00',
     level: '誰でも歓迎',
@@ -677,7 +677,7 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     sport: 'ランニング',
     emoji: '🏃',
     location: '札幌・中島公園',
-    date: '2026-08-24',
+    date: '2026-08-28',
     time: '07:30',
     endTime: '08:45',
     level: '誰でも歓迎',
@@ -694,12 +694,100 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     accent: '#06B6D4',
   },
   {
+    id: 'demo-sapporo-futsal',
+    title: '札幌駅前ナイトフットサル',
+    sport: 'フットサル',
+    emoji: '⚽️',
+    location: '札幌・北区インドアコート',
+    date: '2026-08-29',
+    time: '20:00',
+    endTime: '22:00',
+    level: '初心者',
+    latitude: 43.0885,
+    longitude: 141.3402,
+    spotsLeft: 4,
+    capacity: 10,
+    joinedCount: 6,
+    host: 'Sapporo Night FS',
+    vibe: '駅近インドア。ブランク歓迎。',
+    description:
+      '⚽️ 札幌駅周辺のナイトフットサル。楽しさ優先でまわします。',
+    ...eventGallery('フットサル'),
+    accent: '#10B981',
+  },
+  {
+    id: 'demo-sapporo-badminton',
+    title: '円山バドミントン交流会',
+    sport: 'バドミントン',
+    emoji: '🏸',
+    location: '札幌・円山体育館',
+    date: '2026-08-30',
+    time: '14:00',
+    endTime: '16:00',
+    level: '中級',
+    latitude: 43.0548,
+    longitude: 141.3145,
+    spotsLeft: 5,
+    capacity: 12,
+    joinedCount: 7,
+    host: 'Maruyama Smash',
+    vibe: 'ダブルス中心の午後練。',
+    description:
+      '🏸 円山で気軽なバドミントン交流。ラケットレンタル相談可。',
+    ...eventGallery('バドミントン'),
+    accent: '#EC4899',
+  },
+  {
+    id: 'demo-sapporo-yoga',
+    title: '大通パークヨガ',
+    sport: 'ヨガ',
+    emoji: '🧘',
+    location: '札幌・大通公園西側',
+    date: '2026-08-31',
+    time: '09:00',
+    endTime: '10:00',
+    level: '誰でも歓迎',
+    latitude: 43.0608,
+    longitude: 141.3462,
+    spotsLeft: 12,
+    capacity: 20,
+    joinedCount: 8,
+    host: 'Odori Breath',
+    vibe: '青空の下で朝ヨガ。マット持参。',
+    description:
+      '🧘 大通公園での屋外ヨガ。初心者歓迎、雨天中止。',
+    ...eventGallery('ヨガ'),
+    accent: '#A78BFA',
+  },
+  {
+    id: 'demo-sapporo-tennis',
+    title: '豊平川テニス申し込み',
+    sport: 'テニス',
+    emoji: '🎾',
+    location: '札幌・豊平川緑地テニスコート',
+    date: '2026-09-01',
+    time: '11:00',
+    endTime: '13:00',
+    level: '中級',
+    latitude: 43.0412,
+    longitude: 141.3688,
+    spotsLeft: 2,
+    capacity: 4,
+    joinedCount: 2,
+    host: 'Toyohira Rally',
+    vibe: 'ダブルス募集。ボールはこちらで用意。',
+    description:
+      '🎾 豊平川緑地でテニス。中級者向けにテンポよく回します。',
+    ...eventGallery('テニス'),
+    accent: '#F59E0B',
+  },
+  {
     id: '10',
     title: '大阪城ナイトラン',
     sport: 'ランニング',
     emoji: '🏃',
     location: '大阪城公園ランニングコース',
-    date: '2026-08-23',
+    date: '2026-08-29',
     time: '19:00',
     endTime: '20:30',
     level: '中級',
@@ -721,7 +809,7 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     sport: 'フットサル',
     emoji: '⚽️',
     location: '大阪市西区インドアコート',
-    date: '2026-08-25',
+    date: '2026-08-30',
     time: '20:00',
     endTime: '22:00',
     level: '初心者',
@@ -743,7 +831,7 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     sport: 'ランニング',
     emoji: '🏃',
     location: '福岡・大濠公園',
-    date: '2026-08-23',
+    date: '2026-08-31',
     time: '07:00',
     endTime: '08:15',
     level: '誰でも歓迎',
@@ -1467,6 +1555,99 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     accent: '#8B5CF6',
   },
 ];
+
+/** SAMPLE_EVENTS の「いま開催中」群の基準日（相対シフトのアンカー） */
+const DEV_SAMPLE_DATE_ANCHOR = '2026-08-26';
+
+function shiftDateStamp(stamp: string | undefined, deltaDays: number): string | undefined {
+  if (!stamp) return stamp;
+  const base = parseEventDateTime(stamp, '12:00');
+  if (!Number.isFinite(base.getTime())) return stamp;
+  base.setDate(base.getDate() + deltaDays);
+  return formatDateStamp(base);
+}
+
+function startOfLocalDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+/**
+ * 開発用モックを「今日」基準に日付シフトしたコピー。
+ * リモート取得で上書きされないよう eventsContext からマージする。
+ */
+export function getDevSampleEvents(now = new Date()): SportEvent[] {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) return [];
+
+  const anchor = startOfLocalDay(parseEventDateTime(DEV_SAMPLE_DATE_ANCHOR, '00:00'));
+  const today = startOfLocalDay(now);
+  if (!Number.isFinite(anchor.getTime())) return SAMPLE_EVENTS.slice();
+
+  const deltaDays = Math.round(
+    (today.getTime() - anchor.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  if (deltaDays === 0) return SAMPLE_EVENTS.slice();
+
+  return SAMPLE_EVENTS.map((event) => {
+    const nextDate = shiftDateStamp(event.date, deltaDays) || event.date;
+    const nextEndDate = shiftDateStamp(event.endDate, deltaDays);
+    const nextSessions = Array.isArray(event.sessions)
+      ? event.sessions.map((session) => ({
+          ...session,
+          date: shiftDateStamp(session.date, deltaDays) || session.date,
+          endDate: shiftDateStamp(session.endDate, deltaDays),
+        }))
+      : event.sessions;
+
+    let date = nextDate;
+    let endDate = nextEndDate;
+    let sessions = nextSessions;
+
+    // 終了済みデモは必ず過去に残す
+    if (String(event.id).startsWith('demo-past-')) {
+      const start = parseEventDateTime(date, event.time || '12:00');
+      if (Number.isFinite(start.getTime()) && start.getTime() >= today.getTime()) {
+        const past = new Date(today);
+        past.setDate(past.getDate() - 21);
+        date = formatDateStamp(past);
+        if (endDate) {
+          const endPast = new Date(past);
+          endPast.setDate(endPast.getDate());
+          endDate = formatDateStamp(endPast);
+        }
+      }
+    }
+
+    return {
+      ...event,
+      date,
+      endDate,
+      sessions,
+    };
+  });
+}
+
+/** リモート一覧に開発モックを合成（demo-* は常に残す） */
+export function mergeWithDevSampleEvents(
+  remote: SportEvent[] | null | undefined,
+  now = new Date(),
+): SportEvent[] {
+  const remoteList = Array.isArray(remote) ? remote : [];
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) return remoteList;
+
+  const samples = getDevSampleEvents(now);
+  const sampleIds = new Set(samples.map((item) => item.id));
+  const merged = [
+    ...samples,
+    ...remoteList.filter((item) => {
+      const id = String(item?.id || '');
+      if (!id) return false;
+      if (sampleIds.has(id)) return false;
+      if (id.startsWith('demo-')) return false;
+      return true;
+    }),
+  ];
+  return merged;
+}
 
 export function getNearbyEvents(
   latitude: number,

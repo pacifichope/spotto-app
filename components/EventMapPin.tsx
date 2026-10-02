@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -28,6 +28,9 @@ type EventMapPinProps = {
  * ブランドカラーのカスタム地図ピン。
  * 丸頭＋下向きティップの中にスポーツアイコンを配置。
  * 標準の赤いデフォルトマーカーは使わない。
+ *
+ * Android の Google Maps カスタム Marker は elevation/影があると
+ * ビットマップが透明になることがあるため、影は iOS のみ。
  */
 export default function EventMapPin({
   sport,
@@ -210,11 +213,16 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.08 }],
   },
   shadowHost: {
-    shadowColor: '#0B1A22',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.32,
-    shadowRadius: 7,
-    elevation: 9,
+    // Android Google Maps は elevation 付き View を透明ビットマップ化することがある
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#0B1A22',
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.32,
+          shadowRadius: 7,
+        }
+      : null),
+    elevation: 0,
   },
   iconSlot: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import {
   createElement,
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useState,
@@ -57,6 +58,16 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   const [viewRegion, setViewRegion] = useState(propRegion);
   const [forcePointIds, setForcePointIds] = useState<Set<string> | null>(null);
 
+  useEffect(() => {
+    setViewRegion(propRegion);
+    setForcePointIds(null);
+  }, [
+    propRegion.latitude,
+    propRegion.longitude,
+    propRegion.latitudeDelta,
+    propRegion.longitudeDelta,
+  ]);
+
   useImperativeHandle(ref, () => ({
     animateToRegion: (next) => {
       setViewRegion(next);
@@ -101,7 +112,14 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
       <View style={styles.iframeHost} pointerEvents="auto">
         {iframe}
       </View>
-      <View style={styles.overlay} pointerEvents="box-none">
+      <Pressable
+        style={styles.overlay}
+        pointerEvents="box-none"
+        onPress={() => {
+          setForcePointIds(null);
+          onSelectEvent(null);
+        }}
+      >
         {clusters.map((item) => {
           if (item.type === 'cluster') {
             const pos = toPercent(item.latitude, item.longitude, activeRegion);
@@ -149,7 +167,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
             </Pressable>
           );
         })}
-      </View>
+      </Pressable>
     </View>
   );
 });

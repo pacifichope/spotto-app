@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
-const FALLBACK_APP_ID = 'com.spotto.app';
+const FALLBACK_APP_ID = 'com.taiki.spotto';
 
 /** ビルドに埋め込まれた iOS bundle ID / Android package name */
 export function getNativeAppId(): string {

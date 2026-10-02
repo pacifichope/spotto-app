@@ -8,10 +8,12 @@ import { theme } from '@/constants/theme';
 import { formatUnreadBadge } from '@/lib/chats';
 import { useAuth } from '@/lib/authContext';
 import { useChats } from '@/lib/chatsContext';
+import { useHomeBrowse } from '@/lib/homeBrowseContext';
 
 export default function TabLayout() {
   const { isReady, isLoggedIn } = useAuth();
   const { unreadCount } = useChats();
+  const { resetToCurrentLocation } = useHomeBrowse();
   const messagesBadge = formatUnreadBadge(isLoggedIn ? unreadCount : 0);
 
   // 認証判定が終わるまで待つ（前回ルート復元でホームが先に出るのを防ぐ）
@@ -56,6 +58,14 @@ export default function TabLayout() {
             />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // すでにホームにいる状態での再タップ → 現在地へリセット
+            if (navigation.isFocused()) {
+              void resetToCurrentLocation();
+            }
+          },
+        })}
       />
       <Tabs.Screen
         name="messages"

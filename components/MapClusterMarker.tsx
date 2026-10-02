@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '@/constants/theme';
 
@@ -57,11 +57,15 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0B1A22',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 6,
-    elevation: 6,
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#0B1A22',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.28,
+          shadowRadius: 6,
+        }
+      : null),
+    elevation: 0,
   },
   count: {
     color: '#FFFFFF',

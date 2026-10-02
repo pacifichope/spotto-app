@@ -15,10 +15,11 @@ import {
 } from '@/lib/devTestFlags';
 import {
     applyToggleJoin,
+    getDevSampleEvents,
     isEventCancelled,
     isEventPast,
     isHostedEventArchived,
-    SAMPLE_EVENTS,
+    mergeWithDevSampleEvents,
     sortEventsUpcomingThenPast,
     sortPastEventsNewestFirst,
     type JoinActionResult,
@@ -222,7 +223,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
   // 本番は空配列スタート（リモート取得までサンプルを出さない）
   const [events, setEvents] = useState<SportEvent[]>(() =>
-    __DEV__ ? SAMPLE_EVENTS.slice() : [],
+    __DEV__ ? getDevSampleEvents() : [],
   );
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
   const [hostedIds, setHostedIds] = useState<Set<string>>(() => new Set());
@@ -300,6 +301,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const refreshEvents = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       setEventsLoading(false);
+      if (__DEV__) {
+        applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+      }
       return;
     }
     setEventsLoading(true);
@@ -308,13 +312,23 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       const remote = await fetchRemoteEvents();
       if (!remote.ok) {
         setEventsError(userFacingNetworkError(remote.error));
-        if (__DEV__) console.warn('[events] fetch failed', remote.error);
+        if (__DEV__) {
+          console.warn('[events] fetch failed', remote.error);
+          // 開発中はモックを残してマップ／リストを空にしない
+          applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+        }
         return;
       }
-      applyEventsList(remote.data, currentUserIdRef.current);
+      applyEventsList(
+        mergeWithDevSampleEvents(remote.data),
+        currentUserIdRef.current,
+      );
     } catch (error) {
       setEventsError(userFacingNetworkError(error));
-      if (__DEV__) console.warn('[events] fetch threw', error);
+      if (__DEV__) {
+        console.warn('[events] fetch threw', error);
+        applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+      }
     } finally {
       setEventsLoading(false);
     }
@@ -472,8 +486,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       joinedRef.current = new Set();
       setJoinedIds(new Set());
 
-      eventsRef.current = __DEV__ ? SAMPLE_EVENTS.slice() : [];
-      setEvents(__DEV__ ? SAMPLE_EVENTS.slice() : []);
+      eventsRef.current = __DEV__ ? getDevSampleEvents() : [];
+      setEvents(__DEV__ ? getDevSampleEvents() : []);
       hydrateDoneRef.current = true;
 
       if (isSupabaseConfigured()) {
@@ -481,7 +495,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           const remote = await fetchRemoteEvents();
           if (cancelled) return;
           if (remote.ok) {
-            applyEventsList(remote.data, currentUserIdRef.current);
+            applyEventsList(
+              mergeWithDevSampleEvents(remote.data),
+              currentUserIdRef.current,
+            );
             setEventsError(null);
             const uid = currentUserIdRef.current;
             if (uid && !hasOrganizerName(organizerRef.current)) {
@@ -495,11 +512,15 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             setEventsError(userFacingNetworkError(remote.error));
             if (__DEV__) {
               console.warn('[events] initial fetch failed', remote.error);
+              applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
             }
           }
         } catch (error) {
           if (!cancelled) {
             setEventsError(userFacingNetworkError(error));
+            if (__DEV__) {
+              applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+            }
           }
         }
       }
@@ -1306,7 +1327,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   const resetAccountData = useCallback(() => {
     const previousUserId = currentUserIdRef.current;
-    const nextEvents = __DEV__ ? SAMPLE_EVENTS.slice() : [];
+    const nextEvents = __DEV__ ? getDevSampleEvents() : [];
     const nextJoined = new Set<string>();
     const nextFavorites = new Set<string>();
     const nextHosted = new Set<string>();

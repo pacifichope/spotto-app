@@ -23,10 +23,11 @@ import type {
   EventsMapRef,
   MapCameraRegion,
 } from '@/components/eventsMapTypes';
+import { theme } from '@/constants/theme';
 import { type SportEvent } from '@/lib/events';
 import {
-  CLUSTER_DISABLE_LAT_DELTA,
   clusterEventsForRegion,
+  isClusterOnlyZoom,
   regionForClusterEvents,
 } from '@/lib/mapClustering';
 import { FALLBACK_REGION } from '@/lib/userLocation';
@@ -45,18 +46,32 @@ function toCameraRegion(region: Region | MapCameraRegion): MapCameraRegion {
   };
 }
 
-function shouldKeepForcePoints(
-  events: SportEvent[],
-  region: MapCameraRegion,
-  forceIds: ReadonlySet<string>,
-): boolean {
-  if (forceIds.size === 0) return false;
-  if (region.latitudeDelta <= CLUSTER_DISABLE_LAT_DELTA) return false;
-  const natural = clusterEventsForRegion(events, region);
-  return natural.some(
-    (item) =>
-      item.type === 'cluster' && item.events.some((e) => forceIds.has(e.id)),
+function regionsNearlyEqual(a: MapCameraRegion, b: MapCameraRegion) {
+  return (
+    Math.abs(a.latitude - b.latitude) < 0.00008 &&
+    Math.abs(a.longitude - b.longitude) < 0.00008 &&
+    Math.abs(a.latitudeDelta - b.latitudeDelta) < 0.0008 &&
+    Math.abs(a.longitudeDelta - b.longitudeDelta) < 0.0008
   );
+}
+
+/**
+ * クラスタ展開後のカメラから、ユーザーがズーム／パンで十分動いたか。
+ * 動いたら forcePointIds を解除して通常クラスタに戻す。
+ */
+function forceExpandCameraMoved(
+  baseline: MapCameraRegion,
+  current: MapCameraRegion,
+): boolean {
+  const baseLat = Math.max(baseline.latitudeDelta, 0.0001);
+  const baseLng = Math.max(baseline.longitudeDelta, 0.0001);
+  const zoomChanged =
+    Math.abs(current.latitudeDelta - baseline.latitudeDelta) > baseLat * 0.1 ||
+    Math.abs(current.longitudeDelta - baseline.longitudeDelta) > baseLng * 0.1;
+  const panChanged =
+    Math.abs(current.latitude - baseline.latitude) > baseLat * 0.28 ||
+    Math.abs(current.longitude - baseline.longitude) > baseLng * 0.28;
+  return zoomChanged || panChanged;
 }
 
 const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
@@ -65,6 +80,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
     selectedId,
     joinedIds,
     onSelectEvent,
+    onRegionChangeComplete,
     initialRegion = null,
     region = null,
     showsUserLocation = true,
@@ -76,28 +92,76 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   const mapRef = useRef<MapView>(null);
   /** Marker onPress の直後に MapView onPress が走って選択解除されるのを防ぐ */
   const ignoreNextMapPressRef = useRef(false);
+  /** 親へ通知した直後の region（自分発の更新で再 animate しない） */
+  const lastEmittedRegionRef = useRef<MapCameraRegion | null>(null);
+  const mountedRef = useRef(false);
+  const readyRef = useRef(false);
+  /** クラスタ展開時のカメラ。ここから動いたら展開解除 */
+  const forceExpandRegionRef = useRef<MapCameraRegion | null>(null);
   const propRegion = region ?? initialRegion ?? FALLBACK_REGION;
+  const propRegionRef = useRef(propRegion);
+  propRegionRef.current = propRegion;
   const [viewRegion, setViewRegion] = useState<MapCameraRegion>(propRegion);
-  /** クラスタタップ後、該当イベントを必ず個別ピンにする */
+  /** クラスタタップ後、該当イベントを必ず個別ピンにする（一時的） */
   const [forcePointIds, setForcePointIds] = useState<Set<string> | null>(null);
+
+  const clearForceExpand = useCallback(() => {
+    forceExpandRegionRef.current = null;
+    setForcePointIds(null);
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      readyRef.current = false;
+    };
+  }, []);
+
+  // フィルター変更でイベント集合が変わったら展開状態をリセット
+  const eventsSignature = useMemo(
+    () =>
+      events
+        .map((e) => e.id)
+        .sort()
+        .join(','),
+    [events],
+  );
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    clearForceExpand();
+  }, [eventsSignature, clearForceExpand]);
 
   useImperativeHandle(ref, () => ({
     animateToRegion: (next: MapCameraRegion, duration = 800) => {
+      if (!mountedRef.current) return;
+      lastEmittedRegionRef.current = next;
       mapRef.current?.animateToRegion(next, duration);
       setViewRegion(next);
-      setForcePointIds(null);
+      clearForceExpand();
     },
   }));
 
+  // エリア変更など「親が意図したカメラ」だけ追従。パン結果のエコーは無視
+  // マップ ready 前は initialRegion / onMapReady に任せ、マウント完了前の animate 連鎖を避ける
   useEffect(() => {
-    mapRef.current?.animateToRegion(propRegion, 800);
+    if (!mountedRef.current || !readyRef.current) return;
+    if (
+      lastEmittedRegionRef.current &&
+      regionsNearlyEqual(propRegion, lastEmittedRegionRef.current)
+    ) {
+      return;
+    }
+    lastEmittedRegionRef.current = propRegion;
+    mapRef.current?.animateToRegion(propRegion, 500);
     setViewRegion(propRegion);
-    setForcePointIds(null);
+    clearForceExpand();
   }, [
     propRegion.latitude,
     propRegion.longitude,
     propRegion.latitudeDelta,
     propRegion.longitudeDelta,
+    clearForceExpand,
   ]);
 
   const clusters = useMemo(
@@ -121,17 +185,21 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
 
   const handleClusterPress = useCallback(
     (clusterEvents: SportEvent[]) => {
+      if (!mountedRef.current) return;
       ignoreNextMapPressRef.current = true;
       onSelectEvent(null);
       const next = regionForClusterEvents(clusterEvents, viewRegion);
+      forceExpandRegionRef.current = next;
       setForcePointIds(new Set(clusterEvents.map((e) => e.id)));
       setViewRegion(next);
+      lastEmittedRegionRef.current = next;
+      onRegionChangeComplete?.(next);
       mapRef.current?.animateToRegion(next, 480);
       setTimeout(() => {
         ignoreNextMapPressRef.current = false;
       }, 500);
     },
-    [onSelectEvent, viewRegion],
+    [onSelectEvent, onRegionChangeComplete, viewRegion],
   );
 
   const handleMapPress = () => {
@@ -139,6 +207,8 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
       ignoreNextMapPressRef.current = false;
       return;
     }
+    // 選択解除と同時にクラスタ展開も戻す
+    clearForceExpand();
     onSelectEvent(null);
   };
 
@@ -156,15 +226,33 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
         provider={mapProvider}
         initialRegion={propRegion}
         onMapReady={() => {
-          mapRef.current?.animateToRegion(propRegion, 0);
+          if (!mountedRef.current) return;
+          readyRef.current = true;
+          const next = propRegionRef.current;
+          lastEmittedRegionRef.current = next;
+          mapRef.current?.animateToRegion(next, 0);
+          setViewRegion(next);
         }}
         onRegionChangeComplete={(next) => {
+          if (!mountedRef.current || !readyRef.current) return;
           const camera = toCameraRegion(next);
           setViewRegion(camera);
-          setForcePointIds((prev) => {
-            if (!prev || prev.size === 0) return null;
-            return shouldKeepForcePoints(events, camera, prev) ? prev : null;
-          });
+          lastEmittedRegionRef.current = camera;
+          onRegionChangeComplete?.(camera);
+
+          // 広域ズームでは展開ピンを必ず解除（クラスタのみ表示）
+          if (isClusterOnlyZoom(camera)) {
+            clearForceExpand();
+            return;
+          }
+
+          const baseline = forceExpandRegionRef.current;
+          if (!baseline) return;
+          // 展開直後の animate 着地は維持。その後のズーム／パンでクラスタに戻す
+          if (regionsNearlyEqual(camera, baseline)) return;
+          if (forceExpandCameraMoved(baseline, camera)) {
+            clearForceExpand();
+          }
         }}
         scrollEnabled
         zoomEnabled
@@ -222,6 +310,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
           const { event } = item;
           const selected = event.id === selectedId;
           const joined = joinedIds?.has?.(event.id) ?? false;
+          const isDot = item.appearance === 'dot' && !selected;
           return (
             <CustomMapMarker
               key={item.id}
@@ -231,21 +320,25 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
                 longitude: item.longitude,
               }}
               tappable
-              anchor={{ x: 0.5, y: 1 }}
-              zIndex={selected ? 10 : 1}
-              trackKey={`p:${event.id}:${selected ? 1 : 0}:${joined ? 1 : 0}:${event.sport || ''}`}
+              anchor={isDot ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 1 }}
+              zIndex={selected ? 10 : isDot ? 2 : 1}
+              trackKey={`p:${event.id}:${selected ? 1 : 0}:${joined ? 1 : 0}:${isDot ? 'd' : 'f'}:${event.sport || ''}`}
               forceTracking={selected}
               onPress={(e) => {
                 e.stopPropagation?.();
                 handleMarkerPress(event);
               }}
             >
-              <EventMapPin
-                sport={event.sport || 'その他'}
-                selected={selected}
-                joined={joined}
-                gradientId={`pin-${event.id}`}
-              />
+              {isDot ? (
+                <View style={styles.eventDot} pointerEvents="none" collapsable={false} />
+              ) : (
+                <EventMapPin
+                  sport={event.sport || 'その他'}
+                  selected={selected}
+                  joined={joined}
+                  gradientId={`pin-${event.id}`}
+                />
+              )}
             </CustomMapMarker>
           );
         })}
@@ -283,6 +376,14 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     backgroundColor: '#2563EB',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  eventDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: theme.colors.primaryDark,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },

@@ -5,7 +5,8 @@
 #   1) このリポジトリを GitHub/GitLab に push
 #   2) Render Dashboard → New → Blueprint → このリポジトリを選択
 #   3) sync: false の環境変数を Dashboard で入力
-#   4) デプロイ後の URL をアプリの EXPO_PUBLIC_API_BASE_URL に設定
+#   4) デプロイ後: curl /health で "service":"spotto-api" を確認（無いと LINE 404）
+#   5) デプロイ後の URL をアプリの EXPO_PUBLIC_API_BASE_URL_REMOTE に設定
 #
 # 常時稼働: plan は starter 以上（free はアイドルでスリープします）
 

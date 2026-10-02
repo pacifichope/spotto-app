@@ -42,12 +42,13 @@ import {
   registerDevicePushToken,
   unregisterDevicePushToken,
 } from '@/lib/pushNotifications';
-import { fetchRemoteProfileForUser } from '@/lib/sessionHydration';
+import { fetchRemoteProfileForUser, mergeAuthUserIntoProfile } from '@/lib/sessionHydration';
 import { setSessionExpiredHandler } from '@/lib/sessionExpiry';
 import { userFacingSocialLoginError } from '@/lib/socialLoginErrors';
 import { useUserProfile } from '@/lib/userProfileContext';
 import {
   getUserProfile,
+  hydrateUserProfileForUser,
   isProfileComplete,
   isProfileSetupMarkedComplete,
   markProfileSetupComplete,
@@ -96,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { userProfile, updateUserProfile, clearUserProfile } = useUserProfile();
   const { resetAccountData, clearParticipantSessionData, hydrateParticipantSessionData } =
     useEvents();
-  const { resetJoinedClubs } = useClubs();
+  const { resetJoinedClubs, clearPersistedJoinedClubs } = useClubs();
   const { clearBlockedUsers, refreshBlocks } = useBlocks();
   const [isReady, setIsReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -112,6 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** 直近でフル hydration したユーザー（重複 fetch 抑制） */
   const lastHydratedUserIdRef = useRef<string | null>(null);
   const hydrateGenerationRef = useRef(0);
+  /** 同一 uid の並行 hydrate を1本にまとめる */
+  const hydrateInFlightRef = useRef<{
+    userId: string;
+    promise: Promise<UserProfile | null>;
+  } | null>(null);
   userRef.current = user;
 
   const applySession = useCallback((next: AuthUser) => {
@@ -121,18 +127,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveProfileUserId(next.id);
   }, []);
 
+  /**
+   * ログイン直後に OAuth 名・画像を即反映し、続けて端末キャッシュを載せる。
+   * リモート同期は hydrateSessionData 側で上書きする。
+   */
+  const seedProfileFromAuth = useCallback(
+    (authUser: AuthUser) => {
+      if (!authUser.id) return;
+      setActiveProfileUserId(authUser.id);
+      updateUserProfile(mergeAuthUserIntoProfile(getUserProfile(), authUser));
+      void hydrateUserProfileForUser(authUser.id)
+        .then((cached) => {
+          if (userRef.current?.id !== authUser.id) return;
+          updateUserProfile(mergeAuthUserIntoProfile(cached, authUser));
+        })
+        .catch(() => undefined);
+    },
+    [updateUserProfile],
+  );
+
   const clearSessionLocalState = useCallback(() => {
     hydrateGenerationRef.current += 1;
+    hydrateInFlightRef.current = null;
     lastHydratedUserIdRef.current = null;
     const previousId = userRef.current?.id;
     userRef.current = null;
     setUser(null);
     clearParticipantSessionData();
     clearUserProfile();
+    resetJoinedClubs();
     clearCachedBanStatus(previousId);
     void saveAuthSession(null);
     void clearPhoneVerification();
-  }, [clearParticipantSessionData, clearUserProfile]);
+  }, [clearParticipantSessionData, clearUserProfile, resetJoinedClubs]);
 
   /** 凍結アカウントを検知したら強制ログアウト＋専用アラート。true = 凍結だった */
   const rejectIfBanned = useCallback(
@@ -154,7 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * ログイン後 / 起動時: プロフィール・お気に入り・ブロック等を取得して画面 state に反映。
+   * ログイン後 / 起動時: プロフィールを先に反映し、参加データ等は背面で取得。
    */
   const hydrateSessionData = useCallback(
     async (
@@ -163,55 +190,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ): Promise<UserProfile | null> => {
       if (!authUser.id) return null;
 
-      const generation = ++hydrateGenerationRef.current;
-      try {
-        if (!options?.force && lastHydratedUserIdRef.current === authUser.id) {
-          return getUserProfile();
-        }
-
-        if (await rejectIfBanned(authUser.id)) {
-          return null;
-        }
-        if (generation !== hydrateGenerationRef.current) return null;
-
-        await hydrateParticipantSessionData();
-        if (generation !== hydrateGenerationRef.current) return null;
-
-        setActiveProfileUserId(authUser.id);
-        const profile = await fetchRemoteProfileForUser(authUser);
-        if (generation !== hydrateGenerationRef.current) return null;
-
-        if (await rejectIfBanned(authUser.id)) {
-          return null;
-        }
-        if (generation !== hydrateGenerationRef.current) return null;
-
-        updateUserProfile(profile);
-        lastHydratedUserIdRef.current = authUser.id;
-
-        void refreshBlocks().catch(() => undefined);
-        void registerDevicePushToken().catch(() => undefined);
-
-        if (__DEV__) {
-          console.log('[auth] session data hydrated', {
-            userId: authUser.id,
-            profileName: profile.name,
-            gender: profile.gender || '(empty)',
-            complete: isProfileComplete(profile),
-          });
-        }
-        return profile;
-      } catch (error) {
-        if (__DEV__) {
-          console.warn('[auth] hydrateSessionData failed', error);
-        }
-        return null;
+      // 同一ユーザーの進行中 hydrate に合流（onAuthStateChanged × completeAuth の二重実行を防ぐ）
+      const inFlight = hydrateInFlightRef.current;
+      if (inFlight && inFlight.userId === authUser.id) {
+        return inFlight.promise;
       }
+
+      if (!options?.force && lastHydratedUserIdRef.current === authUser.id) {
+        return getUserProfile();
+      }
+
+      const generation = ++hydrateGenerationRef.current;
+
+      const run = async (): Promise<UserProfile | null> => {
+        try {
+          if (await rejectIfBanned(authUser.id)) {
+            return null;
+          }
+          if (generation !== hydrateGenerationRef.current) return null;
+
+          // 1) 即時表示 → 2) リモートプロフィール（UI ブロックはここまで）
+          seedProfileFromAuth(authUser);
+          const profile = await fetchRemoteProfileForUser(authUser);
+          if (generation !== hydrateGenerationRef.current) return null;
+
+          if (await rejectIfBanned(authUser.id)) {
+            return null;
+          }
+          if (generation !== hydrateGenerationRef.current) return null;
+
+          updateUserProfile(profile);
+          lastHydratedUserIdRef.current = authUser.id;
+
+          // 3) イベント／参加／チャットはプロフィール表示後に背面実行
+          void hydrateParticipantSessionData().catch((error) => {
+            if (__DEV__) {
+              console.warn('[auth] hydrateParticipantSessionData failed', error);
+            }
+          });
+          void refreshBlocks().catch(() => undefined);
+          void registerDevicePushToken().catch(() => undefined);
+
+          if (__DEV__) {
+            console.log('[auth] session data hydrated', {
+              userId: authUser.id,
+              profileName: profile.name,
+              gender: profile.gender || '(empty)',
+              complete: isProfileComplete(profile),
+            });
+          }
+          return profile;
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('[auth] hydrateSessionData failed', error);
+          }
+          return null;
+        } finally {
+          if (hydrateInFlightRef.current?.userId === authUser.id) {
+            hydrateInFlightRef.current = null;
+          }
+        }
+      };
+
+      const promise = run();
+      hydrateInFlightRef.current = { userId: authUser.id, promise };
+      return promise;
     },
     [
       hydrateParticipantSessionData,
       refreshBlocks,
       rejectIfBanned,
+      seedProfileFromAuth,
       updateUserProfile,
     ],
   );
@@ -278,10 +327,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousId = userRef.current?.id;
       applySession(next);
       if (previousId !== next.id) {
+        seedProfileFromAuth(next);
         void hydrateSessionData(next, { force: true });
       }
     });
-  }, [applySession, clearSessionLocalState, hydrateSessionData]);
+  }, [applySession, clearSessionLocalState, hydrateSessionData, seedProfileFromAuth]);
 
   // API 401 / JWT 失効時: ローカルセッションを破棄して再ログインを促す
   useEffect(() => {
@@ -408,50 +458,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (next: AuthUser) => {
       setIsGuestBrowsing(false);
       applySession(next);
+      // モーダルを閉じる前に OAuth 名・画像を即反映（ゲスト表示のちらつき防止）
+      seedProfileFromAuth(next);
       setLoginVisible(false);
       setLoginReason(undefined);
       const resume = pendingResume.current;
       pendingResume.current = null;
-      setTimeout(() => {
-        void (async () => {
-          if (await rejectIfBanned(next.id)) {
-            return;
+      void (async () => {
+        if (await rejectIfBanned(next.id)) {
+          return;
+        }
+
+        let profile =
+          (await hydrateSessionData(next, { force: true })) ??
+          getUserProfile();
+
+        if (!userRef.current) return;
+
+        if (!isProfileComplete(profile)) {
+          const remoteComplete = await hasCompleteRemoteProfile(next.id);
+          if (remoteComplete) {
+            profile = await fetchRemoteProfileForUser(next);
+            updateUserProfile(profile);
           }
+        }
 
-          let profile =
-            (await hydrateSessionData(next, { force: true })) ??
-            getUserProfile();
+        if (isProfileComplete(profile)) {
+          await markProfileSetupComplete(next.id);
+          setProfileSetupVisible(false);
+          resume?.();
+          return;
+        }
 
-          if (!userRef.current) return;
+        const setupDone = await isProfileSetupMarkedComplete(next.id);
+        if (setupDone) {
+          setProfileSetupVisible(false);
+          resume?.();
+          return;
+        }
 
-          if (!isProfileComplete(profile)) {
-            const remoteComplete = await hasCompleteRemoteProfile(next.id);
-            if (remoteComplete) {
-              profile = await fetchRemoteProfileForUser(next);
-              updateUserProfile(profile);
-            }
-          }
-
-          if (isProfileComplete(profile)) {
-            await markProfileSetupComplete(next.id);
-            setProfileSetupVisible(false);
-            resume?.();
-            return;
-          }
-
-          const setupDone = await isProfileSetupMarkedComplete(next.id);
-          if (setupDone) {
-            setProfileSetupVisible(false);
-            resume?.();
-            return;
-          }
-
-          pendingAfterProfile.current = resume;
-          setProfileSetupVisible(true);
-        })();
-      }, 80);
+        pendingAfterProfile.current = resume;
+        setProfileSetupVisible(true);
+      })();
     },
-    [applySession, hydrateSessionData, rejectIfBanned, updateUserProfile],
+    [
+      applySession,
+      hydrateSessionData,
+      rejectIfBanned,
+      seedProfileFromAuth,
+      updateUserProfile,
+    ],
   );
 
   const continueAsGuest = useCallback(() => {
@@ -543,6 +599,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoginReason(undefined);
     setProfileSetupVisible(false);
     resetJoinedClubs();
+    clearPersistedJoinedClubs();
     clearBlockedUsers();
     clearAllChatThreads();
     await clearPhoneVerification();
@@ -551,6 +608,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true as const };
   }, [
     clearBlockedUsers,
+    clearPersistedJoinedClubs,
     clearSessionLocalState,
     resetAccountData,
     resetJoinedClubs,

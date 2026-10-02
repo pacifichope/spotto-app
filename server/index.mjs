@@ -2269,9 +2269,18 @@ const server = http.createServer(async (req, res) => {
       const modeMatch =
         (!skMeta.mode || skMeta.mode === mode) &&
         (!pkMeta.mode || pkMeta.mode === mode);
+      const fbOk = Boolean(getFirebaseAdmin());
       json(res, 200, {
         ok: true,
+        // 古い／別サービスの {"status":"ok"} と区別するための識別子
+        status: 'ok',
         service: 'spotto-api',
+        auth: {
+          lineFirebase: 'POST /auth/line-firebase',
+          lineToken: 'POST /auth/line-token',
+          ensureClaims: 'POST /auth/firebase-ensure-claims',
+          firebaseAdmin: fbOk,
+        },
         stripe: {
           mode,
           configured: Boolean(stripeSecretKey()),
@@ -2294,6 +2303,26 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // 認証ルートの存在確認（デプロイ検証用。本体は POST）
+    if (
+      (pathname === '/auth/line-firebase' ||
+        pathname === '/auth/line-token' ||
+        pathname === '/auth/firebase-ensure-claims') &&
+      (req.method === 'GET' || req.method === 'HEAD')
+    ) {
+      json(res, 200, {
+        ok: true,
+        service: 'spotto-api',
+        endpoint: pathname,
+        methods: ['POST'],
+        hint:
+          pathname === '/auth/line-firebase'
+            ? 'POST JSON { accessToken, idToken? } or { code, redirectUri, codeVerifier? }'
+            : undefined,
+      });
+      return;
+    }
+
     if (pathname === '/admin/access' && req.method === 'GET') {
       json(res, 200, await handleAdminAccess(req));
       return;
@@ -2309,94 +2338,84 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method !== 'POST') {
-      json(res, 404, { error: 'not found' });
+      json(res, 404, {
+        error: 'not found',
+        service: 'spotto-api',
+        path: pathname,
+        method: req.method,
+      });
       return;
     }
 
     const body = await readJson(req);
-    if (url.pathname === '/payments' || url.pathname === '/payments/') {
+    if (pathname === '/payments') {
       json(res, 200, await handlePayments(body));
       return;
     }
-    if (
-      url.pathname === '/payments/status' ||
-      url.pathname === '/payments/status/'
-    ) {
+    if (pathname === '/payments/status') {
       json(res, 200, await handlePaymentIntentStatus(body));
       return;
     }
-    if (
-      url.pathname === '/payments/confirm' ||
-      url.pathname === '/payments/confirm/'
-    ) {
+    if (pathname === '/payments/confirm') {
       json(res, 200, await handlePaymentConfirm(body));
       return;
     }
-    if (url.pathname === '/refunds' || url.pathname === '/refunds/') {
+    if (pathname === '/refunds') {
       json(res, 200, await handleRefunds(body));
       return;
     }
-    if (url.pathname === '/notify' || url.pathname === '/notify/') {
+    if (pathname === '/notify') {
       json(res, 200, await handleNotify(body));
       return;
     }
-    if (url.pathname === '/push' || url.pathname === '/push/') {
+    if (pathname === '/push') {
       json(res, 200, await handlePush(body));
       return;
     }
-    if (url.pathname === '/contact' || url.pathname === '/contact/') {
+    if (pathname === '/contact') {
       json(res, 200, await handleContact(req, body));
       return;
     }
-    if (
-      url.pathname === '/auth/line-token' ||
-      url.pathname === '/auth/line-token/'
-    ) {
+    if (pathname === '/auth/line-token') {
       json(res, 200, await handleLineToken(body));
       return;
     }
-    if (
-      url.pathname === '/auth/line-firebase' ||
-      url.pathname === '/auth/line-firebase/'
-    ) {
+    if (pathname === '/auth/line-firebase') {
       json(res, 200, await handleLineFirebase(body));
       return;
     }
-    if (
-      url.pathname === '/auth/firebase-ensure-claims' ||
-      url.pathname === '/auth/firebase-ensure-claims/'
-    ) {
+    if (pathname === '/auth/firebase-ensure-claims') {
       json(res, 200, await handleFirebaseEnsureClaims(req));
       return;
     }
-    if (url.pathname === '/phone/send' || url.pathname === '/phone/send/') {
+    if (pathname === '/phone/send') {
       json(res, 200, await handlePhoneSend(body));
       return;
     }
-    if (url.pathname === '/phone/verify' || url.pathname === '/phone/verify/') {
+    if (pathname === '/phone/verify') {
       json(res, 200, await handlePhoneVerify(body));
       return;
     }
-    if (
-      url.pathname === '/account/delete' ||
-      url.pathname === '/account/delete/'
-    ) {
+    if (pathname === '/account/delete') {
       json(res, 200, await handleAccountDelete(req));
       return;
     }
-    if (
-      url.pathname === '/cron/reminders' ||
-      url.pathname === '/cron/reminders/'
-    ) {
+    if (pathname === '/cron/reminders') {
       json(res, 200, await handleReminders(req));
       return;
     }
-    json(res, 404, { error: 'not found' });
+    json(res, 404, {
+      error: 'not found',
+      service: 'spotto-api',
+      path: pathname,
+      method: req.method,
+    });
   } catch (error) {
     const status = Number(error?.status) || 500;
     console.warn('[api]', route, error);
     json(res, status, {
       error: error instanceof Error ? error.message : 'server error',
+      service: 'spotto-api',
     });
   }
 });
