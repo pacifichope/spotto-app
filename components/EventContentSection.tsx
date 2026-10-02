@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutAnimation,
   Modal,
@@ -32,6 +33,7 @@ type EventContentSectionProps = {
 export default function EventContentSection({
   text,
 }: EventContentSectionProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const body = useMemo(
     () =>
@@ -64,7 +66,7 @@ export default function EventContentSection({
         <Text style={styles.sectionTitle}>Activity Details</Text>
         <View style={styles.card}>
           <Text style={styles.empty}>
-            イベント内容はまだ登録されていません。
+            {t('events.contentEmpty')}
           </Text>
         </View>
       </View>
@@ -106,7 +108,7 @@ export default function EventContentSection({
               pressed && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={expanded ? '折りたたむ' : '展開する'}
+            accessibilityLabel={expanded ? t('common.collapse') : t('common.expand')}
           >
             <Text style={styles.expandText}>
               {expanded ? 'Collapse' : 'Expand'}
@@ -133,9 +135,9 @@ export default function EventContentSection({
               onPress={() => setFullOpen(false)}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="閉じる"
+              accessibilityLabel={t('common.close')}
             >
-              <Text style={styles.fullClose}>閉じる</Text>
+              <Text style={styles.fullClose}>{t('common.close')}</Text>
             </Pressable>
           </View>
           <ScrollView

@@ -55,6 +55,7 @@ import {
 } from '@/lib/chatsRemote';
 import type { SportEvent } from '@/lib/events';
 import { findNgWord, NG_WORD_ERROR_MESSAGE } from '@/lib/ngWords';
+import i18n from '@/lib/i18n';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { notifyChatMessagePush } from '@/lib/pushNotifications';
 import { userFacingNetworkError } from '@/lib/safeAsync';
@@ -548,7 +549,7 @@ async function hydrateRemoteThread(
       mode: room,
       dmUserId: dm,
     });
-    return { ok: false as const, error: 'メッセージの取得に失敗しました' };
+    return { ok: false as const, error: i18n.t('chat.fetchFailed') };
   });
 
   const isLatestGeneration =
@@ -1050,7 +1051,7 @@ async function sendMessage(
 ): Promise<SendMessageResult> {
   const room = parseChatMode(mode);
   const body = text.trim();
-  if (!body) return { ok: false, error: 'メッセージが空です' };
+  if (!body) return { ok: false, error: i18n.t('chat.emptyMessage') };
   if (findNgWord(body)) {
     return { ok: false, error: NG_WORD_ERROR_MESSAGE };
   }
@@ -1067,7 +1068,7 @@ async function sendMessage(
           : null)
       : null;
   if (room === 'host' && !dm) {
-    return { ok: false, error: 'DM の相手が特定できません' };
+    return { ok: false, error: i18n.t('chat.dmPeerUnknown') };
   }
 
   const id = chatThreadId(eventId, room, dm);
@@ -1136,7 +1137,7 @@ async function sendMessage(
     });
     return {
       ok: false,
-      error: 'このイベントではクラウド同期できません。',
+      error: i18n.t('chat.cloudSyncUnavailable'),
     };
   }
 
@@ -1155,7 +1156,7 @@ async function sendMessage(
     });
     return {
       ok: false,
-      error: 'ログインセッションを確認できません。再ログインしてください。',
+      error: i18n.t('chat.sessionLost'),
     };
   }
 
@@ -1196,7 +1197,7 @@ async function sendMessage(
     });
     return {
       ok: false,
-      error: userFacingNetworkError(remote.error, 'メッセージの送信に失敗しました'),
+      error: userFacingNetworkError(remote.error, i18n.t('chat.sendFailed')),
     };
   }
 
@@ -1261,18 +1262,18 @@ async function deleteMessage(
     (dm ? undefined : snapshot.byId[chatThreadId(eventId, room)]);
   const targetId = String(messageId || '').trim();
   if (!targetId) {
-    return { ok: false, error: 'メッセージ ID がありません' };
+    return { ok: false, error: i18n.t('chat.noMessageId') };
   }
 
   const message = thread?.messages.find((item) => item.id === targetId);
   if (!message) {
-    return { ok: false, error: 'メッセージが見つかりません' };
+    return { ok: false, error: i18n.t('chat.messageNotFound') };
   }
   if (isSeededMessage(message)) {
-    return { ok: false, error: 'このメッセージは削除できません' };
+    return { ok: false, error: i18n.t('chat.cannotDelete') };
   }
   if (message.role !== 'me') {
-    return { ok: false, error: '自分のメッセージのみ削除できます' };
+    return { ok: false, error: i18n.t('chat.deleteOwnOnly') };
   }
   if (
     authUserId &&
@@ -1280,7 +1281,7 @@ async function deleteMessage(
     message.senderId !== 'me' &&
     message.senderId !== authUserId
   ) {
-    return { ok: false, error: '自分のメッセージのみ削除できます' };
+    return { ok: false, error: i18n.t('chat.deleteOwnOnly') };
   }
 
   const resolvedThreadId = thread?.id ?? threadId;
@@ -1290,7 +1291,7 @@ async function deleteMessage(
       ok: false,
       error: userFacingNetworkError(
         remote.error,
-        'メッセージの削除に失敗しました',
+        i18n.t('chat.deleteFailed'),
       ),
     };
   }

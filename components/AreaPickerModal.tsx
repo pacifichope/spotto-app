@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Modal,
@@ -10,6 +11,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
+import {
+  prefectureDisplayLabel,
+  prefectureGroupDisplayTitle,
+} from '@/lib/areaLabels';
 import {
   PREFECTURE_GROUPS,
   getPrefectureById,
@@ -33,6 +38,7 @@ export default function AreaPickerModal({
   onSelectNearby,
   onSelectPrefecture,
 }: AreaPickerModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const nearbySelected = selection?.mode === 'nearby';
   const selectedPrefectureId =
@@ -48,9 +54,9 @@ export default function AreaPickerModal({
       <View style={[styles.root, { paddingTop: insets.top || 8 }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
-            <Text style={styles.cancel}>キャンセル</Text>
+            <Text style={styles.cancel}>{t('common.cancel')}</Text>
           </Pressable>
-          <Text style={styles.title}>都道府県</Text>
+          <Text style={styles.title}>{t('areas.pickerTitle')}</Text>
           <View style={styles.headerSide} />
         </View>
 
@@ -65,7 +71,7 @@ export default function AreaPickerModal({
             onPress={onSelectNearby}
             disabled={locating}
           >
-            <Text style={styles.itemLabel}>現在地</Text>
+            <Text style={styles.itemLabel}>{t('areas.nearby')}</Text>
             {locating ? (
               <ActivityIndicator color={theme.colors.primaryDark} />
             ) : nearbySelected ? (
@@ -73,9 +79,11 @@ export default function AreaPickerModal({
             ) : null}
           </Pressable>
 
-          {PREFECTURE_GROUPS.map((group) => (
+          {PREFECTURE_GROUPS.map((group, groupIndex) => (
             <View key={group.title}>
-              <Text style={styles.section}>{group.title}</Text>
+              <Text style={styles.section}>
+                {prefectureGroupDisplayTitle(groupIndex, group.title)}
+              </Text>
               {group.ids.map((id) => {
                 const prefecture = getPrefectureById(id);
                 const selected = selectedPrefectureId === prefecture.id;
@@ -85,7 +93,9 @@ export default function AreaPickerModal({
                     style={[styles.item, selected && styles.itemSelected]}
                     onPress={() => onSelectPrefecture(prefecture.id)}
                   >
-                    <Text style={styles.itemLabel}>{prefecture.label}</Text>
+                    <Text style={styles.itemLabel}>
+                      {prefectureDisplayLabel(prefecture.id)}
+                    </Text>
                     {selected ? <Text style={styles.check}>✓</Text> : null}
                   </Pressable>
                 );

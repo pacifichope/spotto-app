@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +62,7 @@ export default function LocationPickerModal({
   onClose,
   onConfirm,
 }: LocationPickerModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
   const searchSeq = useRef(0);
@@ -235,8 +237,8 @@ export default function LocationPickerModal({
     const trimmed = label.trim();
     if (!trimmed || looksLikeCoordinateLabel(trimmed)) {
       Alert.alert(
-        '場所の名称を入力',
-        '施設名・会場名など、場所の名前を入力してください。',
+        t('create.location.nameRequiredTitle'),
+        t('create.location.nameRequiredBody'),
       );
       return;
     }
@@ -294,11 +296,11 @@ export default function LocationPickerModal({
         >
           <View style={styles.header}>
             <Pressable onPress={onClose} hitSlop={12}>
-              <Text style={styles.cancel}>キャンセル</Text>
+              <Text style={styles.cancel}>{t('common.cancel')}</Text>
             </Pressable>
-            <Text style={styles.title}>活動地点をピン留め</Text>
+            <Text style={styles.title}>{t('create.location.titleMap')}</Text>
             <Pressable onPress={handleConfirm} hitSlop={12}>
-              <Text style={styles.confirm}>決定</Text>
+              <Text style={styles.confirm}>{t('common.confirm')}</Text>
             </Pressable>
           </View>
 
@@ -307,7 +309,7 @@ export default function LocationPickerModal({
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="施設名・住所で検索"
+              placeholder={t('create.location.searchPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               autoCorrect={false}
               autoCapitalize="none"
@@ -348,8 +350,8 @@ export default function LocationPickerModal({
           ) : (
             <Text style={styles.hint} pointerEvents="none">
               {query.trim().length >= 2 && !searching
-                ? '候補が見つかりませんでした。地図を動かして位置を選べます。'
-                : '地図をドラッグ・ピンチで移動できます。画面中央のピンが指す位置を選べます。'}
+                ? t('create.location.noResultsMap')
+                : t('create.location.mapHint')}
             </Text>
           )}
         </View>
@@ -364,7 +366,7 @@ export default function LocationPickerModal({
           pointerEvents="auto"
           onPress={() => void goToMyLocation()}
         >
-          <Text style={styles.myLocationText}>現在地</Text>
+          <Text style={styles.myLocationText}>{t('create.location.myLocation')}</Text>
         </Pressable>
         <View
           style={[
@@ -376,13 +378,13 @@ export default function LocationPickerModal({
           ]}
           pointerEvents="auto"
         >
-          <Text style={styles.footerLabel}>場所の名称</Text>
+          <Text style={styles.footerLabel}>{t('create.location.nameLabel')}</Text>
           <View style={styles.labelRow}>
             <TextInput
               style={styles.labelInput}
               value={label}
               onChangeText={setLabel}
-              placeholder="例: 代々木公園グラウンド"
+              placeholder={t('create.location.namePlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
             />
             {resolving ? (
@@ -390,7 +392,7 @@ export default function LocationPickerModal({
             ) : null}
           </View>
           <Pressable style={styles.doneBtn} onPress={handleConfirm}>
-            <Text style={styles.doneText}>この位置に決定</Text>
+            <Text style={styles.doneText}>{t('create.location.confirm')}</Text>
           </Pressable>
         </View>
       </View>

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Pressable,
@@ -14,6 +15,7 @@ import { clubHref } from '@/lib/clubNavigation';
 import { useEvents } from '@/lib/eventsContext';
 
 export default function EventDetailScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
@@ -66,7 +68,7 @@ export default function EventDetailScreen() {
     return (
       <View style={styles.missing}>
         <ActivityIndicator color={theme.colors.primary} />
-        <Text style={styles.missingBody}>イベントを読み込んでいます…</Text>
+        <Text style={styles.missingBody}>{t('events.detailLoading')}</Text>
       </View>
     );
   }
@@ -74,12 +76,12 @@ export default function EventDetailScreen() {
   if (!event) {
     return (
       <View style={styles.missing}>
-        <Text style={styles.missingTitle}>イベントが見つかりません</Text>
+        <Text style={styles.missingTitle}>{t('events.detailNotFoundTitle')}</Text>
         <Text style={styles.missingBody}>
-          リンクのイベントは削除されたか、この端末ではまだ表示できません。
+          {t('events.detailNotFoundBody')}
         </Text>
         <Pressable style={styles.homeBtn} onPress={close}>
-          <Text style={styles.homeBtnText}>ホームに戻る</Text>
+          <Text style={styles.homeBtnText}>{t('common.backToHome')}</Text>
         </Pressable>
       </View>
     );

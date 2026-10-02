@@ -1,4 +1,5 @@
 import { ensureFirebaseAuthenticatedClaim } from '@/lib/firebaseEnsureClaims';
+import i18n from '@/lib/i18n';
 import {
   firebaseJwtHasAuthenticatedRole,
   getFirebaseIdToken,
@@ -23,11 +24,10 @@ import {
 function formatProfileRemoteError(message: string | undefined, fallback: string) {
   const raw = String(message || '').trim() || fallback;
   if (/row level security|rls|42501|permission denied/i.test(raw)) {
-    return (
-      `${raw}\n\n` +
-      'JWT の role: "authenticated" と profiles RLS（requesting_user_id）を確認してください。' +
-      ' SQL: supabase/apply_grants_and_rls_check.sql'
-    );
+    if (__DEV__) {
+      console.warn('[profile] permission/rls', raw);
+    }
+    return fallback;
   }
   return raw;
 }
@@ -165,11 +165,11 @@ export async function pushProfileToRemote(
   profile: UserProfile,
 ): Promise<ProfileRemoteResult> {
   if (!userId || !isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
   const client = getSupabaseClient();
   if (!client) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
 
   await waitForAuthUser(userId);
@@ -185,14 +185,14 @@ export async function pushProfileToRemote(
     return {
       ok: false,
       error:
-        '認証トークンに role: "authenticated" がありません。API（ensure-claims）を確認してください。',
+        i18n.t('errors.authRoleMissing'),
     };
   }
   if (jwtSub && jwtSub !== userId) {
     return {
       ok: false,
       error:
-        'アカウント情報が一致しません。ログアウト後、もう一度ログインしてからお試しください。',
+        i18n.t('errors.profile.accountMismatch'),
     };
   }
 
@@ -246,7 +246,7 @@ export async function pushProfileToRemote(
         ok: false,
         error: formatProfileRemoteError(
           error.message,
-          'プロフィールの保存に失敗しました',
+          i18n.t('errors.profile.saveFailed'),
         ),
       };
     }
@@ -263,7 +263,7 @@ export async function pushProfileToRemote(
       ok: false,
       error: formatProfileRemoteError(
         error instanceof Error ? error.message : undefined,
-        'プロフィールの保存に失敗しました',
+        i18n.t('errors.profile.saveFailed'),
       ),
     };
   }
@@ -332,14 +332,14 @@ export async function fetchPublicProfileByUserId(
 ): Promise<PublicProfileFetchResult> {
   const id = String(userId || '').trim();
   if (!id || id === 'me') {
-    return { ok: false, error: 'ユーザーを特定できませんでした。' };
+    return { ok: false, error: i18n.t('errors.profile.userUnknown') };
   }
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'プロフィールサービスが未設定です。' };
+    return { ok: false, error: i18n.t('errors.profile.serviceUnavailable') };
   }
   const client = getSupabaseClient();
   if (!client) {
-    return { ok: false, error: 'プロフィールサービスが未設定です。' };
+    return { ok: false, error: i18n.t('errors.profile.serviceUnavailable') };
   }
 
   try {
@@ -349,7 +349,7 @@ export async function fetchPublicProfileByUserId(
       console.warn('[profile] public fetch failed', { userId: id, error });
       return {
         ok: false,
-        error: 'プロフィールを取得できませんでした。時間をおいて再度お試しください。',
+        error: i18n.t('errors.profile.fetchFailedRetry'),
       };
     }
     if (!row || !hasRemoteProfileData(row)) {
@@ -382,7 +382,7 @@ export async function fetchPublicProfileByUserId(
     console.warn('[profile] public fetch threw', error);
     return {
       ok: false,
-      error: 'プロフィールを取得できませんでした。',
+      error: i18n.t('errors.profile.fetchFailed'),
     };
   }
 }

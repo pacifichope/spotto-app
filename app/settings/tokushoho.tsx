@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,6 +9,7 @@ import { LEGAL_EXTERNAL_URLS } from '@/lib/settings';
 
 /** 旧アプリ内ルート互換。外部ブラウザで特商法表記を開き設定へ戻る */
 export default function TokushohoSettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,10 +31,10 @@ export default function TokushohoSettingsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="特定商取引法に基づく表記" />
+      <SettingsHeader title={t('settings.tokushoho')} />
       <View style={styles.loading}>
         <ActivityIndicator color={theme.colors.primary} />
-        <Text style={styles.loadingText}>ブラウザで開いています…</Text>
+        <Text style={styles.loadingText}>{t('settings.openingInBrowser')}</Text>
       </View>
     </View>
   );

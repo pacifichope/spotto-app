@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { isRemoteEventId } from '@/lib/chatsRemote';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
@@ -10,10 +11,10 @@ export async function fetchWatchlistEventIds(): Promise<
   WatchlistRemoteResult<string[]>
 > {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
 
   const userId = await resolveAuthUserId();
   if (!userId) {
@@ -30,7 +31,7 @@ export async function fetchWatchlistEventIds(): Promise<
     if (error) {
       return {
         ok: false,
-        error: error.message || '空き通知リストの取得に失敗しました',
+        error: error.message || i18n.t('errors.watchlistFetchFailed'),
       };
     }
 
@@ -44,7 +45,7 @@ export async function fetchWatchlistEventIds(): Promise<
       error:
         error instanceof Error
           ? error.message
-          : '空き通知リストの取得に失敗しました',
+          : i18n.t('errors.watchlistFetchFailed'),
     };
   }
 }
@@ -53,17 +54,17 @@ export async function addWatchlistRemote(
   eventId: string,
 ): Promise<WatchlistRemoteResult<void>> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
   if (!isRemoteEventId(eventId)) {
-    return { ok: false, error: 'このイベントはクラウド同期できません' };
+    return { ok: false, error: i18n.t('errors.cloudSyncUnavailable') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
 
   const userId = await resolveAuthUserId();
   if (!userId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   try {
@@ -78,7 +79,7 @@ export async function addWatchlistRemote(
     if (error) {
       return {
         ok: false,
-        error: error.message || '空き通知の登録に失敗しました',
+        error: error.message || i18n.t('errors.watchlistAddFailed'),
       };
     }
     return { ok: true, data: undefined };
@@ -88,7 +89,7 @@ export async function addWatchlistRemote(
       error:
         error instanceof Error
           ? error.message
-          : '空き通知の登録に失敗しました',
+          : i18n.t('errors.watchlistAddFailed'),
     };
   }
 }
@@ -97,17 +98,17 @@ export async function removeWatchlistRemote(
   eventId: string,
 ): Promise<WatchlistRemoteResult<void>> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
   if (!isRemoteEventId(eventId)) {
-    return { ok: false, error: 'このイベントはクラウド同期できません' };
+    return { ok: false, error: i18n.t('errors.cloudSyncUnavailable') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
 
   const userId = await resolveAuthUserId();
   if (!userId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   try {
@@ -120,7 +121,7 @@ export async function removeWatchlistRemote(
     if (error) {
       return {
         ok: false,
-        error: error.message || '空き通知の解除に失敗しました',
+        error: error.message || i18n.t('errors.watchlistRemoveFailed'),
       };
     }
     return { ok: true, data: undefined };
@@ -130,7 +131,7 @@ export async function removeWatchlistRemote(
       error:
         error instanceof Error
           ? error.message
-          : '空き通知の解除に失敗しました',
+          : i18n.t('errors.watchlistRemoveFailed'),
     };
   }
 }

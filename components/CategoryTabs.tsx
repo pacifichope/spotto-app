@@ -1,8 +1,23 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import BrandGradient from '@/components/BrandGradient';
 import { theme } from '@/constants/theme';
-import { CATEGORIES, type CategoryId } from '@/lib/events';
+import { CATEGORIES, OTHER_SPORT_LABEL, type CategoryId } from '@/lib/events';
+
+/** カテゴリ ID（データ上の識別子）→ 翻訳キー */
+const CATEGORY_LABEL_KEYS: Record<string, string> = {
+  all: 'all',
+  hot: 'hot',
+  サッカー: 'soccer',
+  バスケットボール: 'basketball',
+  テニス: 'tennis',
+  ランニング: 'running',
+  フットサル: 'futsal',
+  バドミントン: 'badminton',
+  バレーボール: 'volleyball',
+  [OTHER_SPORT_LABEL]: 'other',
+};
 
 type CategoryTabsProps = {
   activeId: CategoryId;
@@ -10,6 +25,13 @@ type CategoryTabsProps = {
 };
 
 export default function CategoryTabs({ activeId, onChange }: CategoryTabsProps) {
+  const { t } = useTranslation();
+  const labelFor = (cat: (typeof CATEGORIES)[number]) => {
+    const key = CATEGORY_LABEL_KEYS[cat.id];
+    return key
+      ? t(`home.categories.${key}`, { defaultValue: cat.label })
+      : cat.label;
+  };
   return (
     <ScrollView
       horizontal
@@ -33,12 +55,12 @@ export default function CategoryTabs({ activeId, onChange }: CategoryTabsProps) 
             accessibilityState={{ selected: active }}
             accessibilityLabel={
               active && cat.id !== 'all'
-                ? `${cat.label}の絞り込みを解除`
-                : cat.label
+                ? t('home.categoryClearA11y', { category: labelFor(cat) })
+                : labelFor(cat)
             }
           >
             <Text style={[styles.label, active && styles.labelActive]}>
-              {cat.label}
+              {labelFor(cat)}
             </Text>
             {active ? <BrandGradient style={styles.marker} /> : null}
           </Pressable>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Modal,
@@ -13,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
+import { MONTH_KEYS, WEEKDAY_KEYS } from '@/lib/createEventLabels';
 import {
   ALLOW_PAST_EVENT_DATES,
   PAST_EVENT_DATE_LOOKBACK_DAYS,
@@ -22,6 +24,7 @@ import {
   formatDateStamp,
   parseEventDateTime,
 } from '@/lib/events';
+import i18n from '@/lib/i18n';
 
 export type PickedEventSchedule = {
   date: string;
@@ -46,22 +49,6 @@ const VISIBLE = 5;
 const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
 const DAY_COUNT = 45;
 const MINUTE_STEP = 5;
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
 function pad2(value: number) {
   return String(value).padStart(2, '0');
 }
@@ -75,13 +62,17 @@ function dateLabel(value: Date, today: Date) {
   const diffDays = Math.round(
     (value.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
   );
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays === -1) return 'Yesterday';
-  if (diffDays < 0) {
-    return `${WEEKDAYS[value.getDay()]}, ${MONTHS[value.getMonth()]} ${value.getDate()} (past)`;
-  }
-  return `${WEEKDAYS[value.getDay()]}, ${MONTHS[value.getMonth()]} ${value.getDate()}`;
+  if (diffDays === 0) return i18n.t('create.timePicker.today');
+  if (diffDays === 1) return i18n.t('create.timePicker.tomorrow');
+  if (diffDays === -1) return i18n.t('create.timePicker.yesterday');
+  const base = i18n.t('create.timePicker.dateFormat', {
+    weekday: i18n.t(`create.weekdaysShort.${WEEKDAY_KEYS[value.getDay()]}`),
+    month: value.getMonth() + 1,
+    monthName: i18n.t(`create.monthsShort.${MONTH_KEYS[value.getMonth()]}`),
+    day: value.getDate(),
+  });
+  if (diffDays < 0) return `${base} ${i18n.t('create.timePicker.past')}`;
+  return base;
 }
 
 function buildAllDateItems(): WheelItem[] {
@@ -112,7 +103,6 @@ function buildMinuteItems(): WheelItem[] {
   });
 }
 
-const ALL_DATES = buildAllDateItems();
 const ALL_HOURS = buildHourItems();
 const ALL_MINUTES = buildMinuteItems();
 
@@ -243,7 +233,12 @@ export default function EventTimePickerModal({
   onClose,
   onConfirm,
 }: EventTimePickerModalProps) {
+  const { t, i18n: i18nInstance } = useTranslation();
+  const language = i18nInstance.language;
   const insets = useSafeAreaInsets();
+  // 日付ラベルは言語に依存するため、言語変更・再オープンのたびに作り直す
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allDates = useMemo(() => buildAllDateItems(), [language, visible]);
   const [step, setStep] = useState<'start' | 'end'>('start');
   const [start, setStart] = useState(initial);
   const [dateKey, setDateKey] = useState(initial.date);
@@ -265,9 +260,10 @@ export default function EventTimePickerModal({
         .filter((key) => key >= minEnd.date)
         .map(dateItemForKey);
     }
-    if (step !== 'end') return ALL_DATES;
-    return ALL_DATES.filter((item) => item.key >= minEnd.date);
-  }, [step, minEnd.date, fixedDate]);
+    if (step !== 'end') return allDates;
+    return allDates.filter((item) => item.key >= minEnd.date);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, minEnd.date, fixedDate, allDates, language]);
 
   const hourItems = useMemo(() => {
     if (step !== 'end') return ALL_HOURS;
@@ -365,8 +361,8 @@ export default function EventTimePickerModal({
     const endAt = parseEventDateTime(picked.date, picked.time).getTime();
     if (!Number.isFinite(endAt) || endAt <= startAt) {
       Alert.alert(
-        '終了時間',
-        '終了時間は開始時間より後に設定してください',
+        t('create.timePicker.endErrorTitle'),
+        t('create.timePicker.endErrorBody'),
       );
       showWheels(minEnd.date, minEnd.time, 'end');
       return;
@@ -403,11 +399,13 @@ export default function EventTimePickerModal({
         <View style={styles.header}>
           <Pressable onPress={handleLeft} hitSlop={12} style={styles.headerSide}>
             <Text style={styles.headerLeft}>
-              {step === 'end' ? '戻る' : 'キャンセル'}
+              {step === 'end' ? t('common.back') : t('common.cancel')}
             </Text>
           </Pressable>
           <Text style={styles.title}>
-            {step === 'start' ? '開始時間' : '終了時間'}
+            {step === 'start'
+              ? t('create.timePicker.startTitle')
+              : t('create.timePicker.endTitle')}
           </Text>
           <Pressable onPress={handleConfirm} hitSlop={8} style={styles.headerSide}>
             <View style={styles.confirmBtn}>
@@ -418,11 +416,15 @@ export default function EventTimePickerModal({
         <Text style={styles.subtitle}>
           {fixedDate
             ? step === 'start'
-              ? `${fixedDateLabel(fixedDate)} の開始時刻を選んでください`
-              : `${fixedDateLabel(fixedDate)} の終了時刻を選んでください`
+              ? t('create.timePicker.subtitleStartFixed', {
+                  date: fixedDateLabel(fixedDate),
+                })
+              : t('create.timePicker.subtitleEndFixed', {
+                  date: fixedDateLabel(fixedDate),
+                })
             : step === 'start'
-              ? '開始の日付・時刻を選んでください'
-              : '開始より後の日時だけ選べます'}
+              ? t('create.timePicker.subtitleStart')
+              : t('create.timePicker.subtitleEnd')}
         </Text>
 
         {wheelsReady && dateItems.length > 0 && hourItems.length > 0 && minuteItems.length > 0 ? (

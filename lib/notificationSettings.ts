@@ -1,6 +1,8 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
+
 export type NotificationPreferenceKey =
   | 'eventReminders'
   | 'chatMessages'
@@ -14,26 +16,27 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   eventUpdates: false,
 };
 
+function notificationPrefRow(key: NotificationPreferenceKey) {
+  return {
+    key,
+    // getter: 参照時点の言語で解決する（言語切替に追従）
+    get label() {
+      return i18n.t(`settings.notificationPrefs.${key}.label`);
+    },
+    get caption() {
+      return i18n.t(`settings.notificationPrefs.${key}.caption`);
+    },
+  };
+}
+
 export const NOTIFICATION_PREF_ROWS: {
   key: NotificationPreferenceKey;
-  label: string;
-  caption: string;
+  readonly label: string;
+  readonly caption: string;
 }[] = [
-  {
-    key: 'eventReminders',
-    label: 'イベントのリマインダー',
-    caption: '前日・当日の開始をお知らせします',
-  },
-  {
-    key: 'chatMessages',
-    label: 'メッセージ・チャットの通知',
-    caption: '新しいメッセージを受け取ります',
-  },
-  {
-    key: 'eventUpdates',
-    label: 'イベントの更新・変更のお知らせ',
-    caption: '時間・場所などの変更をお知らせします',
-  },
+  notificationPrefRow('eventReminders'),
+  notificationPrefRow('chatMessages'),
+  notificationPrefRow('eventUpdates'),
 ];
 
 const STORAGE_KEY = '@spotto/notification-settings';
@@ -138,7 +141,7 @@ export async function ensureNotificationPermission(): Promise<NotificationPermis
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'お知らせ',
+        name: i18n.t('settings.notificationChannelName'),
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#29D1E8',

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +21,7 @@ import { theme } from '@/constants/theme';
 import { confirmDeleteAccount } from '@/lib/accountDeletion';
 import { useAuth } from '@/lib/authContext';
 import { useBlocks } from '@/lib/blocksContext';
+import { getCurrentAppLanguage } from '@/lib/i18n';
 import { LEGAL_EXTERNAL_URLS } from '@/lib/settings';
 import { useUserProfile } from '@/lib/userProfileContext';
 import { setActiveProfileUserId } from '@/lib/userProfile';
@@ -44,6 +46,8 @@ type Row = {
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { t } = useTranslation();
+  const language = getCurrentAppLanguage();
   const { userProfile, updateUserProfile } = useUserProfile();
   const { isLoggedIn, user, openLogin, signOut, deleteAccount } = useAuth();
   const { blockedUsers } = useBlocks();
@@ -58,19 +62,18 @@ export default function SettingsScreen() {
     const performLogout = () => {
       signOut();
       router.replace('/');
-      // 画面遷移後も確実に見えるよう Alert で通知
       setTimeout(() => {
-        Alert.alert('ログアウトしました');
+        Alert.alert(t('settings.logoutDone'));
       }, 100);
     };
     if (Platform.OS === 'web') {
       performLogout();
       return;
     }
-    Alert.alert('ログアウト', 'この端末からログアウトしますか？', [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(t('settings.logoutConfirmTitle'), t('settings.logoutConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'ログアウト',
+        text: t('settings.logout'),
         style: 'destructive',
         onPress: performLogout,
       },
@@ -83,12 +86,11 @@ export default function SettingsScreen() {
     const result = await deleteAccount();
     setDeleting(false);
     if (!result.ok) {
-      Alert.alert('削除できませんでした', result.error);
+      Alert.alert(t('settings.deleteFailedTitle'), result.error);
       return;
     }
-    const title = 'アカウントを削除しました';
-    const message =
-      'データは削除され、ログアウトしました。イベントの閲覧はゲストのまま続けられます。';
+    const title = t('settings.deleteDoneTitle');
+    const message = t('settings.deleteDoneMessage');
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.alert(`${title}\n\n${message}`);
     } else {
@@ -108,10 +110,15 @@ export default function SettingsScreen() {
     });
   };
 
+  const languageCaption =
+    language === 'en'
+      ? t('settings.languageEnglish')
+      : t('settings.languageJapanese');
+
   const rows: Row[] = [
     {
       key: 'profile',
-      label: 'プロフィール編集',
+      label: t('settings.profile'),
       onPress: () => {
         if (!isLoggedIn) {
           openLogin();
@@ -121,30 +128,36 @@ export default function SettingsScreen() {
       },
     },
     {
+      key: 'language',
+      label: t('settings.language'),
+      caption: languageCaption,
+      onPress: () => router.push('/settings/language'),
+    },
+    {
       key: 'notifications',
-      label: '通知設定',
-      caption: 'リマインダー・メッセージなど',
+      label: t('settings.notifications'),
+      caption: t('settings.notificationsCaption'),
       onPress: () => router.push('/settings/notifications'),
     },
     {
       key: 'blocklist',
-      label: 'ブロックリスト',
+      label: t('settings.blocklist'),
       caption:
         blockedUsers.length > 0
-          ? `${blockedUsers.length}人をブロック中`
-          : 'ブロック中のユーザーはいません',
+          ? t('settings.blocklistCaptionCount', { count: blockedUsers.length })
+          : t('settings.blocklistCaptionEmpty'),
       onPress: () => router.push('/settings/blocklist'),
     },
     {
       key: 'contact',
-      label: 'お問い合わせ',
-      caption: '不具合・ご質問は運営へ',
+      label: t('settings.contact'),
+      caption: t('settings.contactCaption'),
       onPress: () => router.push('/settings/contact'),
     },
     {
       key: 'terms',
-      label: '利用規約',
-      caption: 'サービスの利用条件',
+      label: t('settings.terms'),
+      caption: t('settings.termsCaption'),
       external: true,
       onPress: () => {
         void Linking.openURL(LEGAL_EXTERNAL_URLS.terms);
@@ -152,8 +165,8 @@ export default function SettingsScreen() {
     },
     {
       key: 'privacy',
-      label: 'プライバシーポリシー',
-      caption: '個人情報の取り扱い',
+      label: t('settings.privacy'),
+      caption: t('settings.privacyCaption'),
       external: true,
       onPress: () => {
         void Linking.openURL(LEGAL_EXTERNAL_URLS.privacy);
@@ -161,8 +174,8 @@ export default function SettingsScreen() {
     },
     {
       key: 'tokushoho',
-      label: '特定商取引法に基づく表記',
-      caption: '運営者情報・支払・キャンセル',
+      label: t('settings.tokushoho'),
+      caption: t('settings.tokushohoCaption'),
       external: true,
       onPress: () => {
         void Linking.openURL(LEGAL_EXTERNAL_URLS.tokushoho);
@@ -170,10 +183,10 @@ export default function SettingsScreen() {
     },
     {
       key: 'delete',
-      label: 'アカウントを削除',
+      label: t('settings.deleteAccount'),
       caption: isLoggedIn
-        ? '退会するとデータは削除されます'
-        : 'ログイン中のアカウントのみ削除できます',
+        ? t('settings.deleteAccountCaptionLoggedIn')
+        : t('settings.deleteAccountCaptionGuest'),
       tone: 'danger',
       busy: deleting,
       disabled: deleting,
@@ -183,7 +196,7 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="設定" />
+      <SettingsHeader title={t('settings.title')} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -243,20 +256,20 @@ export default function SettingsScreen() {
               onPress={onPressLogout}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="ログアウト"
+              accessibilityLabel={t('settings.logout')}
               style={styles.logoutLink}
             >
-              <Text style={styles.logoutLinkText}>ログアウト</Text>
+              <Text style={styles.logoutLinkText}>{t('settings.logout')}</Text>
             </Pressable>
           ) : (
             <Pressable
               onPress={() => openLogin()}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="ログイン"
+              accessibilityLabel={t('settings.login')}
               style={styles.logoutLink}
             >
-              <Text style={styles.loginLinkText}>ログイン</Text>
+              <Text style={styles.loginLinkText}>{t('settings.login')}</Text>
             </Pressable>
           )}
         </View>
@@ -276,11 +289,12 @@ export default function SettingsScreen() {
             void (async () => {
               const result = await pushProfileToRemote(user.id, next);
               if (!result.ok) {
-                const msg = result.error || 'プロフィールをサーバーに保存できませんでした。';
+                const msg = result.error || t('common.profileSaveFailedBody');
+                const failTitle = t('common.saveFailedShort');
                 if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                  window.alert(`保存できませんでした\n\n${msg}`);
+                  window.alert(`${failTitle}\n\n${msg}`);
                 } else {
-                  Alert.alert('保存できませんでした', msg);
+                  Alert.alert(failTitle, msg);
                 }
               }
             })();

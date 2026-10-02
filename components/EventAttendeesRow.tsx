@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import AttendeeAvatarWithBadges from '@/components/AttendeeAvatarWithBadges';
@@ -32,9 +33,10 @@ export default function EventAttendeesRow({
   onPressAttendee,
   onPressOverflow,
 }: EventAttendeesRowProps) {
+  const { t } = useTranslation();
   if (attendees.length === 0) {
     return (
-      <Text style={styles.empty}>まだ参加者はいません。最初の一人になれます。</Text>
+      <Text style={styles.empty}>{t('events.attendeesEmpty')}</Text>
     );
   }
 
@@ -58,7 +60,13 @@ export default function EventAttendeesRow({
                 { marginLeft: index === 0 ? 0 : -OVERLAP, zIndex: index + 1 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`${person.self ? '自分' : person.name}のプロフィール${isHost ? '（主催）' : ''}${qty > 1 ? `、チケット${qty}枚` : ''}`}
+              accessibilityLabel={[
+                t('events.attendeeProfileA11y', {
+                  name: person.self ? t('events.attendeeSelf') : person.name,
+                }),
+                isHost ? t('events.attendeeHostSuffix') : '',
+                qty > 1 ? t('events.attendeeTicketsSuffix', { count: qty }) : '',
+              ].join('')}
             >
               <AttendeeAvatarWithBadges
                 attendee={person}
@@ -76,7 +84,7 @@ export default function EventAttendeesRow({
               { marginLeft: -OVERLAP, zIndex: visible.length + 1 },
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`他${overflow + 1}名の参加者を見る`}
+            accessibilityLabel={t('events.attendeesOverflowA11y', { count: overflow + 1 })}
           >
             <View style={styles.overflow}>
               <Text style={styles.overflowText}>+{overflow + 1}</Text>
@@ -87,7 +95,7 @@ export default function EventAttendeesRow({
       <Pressable
         onPress={onPressOverflow}
         accessibilityRole="button"
-        accessibilityLabel="参加者一覧を開く"
+        accessibilityLabel={t('events.attendeesOpenListA11y')}
       >
         <Text style={styles.preview} numberOfLines={1}>
           {attendeePreviewLabel(attendees)}

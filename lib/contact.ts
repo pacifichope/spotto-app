@@ -2,8 +2,13 @@ import { Linking, Platform, Share } from 'react-native';
 
 import type { AuthUser } from '@/lib/auth';
 import { publicApiUrl, readPublicEnv } from '@/lib/env';
+import i18n from '@/lib/i18n';
 import { APP_DISPLAY_NAME, getAppVersion } from '@/lib/settings';
 
+/**
+ * 問い合わせ種別。値はサーバー／運営宛メールに送る識別子（日本語固定）で、
+ * 画面表示には使わない。表示は contactCategoryLabel() を使う。
+ */
 export const CONTACT_CATEGORIES = [
   '不具合の報告',
   'アカウントについて',
@@ -12,6 +17,19 @@ export const CONTACT_CATEGORIES = [
 ] as const;
 
 export type ContactCategory = (typeof CONTACT_CATEGORIES)[number];
+
+/** 種別 → 翻訳キー */
+export const CONTACT_CATEGORY_KEYS: Record<ContactCategory, string> = {
+  不具合の報告: 'bug',
+  アカウントについて: 'account',
+  'イベント・決済について': 'eventPayment',
+  その他: 'other',
+};
+
+/** 画面表示用の種別ラベル（現在の言語で解決） */
+export function contactCategoryLabel(category: ContactCategory): string {
+  return i18n.t(`contact.categories.${CONTACT_CATEGORY_KEYS[category]}`);
+}
 
 export const MAX_CONTACT_IMAGES = 4;
 
@@ -106,6 +124,7 @@ function identityLines(payload: ContactPayload) {
   ];
 }
 
+/** 運営（日本語）宛てのメール本文。ユーザー向け UI 文言ではないため日本語固定。 */
 function contactPlainBody(payload: ContactPayload) {
   return [
     payload.message.trim(),
@@ -172,11 +191,11 @@ export async function openSupportMail(payload: ContactPayload) {
       shareError.message === 'share_dismissed'
     ) {
       throw new Error(
-        `共有がキャンセルされました。${supportEmail()} 宛に直接ご連絡ください。`,
+        i18n.t('contact.errors.shareCancelled', { email: supportEmail() }),
       );
     }
     throw new Error(
-      `メールアプリを開けませんでした。${supportEmail()} 宛に直接ご連絡ください。`,
+      i18n.t('contact.errors.mailAppFailed', { email: supportEmail() }),
     );
   }
 }
@@ -198,18 +217,18 @@ export async function submitContact(
   const message = payload.message.trim();
   const authenticated = Boolean(payload.authenticated && payload.userId);
   if (!email) {
-    return { ok: false, error: '返信用メールアドレスを入力してください。' };
+    return { ok: false, error: i18n.t('contact.errors.emailRequired') };
   }
   if (!isValidContactEmail(email)) {
-    return { ok: false, error: 'メールアドレスの形式が正しくありません。' };
+    return { ok: false, error: i18n.t('contact.errors.emailInvalid') };
   }
   if (!message) {
-    return { ok: false, error: 'お問い合わせ内容を入力してください。' };
+    return { ok: false, error: i18n.t('contact.errors.messageRequired') };
   }
   if (message.length < 10) {
     return {
       ok: false,
-      error: '内容は10文字以上で入力してください。',
+      error: i18n.t('contact.errors.messageTooShort', { min: 10 }),
     };
   }
 
@@ -277,12 +296,12 @@ export async function submitContact(
       mailError instanceof Error ? mailError.message : '';
     const hint =
       mailMsg ||
-      `送信できませんでした。通信環境を確認するか、${supportEmail()} へ直接メールしてください。`;
+      i18n.t('contact.errors.sendFailed', { email: supportEmail() });
     return {
       ok: false,
       error:
         hint +
-        (apiErrorDetail && __DEV__ ? `（API: ${apiErrorDetail}）` : ''),
+        (apiErrorDetail && __DEV__ ? ` (API: ${apiErrorDetail})` : ''),
     };
   }
 }

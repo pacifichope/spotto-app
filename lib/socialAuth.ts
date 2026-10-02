@@ -3,6 +3,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import { publicApiUrl, readPublicEnv } from '@/lib/env';
+import i18n from '@/lib/i18n';
+import { SOCIAL_LOGIN_USER_ERRORS } from '@/lib/socialLoginErrors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -90,7 +92,7 @@ export function isSocialConfigured(provider: 'line' | 'google' | 'apple') {
 }
 
 function cancelledResult(): SocialAuthResult {
-  return { ok: false, error: 'ログインをキャンセルしました。', cancelled: true };
+  return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.cancelled, cancelled: true };
 }
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -139,7 +141,7 @@ async function googleUserInfo(accessToken: string, idToken?: string) {
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   if (!response.ok) {
-    throw new Error('Google のユーザー情報を取得できませんでした。');
+    throw new Error(SOCIAL_LOGIN_USER_ERRORS.google);
   }
   const data = (await response.json()) as {
     sub?: string;
@@ -148,7 +150,7 @@ async function googleUserInfo(accessToken: string, idToken?: string) {
     picture?: string;
   };
   const id = data.sub?.trim();
-  if (!id) throw new Error('Google アカウントを確認できませんでした。');
+  if (!id) throw new Error(i18n.t('errors.accountNotVerified'));
   return {
     id,
     name: data.name?.trim() || data.email?.trim() || 'Googleユーザー',
@@ -162,8 +164,7 @@ async function authenticateGoogle(): Promise<SocialAuthResult> {
   if (!clientId) {
     return {
       ok: false,
-      error:
-        'Google ログインが未設定です。EXPO_PUBLIC_GOOGLE_*_CLIENT_ID を入れてください。',
+      error: i18n.t('errors.googleNotConfigured'),
     };
   }
 
@@ -189,7 +190,7 @@ async function authenticateGoogle(): Promise<SocialAuthResult> {
   if (result.type !== 'success' || !result.params.code) {
     return {
       ok: false,
-      error: 'Google ログインに失敗しました。もう一度お試しください。',
+      error: SOCIAL_LOGIN_USER_ERRORS.google,
     };
   }
 
@@ -215,8 +216,7 @@ async function authenticateLine(): Promise<SocialAuthResult> {
   if (!channelId) {
     return {
       ok: false,
-      error:
-        'LINE ログインが未設定です。EXPO_PUBLIC_LINE_CHANNEL_ID を入れてください。',
+      error: i18n.t('errors.lineNotConfigured'),
     };
   }
 
@@ -224,8 +224,7 @@ async function authenticateLine(): Promise<SocialAuthResult> {
   if (!apiBase) {
     return {
       ok: false,
-      error:
-        'LINE のトークン交換にはサーバーが必要です。EXPO_PUBLIC_API_BASE_URL を設定してください。',
+      error: SOCIAL_LOGIN_USER_ERRORS.lineApiMissing,
     };
   }
 
@@ -247,7 +246,7 @@ async function authenticateLine(): Promise<SocialAuthResult> {
   if (result.type !== 'success' || !result.params.code) {
     return {
       ok: false,
-      error: 'LINE ログインに失敗しました。もう一度お試しください。',
+      error: SOCIAL_LOGIN_USER_ERRORS.line,
     };
   }
 
@@ -263,7 +262,7 @@ async function authenticateLine(): Promise<SocialAuthResult> {
   if (!response.ok) {
     return {
       ok: false,
-      error: 'LINE の認証サーバーとの通信に失敗しました。',
+      error: SOCIAL_LOGIN_USER_ERRORS.line,
     };
   }
   const data = (await response.json()) as {
@@ -272,7 +271,7 @@ async function authenticateLine(): Promise<SocialAuthResult> {
   const id = data.profile?.id?.trim();
   const name = data.profile?.name?.trim();
   if (!id || !name) {
-    return { ok: false, error: 'LINE アカウントを確認できませんでした。' };
+    return { ok: false, error: i18n.t('errors.accountNotVerified') };
   }
   return {
     ok: true,
@@ -301,7 +300,7 @@ export async function authenticateSocial(
       error:
         error instanceof Error
           ? error.message
-          : 'ソーシャルログインに失敗しました。',
+          : SOCIAL_LOGIN_USER_ERRORS.generic,
     };
   }
 }

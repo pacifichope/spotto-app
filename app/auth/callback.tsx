@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { theme } from '@/constants/theme';
 import { useAuth } from '@/lib/authContext';
@@ -10,6 +11,7 @@ import { useAuth } from '@/lib/authContext';
  * Firebase Auth 移行後は不要だが、ディープリンク互換のためホームへ誘導する。
  */
 export default function AuthCallbackScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { isLoggedIn, isReady } = useAuth();
 
@@ -21,7 +23,7 @@ export default function AuthCallbackScreen() {
   return (
     <View style={styles.container}>
       <ActivityIndicator color={theme.colors.primary} />
-      <Text style={styles.text}>ログインを確認しています…</Text>
+      <Text style={styles.text}>{t('auth.callbackChecking')}</Text>
     </View>
   );
 }

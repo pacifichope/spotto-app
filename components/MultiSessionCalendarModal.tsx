@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Modal,
@@ -14,6 +15,10 @@ import EventTimePickerModal, {
   type PickedEventSchedule,
 } from '@/components/EventTimePickerModal';
 import { theme } from '@/constants/theme';
+import {
+  MONTH_KEYS,
+  WEEKDAY_KEYS,
+} from '@/lib/createEventLabels';
 import {
   ALLOW_PAST_EVENT_DATES,
   PAST_EVENT_DATE_LOOKBACK_DAYS,
@@ -35,8 +40,6 @@ type MultiSessionCalendarModalProps = {
   onConfirm: (sessions: EventSession[]) => void;
 };
 
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
-
 function startOfToday() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -45,14 +48,6 @@ function startOfToday() {
 function parseStamp(stamp: string) {
   const [year, month, day] = stamp.split('-').map(Number);
   return new Date(year, (month || 1) - 1, day || 1);
-}
-
-function weekdayJa(stamp: string) {
-  return WEEKDAYS[parseStamp(stamp).getDay()];
-}
-
-function monthTitle(year: number, monthIndex: number) {
-  return `${year}年${monthIndex + 1}月`;
 }
 
 function makeId() {
@@ -106,7 +101,16 @@ export default function MultiSessionCalendarModal({
   onClose,
   onConfirm,
 }: MultiSessionCalendarModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const weekdayLabel = (dayIndex: number) =>
+    t(`create.weekdaysFull.${WEEKDAY_KEYS[dayIndex] ?? 'sun'}`);
+  const monthTitle = (y: number, mIndex: number) =>
+    t('create.calendar.monthTitle', {
+      year: y,
+      month: mIndex + 1,
+      monthName: t(`create.monthsShort.${MONTH_KEYS[mIndex] ?? 'jan'}`),
+    });
   const today = useMemo(() => startOfToday(), [visible]);
   const todayStamp = formatDateStamp(today);
 
@@ -202,7 +206,10 @@ export default function MultiSessionCalendarModal({
     const target =
       lastSelectedDate ?? orderedSessions[orderedSessions.length - 1]?.date;
     if (!target) {
-      Alert.alert('開催日を選択', '先にカレンダーで日付を選んでください。');
+      Alert.alert(
+        t('create.calendar.selectDateTitle'),
+        t('create.calendar.selectDateFirst'),
+      );
       return;
     }
     const next = defaultSessionForDate(target);
@@ -241,7 +248,10 @@ export default function MultiSessionCalendarModal({
 
   const handleConfirm = () => {
     if (orderedSessions.length === 0) {
-      Alert.alert('開催日を選択', '1日以上の開催日を選んでください。');
+      Alert.alert(
+        t('create.calendar.selectDateTitle'),
+        t('create.calendar.selectAtLeastOne'),
+      );
       return;
     }
     onConfirm(
@@ -264,9 +274,9 @@ export default function MultiSessionCalendarModal({
       <View style={[styles.root, { paddingTop: insets.top || 8 }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
-            <Text style={styles.headerLeft}>キャンセル</Text>
+            <Text style={styles.headerLeft}>{t('common.cancel')}</Text>
           </Pressable>
-          <Text style={styles.title}>活動日時</Text>
+          <Text style={styles.title}>{t('create.calendar.title')}</Text>
           <Pressable onPress={handleConfirm} hitSlop={8} style={styles.headerSide}>
             <View style={styles.confirmBtn}>
               <Text style={styles.confirmMark}>✓</Text>
@@ -310,16 +320,16 @@ export default function MultiSessionCalendarModal({
           </View>
 
           <View style={styles.weekRow}>
-            {WEEKDAYS.map((day, index) => (
+            {WEEKDAY_KEYS.map((dayKey, index) => (
               <Text
-                key={day}
+                key={dayKey}
                 style={[
                   styles.weekLabel,
                   index === 0 && styles.sunday,
                   index === 6 && styles.saturday,
                 ]}
               >
-                {day}
+                {weekdayLabel(index)}
               </Text>
             ))}
           </View>
@@ -365,10 +375,12 @@ export default function MultiSessionCalendarModal({
             })}
           </View>
 
-          <Text style={styles.sectionLabel}>選択した開催日</Text>
+          <Text style={styles.sectionLabel}>
+            {t('create.calendar.selectedDates')}
+          </Text>
           {orderedSessions.length === 0 ? (
             <Text style={styles.emptyHint}>
-              カレンダーの日付をタップして、複数の開催日を選べます
+              {t('create.calendar.emptyHint')}
             </Text>
           ) : (
             orderedSessions.map((session) => {
@@ -380,7 +392,11 @@ export default function MultiSessionCalendarModal({
                     onPress={() => openTimePicker(session)}
                   >
                     <Text style={styles.sessionDate}>
-                      {month}/{day}（{weekdayJa(session.date)}）
+                      {t('create.calendar.rowDate', {
+                        month,
+                        day,
+                        weekday: weekdayLabel(parseStamp(session.date).getDay()),
+                      })}
                     </Text>
                     <Text style={styles.sessionTime}>
                       {formatRowTime(session)}
@@ -400,7 +416,9 @@ export default function MultiSessionCalendarModal({
           )}
 
           <Pressable style={styles.addBtn} onPress={addTimeRange}>
-            <Text style={styles.addBtnText}>+ Add time range</Text>
+            <Text style={styles.addBtnText}>
+              {t('create.calendar.addTimeRange')}
+            </Text>
           </Pressable>
         </ScrollView>
       </View>

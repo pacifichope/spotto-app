@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '@/constants/theme';
 import { formatDateStamp } from '@/lib/events';
+import i18n from '@/lib/i18n';
 
-const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
+/** Date#getDay() の順（日曜始まり） */
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 /** 今日を含む約1ヶ月分（横スクロール） */
 const DATE_STRIP_DAYS = 30;
 
@@ -30,7 +33,10 @@ export function buildWeekDateOptions(now = new Date()): WeekDateOption[] {
     const stamp = formatDateStamp(value);
     return {
       stamp,
-      weekdayLabel: index === 0 ? '今日' : WEEKDAY_JA[value.getDay()]!,
+      weekdayLabel:
+        index === 0
+          ? i18n.t('home.today')
+          : i18n.t(`home.weekday.${WEEKDAY_KEYS[value.getDay()]!}`),
       dayNum: value.getDate(),
       isToday: index === 0,
     };
@@ -42,7 +48,11 @@ export default function HomeWeekDateStrip({
   onSelect,
   now,
 }: HomeWeekDateStripProps) {
-  const options = useMemo(() => buildWeekDateOptions(now), [now]);
+  const { t, i18n: i18nInstance } = useTranslation();
+  const language = i18nInstance.language;
+  // language は言語切替時にラベルを再生成するための依存
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const options = useMemo(() => buildWeekDateOptions(now), [now, language]);
 
   return (
     <View style={styles.wrap}>
@@ -60,7 +70,10 @@ export default function HomeWeekDateStrip({
               style={styles.item}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              accessibilityLabel={`${option.weekdayLabel} ${option.dayNum}日`}
+              accessibilityLabel={t('home.dateStripA11y', {
+                weekday: option.weekdayLabel,
+                day: option.dayNum,
+              })}
             >
               <Text
                 style={[

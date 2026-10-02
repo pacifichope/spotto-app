@@ -1,6 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Alert, Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
 import { openAppSettings } from '@/lib/openAppSettings';
 
 type ImagePickerModule = typeof import('expo-image-picker');
@@ -29,11 +30,11 @@ function promptPhotoLibrarySettings() {
     text: string;
     style?: 'cancel' | 'default';
     onPress?: () => void;
-  }[] = [{ text: '閉じる', style: 'cancel' }];
+  }[] = [{ text: i18n.t('common.close'), style: 'cancel' }];
 
   if (Platform.OS !== 'web') {
     buttons.push({
-      text: '設定を開く',
+      text: i18n.t('settings.openSettings'),
       onPress: () => {
         void openAppSettings();
       },
@@ -41,8 +42,8 @@ function promptPhotoLibrarySettings() {
   }
 
   Alert.alert(
-    'フォトライブラリの許可が必要です',
-    '「設定を開く」を押すと、このアプリの個別設定が開きます。フォトライブラリ（写真）へのアクセスを許可してください。',
+    i18n.t('imagePicker.permissionTitle'),
+    i18n.t('imagePicker.permissionBody'),
     buttons,
   );
 }
@@ -123,8 +124,8 @@ export async function pickLibraryImages(
 
   if (access.reason === 'unavailable') {
     Alert.alert(
-      '画像を選べません',
-      'この環境ではフォトライブラリを開けません。実機または対応ビルドでスクリーンショットを添付できます。',
+      i18n.t('imagePicker.unavailableTitle'),
+      i18n.t('imagePicker.unavailableContact'),
     );
   }
   return [];
@@ -148,8 +149,8 @@ export async function pickAvatarImage(
   if (!access.ok) {
     if (access.reason === 'unavailable') {
       Alert.alert(
-        '画像を選べません',
-        'この環境ではフォトライブラリを開けません。実機または対応ビルドでアイコンを設定できます。',
+        i18n.t('imagePicker.unavailableTitle'),
+        i18n.t('imagePicker.unavailableAvatar'),
       );
     }
     return null;
@@ -183,8 +184,8 @@ export async function pickCoverImage(
   if (!access.ok) {
     if (access.reason === 'unavailable') {
       Alert.alert(
-        '画像を選べません',
-        'この環境ではフォトライブラリを開けません。実機または対応ビルドでカバー写真を設定できます。',
+        i18n.t('imagePicker.unavailableTitle'),
+        i18n.t('imagePicker.unavailableCover'),
       );
     }
     return null;

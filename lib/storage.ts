@@ -1,6 +1,11 @@
 import { decode as decodeBase64 } from 'base64-arraybuffer';
 import { Platform } from 'react-native';
 
+import { readPublicEnv } from '@/lib/env';
+import {
+  firebaseJwtHasAuthenticatedRole,
+} from '@/lib/firebaseIdToken';
+import i18n from '@/lib/i18n';
 import { isLocalImageUri, resolvePublicImageUrl } from '@/lib/imageUrls';
 import {
   getSupabaseClient,
@@ -8,10 +13,6 @@ import {
   isSupabaseConfigured,
   resolveFirebaseAccessToken,
 } from '@/lib/supabase';
-import { readPublicEnv } from '@/lib/env';
-import {
-  firebaseJwtHasAuthenticatedRole,
-} from '@/lib/firebaseIdToken';
 
 export type UploadFolder = 'events' | 'profiles' | 'contact' | 'clubs';
 
@@ -105,7 +106,7 @@ function errorMessage(error: unknown): string {
   return String(error ?? '');
 }
 
-/** ユーザー向けにネットワーク／認証エラーを日本語化する */
+/** ユーザー向けにネットワーク／認証エラーを現在言語へ */
 export function formatStorageUploadError(error: unknown): string {
   const raw = errorMessage(error);
   const lower = raw.toLowerCase();
@@ -114,33 +115,34 @@ export function formatStorageUploadError(error: unknown): string {
     /auth\/network-request-failed|network.?request.?failed|network error|failed to fetch|timed?\s*out|timeout|econnreset|enotfound|unreachable|interrupted connection/i.test(
       raw,
     ) ||
-    lower.includes('ネットワーク')
+    lower.includes('ネットワーク') ||
+    /couldn.?t connect to the network/i.test(raw)
   ) {
-    return 'ネットワークに接続できませんでした。通信環境を確認して、もう一度お試しください。';
+    return i18n.t('errors.storage.network');
   }
-  if (/auth\/|firebase|id.?token|ログインが必要/i.test(raw)) {
-    return '認証の有効期限が切れたか、接続に失敗しました。いったんログアウトして再ログイン後にお試しください。';
+  if (/auth\/|firebase|id.?token|ログインが必要|login required/i.test(raw)) {
+    return i18n.t('errors.storage.authExpired');
   }
   if (/bucket|not found|nosuchbucket/i.test(raw)) {
-    return `Storage バケット「${storageBucket()}」が見つかりません。設定を確認してください。`;
+    return i18n.t('errors.storage.bucketMissing', { bucket: storageBucket() });
   }
   if (/row-level security|policy|unauthorized|jwt|42501|403/i.test(raw)) {
-    return '画像のアップロード権限がありません。ログイン状態を確認してください。';
+    return i18n.t('errors.storage.permission');
   }
   if (/mime|content.?type|not allowed/i.test(raw)) {
-    return '非対応の画像形式です。JPEG / PNG などでお試しください。';
+    return i18n.t('errors.storage.unsupportedFormat');
   }
   if (/too large|payload|file.?size|entity too large/i.test(raw)) {
-    return '画像サイズが大きすぎます。別の写真を選ぶか、もう少し小さい画像でお試しください。';
+    return i18n.t('errors.storage.tooLarge');
   }
   if (raw.trim()) {
     // 生の Firebase / 英語メッセージは出さない
     if (/\[auth\//i.test(raw) || /^[A-Za-z].{0,40}error/i.test(raw)) {
-      return '画像のアップロードに失敗しました。通信環境を確認して再度お試しください。';
+      return i18n.t('errors.storage.uploadFailedRetry');
     }
     return raw;
   }
-  return '画像のアップロードに失敗しました。もう一度お試しください。';
+  return i18n.t('errors.storage.uploadFailed');
 }
 
 async function readNativeBase64(uri: string): Promise<string> {
@@ -177,7 +179,7 @@ async function uriToImageBytes(uri: string): Promise<ImageBytes> {
 
   const response = await fetch(uri);
   if (!response.ok) {
-    throw new Error('画像ファイルを読み込めませんでした。');
+    throw new Error(i18n.t('errors.storage.readFailed'));
   }
   const headerType = (response.headers.get('Content-Type') || '')
     .split(';')[0]
@@ -237,7 +239,7 @@ async function ensureUploadAuth(folder: UploadFolder): Promise<void> {
   const { getCurrentFirebaseUid } = await import('@/lib/currentUser');
   const uid = await getCurrentFirebaseUid();
   if (!uid) {
-    throw new Error('画像のアップロードにはログインが必要です。');
+    throw new Error(i18n.t('errors.storage.loginRequired'));
   }
 
   let token: string | null = null;
@@ -248,14 +250,10 @@ async function ensureUploadAuth(folder: UploadFolder): Promise<void> {
   }
 
   if (!token) {
-    throw new Error(
-      '認証トークンを取得できませんでした。通信環境を確認するか、再ログインしてお試しください。',
-    );
+    throw new Error(i18n.t('errors.storage.tokenFailed'));
   }
   if (!firebaseJwtHasAuthenticatedRole(token)) {
-    throw new Error(
-      '認証の準備が完了していません。しばらく待ってから再度お試しください。',
-    );
+    throw new Error(i18n.t('errors.storage.authNotReady'));
   }
 }
 
@@ -266,9 +264,7 @@ async function uploadBytesOnce(
 ): Promise<void> {
   const client = getSupabaseClient();
   if (!client) {
-    throw new Error(
-      'Supabase が未設定です。EXPO_PUBLIC_SUPABASE_URL / ANON_KEY を確認してください。',
-    );
+    throw new Error(i18n.t('errors.storage.supabaseNotConfigured'));
   }
   const bucket = storageBucket();
   const { error } = await client.storage.from(bucket).upload(path, bytes, {
@@ -293,7 +289,7 @@ export async function uploadPublicImage(
   if (!uri) return uri;
 
   if (!ALLOWED_FOLDERS.includes(folder)) {
-    throw new Error(`非対応のアップロード先です（${folder}）。`);
+    throw new Error(i18n.t('errors.storage.unsupportedFolder', { folder }));
   }
 
   const alreadyPublic = resolvePublicImageUrl(uri);
@@ -301,9 +297,7 @@ export async function uploadPublicImage(
   if (isRemoteHttpUri(uri) && !isLocalImageUri(uri)) return uri;
 
   if (!getSupabaseClient()) {
-    throw new Error(
-      'Supabase が未設定です。EXPO_PUBLIC_SUPABASE_URL / ANON_KEY を確認してください。',
-    );
+    throw new Error(i18n.t('errors.storage.supabaseNotConfigured'));
   }
 
   await ensureUploadAuth(folder);
@@ -313,12 +307,10 @@ export async function uploadPublicImage(
   let { bytes, contentType, ext } = await uriToImageBytes(preparedUri);
 
   if (!bytes.byteLength) {
-    throw new Error('画像データが空です。別の画像を選んでください。');
+    throw new Error(i18n.t('errors.storage.emptyImage'));
   }
   if (bytes.byteLength > HARD_MAX_BYTES) {
-    throw new Error(
-      '画像サイズが大きすぎます。別の写真を選ぶか、もう少し小さい画像でお試しください。',
-    );
+    throw new Error(i18n.t('errors.storage.tooLarge'));
   }
 
   // 圧縮に成功した場合は JPEG として扱う
@@ -379,7 +371,7 @@ export async function uploadPublicImage(
     if (base) {
       return `${base}/storage/v1/object/public/${bucket}/${path}`;
     }
-    throw new Error('公開 URL の取得に失敗しました。');
+    throw new Error(i18n.t('errors.storage.publicUrlFailed'));
   }
   if (__DEV__) {
     console.log('[storage] uploaded', {
@@ -421,7 +413,7 @@ export async function uploadPublicImageOrLocal(
     return {
       uri,
       uploaded: false,
-      error: 'Supabase Storage が未設定です。',
+      error: i18n.t('errors.storage.storageNotConfigured'),
     };
   }
   try {

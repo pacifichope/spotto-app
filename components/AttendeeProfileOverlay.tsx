@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Modal,
@@ -95,6 +96,7 @@ export default function AttendeeProfileOverlay({
   checkedInIds,
   onToggleCheckIn,
 }: AttendeeProfileOverlayProps) {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -110,10 +112,10 @@ export default function AttendeeProfileOverlay({
     ? attendees.filter((person) => checkedInIds?.has(person.id)).length
     : 0;
   const subtitle = hostMode
-    ? `受付完了 ${checkedCount}/${count}`
+    ? t('events.overlay.subtitleHost', { checked: checkedCount, count })
     : capacity && capacity > 0
-      ? `(${count}/${capacity} 参加中)`
-      : `(${count}人)`;
+      ? t('events.overlay.subtitleCapacity', { count, capacity })
+      : t('events.overlay.subtitleCount', { count });
 
   useEffect(() => {
     if (visible) translateY.value = 0;
@@ -158,7 +160,7 @@ export default function AttendeeProfileOverlay({
           style={styles.backdrop}
           onPress={finishClose}
           accessibilityRole="button"
-          accessibilityLabel="閉じる"
+          accessibilityLabel={t('common.close')}
         />
         <Animated.View
           style={[
@@ -176,7 +178,9 @@ export default function AttendeeProfileOverlay({
                 <View style={styles.handle} />
                 <View style={styles.headerText}>
                   <Text style={styles.title}>
-                    {hostMode ? '参加者一覧' : '参加者'}
+                    {hostMode
+                      ? t('events.overlay.titleHost')
+                      : t('events.overlay.title')}
                   </Text>
                   <Text style={styles.subtitle}>{subtitle}</Text>
                 </View>
@@ -189,7 +193,7 @@ export default function AttendeeProfileOverlay({
                   onPress={() => setMenuOpen(true)}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="ブロック・通報"
+                  accessibilityLabel={t('events.overlay.blockReport')}
                 >
                   <Text style={styles.menuMark}>⋯</Text>
                 </Pressable>
@@ -199,7 +203,7 @@ export default function AttendeeProfileOverlay({
                 onPress={finishClose}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="閉じる"
+                accessibilityLabel={t('common.close')}
               >
                 <Text style={styles.closeMark}>×</Text>
               </Pressable>
@@ -216,12 +220,12 @@ export default function AttendeeProfileOverlay({
               keyboardShouldPersistTaps="handled"
             >
               {attendees.length === 0 ? (
-                <Text style={styles.empty}>まだ参加者はいません</Text>
+                <Text style={styles.empty}>{t('events.noAttendeesShort')}</Text>
               ) : (
                 <>
                   {hostMode ? (
                     <Text style={styles.hostHint}>
-                      名前の横のチェックで、その場でチェックインできます
+                      {t('events.overlay.hostHint')}
                     </Text>
                   ) : null}
                   {attendees.map((person) => {
@@ -244,7 +248,13 @@ export default function AttendeeProfileOverlay({
                         style={styles.cardMain}
                         onPress={() => onSelect(person)}
                         accessibilityRole="button"
-                        accessibilityLabel={`${person.self ? '自分' : person.name}のプロフィール${isHost ? '（主催）' : ''}${qty > 1 ? `、チケット${qty}枚` : ''}`}
+                        accessibilityLabel={[
+                          t('events.attendeeProfileA11y', {
+                            name: person.self ? t('events.attendeeSelf') : person.name,
+                          }),
+                          isHost ? t('events.attendeeHostSuffix') : '',
+                          qty > 1 ? t('events.attendeeTicketsSuffix', { count: qty }) : '',
+                        ].join('')}
                       >
                         <AttendeeAvatarWithBadges
                           attendee={person}
@@ -270,20 +280,20 @@ export default function AttendeeProfileOverlay({
                             ) : null}
                             {person.self ? (
                               <View style={styles.selfChip}>
-                                <Text style={styles.selfChipText}>自分</Text>
+                                <Text style={styles.selfChipText}>{t('events.attendeeSelf')}</Text>
                               </View>
                             ) : null}
                             {qty > 1 ? (
                               <View style={styles.qtyChip}>
                                 <Text style={styles.qtyChipText}>
-                                  {qty}枚
+                                  {t('events.overlay.qtyChip', { count: qty })}
                                 </Text>
                               </View>
                             ) : null}
                             {hostMode && checkedIn ? (
                               <View style={styles.checkedChip}>
                                 <Text style={styles.checkedChipText}>
-                                  受付完了
+                                  {t('events.overlay.checkedIn')}
                                 </Text>
                               </View>
                             ) : null}
@@ -302,8 +312,8 @@ export default function AttendeeProfileOverlay({
                           accessibilityState={{ checked: checkedIn }}
                           accessibilityLabel={
                             checkedIn
-                              ? `${person.name}のチェックインを取り消す`
-                              : `${person.name}をチェックイン`
+                              ? t('events.overlay.undoCheckInA11y', { name: person.name })
+                              : t('events.overlay.checkInA11y', { name: person.name })
                           }
                         >
                           <Text
@@ -320,7 +330,7 @@ export default function AttendeeProfileOverlay({
                           style={styles.viewBtn}
                           onPress={() => onSelect(person)}
                           accessibilityRole="button"
-                          accessibilityLabel={`${person.name}を見る`}
+                          accessibilityLabel={t('events.overlay.viewPersonA11y', { name: person.name })}
                         >
                           <Text style={styles.viewBtnText}>View</Text>
                         </Pressable>
@@ -344,9 +354,9 @@ export default function AttendeeProfileOverlay({
                   onPress={onBackToList}
                   style={styles.back}
                   accessibilityRole="button"
-                  accessibilityLabel="一覧に戻る"
+                  accessibilityLabel={t('events.overlay.backToListA11y')}
                 >
-                  <Text style={styles.backText}>‹ 参加者一覧</Text>
+                  <Text style={styles.backText}>‹ {t('events.overlay.titleHost')}</Text>
                 </Pressable>
               ) : null}
               <View style={styles.identity}>
@@ -360,13 +370,13 @@ export default function AttendeeProfileOverlay({
                   {eventHost != null &&
                   isEventHostAttendee(profile, eventHost) ? (
                     <View style={styles.hostBadgeLarge} pointerEvents="none">
-                      <Text style={styles.hostBadgeText}>主催</Text>
+                      <Text style={styles.hostBadgeText}>{t('events.hostBadge')}</Text>
                     </View>
                   ) : null}
                 </View>
                 {profile.self ? (
                   <View style={[styles.selfChip, styles.selfChipProfile]}>
-                    <Text style={styles.selfChipText}>自分</Text>
+                    <Text style={styles.selfChipText}>{t('events.attendeeSelf')}</Text>
                   </View>
                 ) : null}
                 <Text style={styles.profileName}>{profile.name}</Text>
@@ -379,7 +389,9 @@ export default function AttendeeProfileOverlay({
                         : styles.genderMale,
                     ]}
                   >
-                    {profile.gender === '女性' ? '♀ 女性' : '♂ 男性'}
+                    {profile.gender === '女性'
+                      ? `♀ ${t('events.gender.female')}`
+                      : `♂ ${t('events.gender.male')}`}
                   </Text>
                 ) : null}
               </View>
@@ -388,9 +400,9 @@ export default function AttendeeProfileOverlay({
                   style={styles.safetyBtn}
                   onPress={() => setMenuOpen(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="ブロック・通報"
+                  accessibilityLabel={t('events.overlay.blockReport')}
                 >
-                  <Text style={styles.safetyBtnText}>ブロック・通報</Text>
+                  <Text style={styles.safetyBtnText}>{t('events.overlay.blockReport')}</Text>
                 </Pressable>
               ) : null}
               {profile.bio?.trim() ? (
@@ -409,8 +421,8 @@ export default function AttendeeProfileOverlay({
                   }}
                   accessibilityLabel={
                     checkedInIds?.has(profile.id)
-                      ? `${profile.name}のチェックインを取り消す`
-                      : `${profile.name}をチェックイン`
+                      ? t('events.overlay.undoCheckInA11y', { name: profile.name })
+                      : t('events.overlay.checkInA11y', { name: profile.name })
                   }
                 >
                   <View
@@ -431,20 +443,20 @@ export default function AttendeeProfileOverlay({
                   <View style={styles.cardBody}>
                     <Text style={styles.profileCheckInTitle}>
                       {checkedInIds?.has(profile.id)
-                        ? '受付完了'
-                        : 'チェックインする'}
+                        ? t('events.overlay.checkedIn')
+                        : t('events.overlay.checkIn')}
                     </Text>
                     <Text style={styles.profileCheckInSub}>
                       {checkedInIds?.has(profile.id)
-                        ? '当日受付済みとして記録されています'
-                        : 'タップすると参加済みに更新します'}
+                        ? t('events.overlay.checkedInSub')
+                        : t('events.overlay.checkInSub')}
                     </Text>
                   </View>
                 </Pressable>
               ) : null}
               <View style={styles.clubSection}>
                 <View style={styles.clubSectionHeader}>
-                  <Text style={styles.clubLabel}>参加したクラブ</Text>
+                  <Text style={styles.clubLabel}>{t('events.overlay.clubs')}</Text>
                   <View style={styles.clubCountBadge}>
                     <Text style={styles.clubCountText}>
                       {clubsLoading ? '…' : safeClubs.length}
@@ -454,19 +466,19 @@ export default function AttendeeProfileOverlay({
                 {clubsLoading && safeClubs.length === 0 ? (
                   <View style={styles.clubLoading}>
                     <ActivityIndicator color={theme.colors.primary} />
-                    <Text style={styles.clubEmpty}>クラブを読み込み中…</Text>
+                    <Text style={styles.clubEmpty}>{t('events.overlay.clubsLoading')}</Text>
                   </View>
                 ) : safeClubs.length === 0 ? (
                   <View style={styles.clubEmptyCard}>
                     <Text style={styles.clubEmpty}>
-                      参加しているクラブはありません
+                      {t('events.overlay.clubsEmpty')}
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.clubList}>
                     {safeClubs.map((club) => {
                       const clubId = String(club?.id || '').trim();
-                      const clubName = String(club?.name || '').trim() || 'クラブ';
+                      const clubName = String(club?.name || '').trim() || t('events.overlay.clubFallback');
                       const cover =
                         club?.imageUri?.trim() ||
                         club?.coverUri?.trim() ||
@@ -477,7 +489,7 @@ export default function AttendeeProfileOverlay({
                           style={styles.clubRow}
                           onPress={() => clubId && onOpenClub?.(clubId)}
                           accessibilityRole="button"
-                          accessibilityLabel={`${clubName}のクラブプロフィール`}
+                          accessibilityLabel={t('events.overlay.clubProfileA11y', { name: clubName })}
                         >
                           <HostAvatar
                             name={clubName}

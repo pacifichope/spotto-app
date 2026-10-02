@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -22,7 +23,6 @@ import {
   BANK_ACCOUNT_TYPE_OPTIONS,
   EMPTY_BANK_ACCOUNT,
   SUPPORTED_BANKS,
-  accountTypeLabel,
   deleteOrganizerBankAccount,
   fetchOrganizerBankAccount,
   maskAccountNumber,
@@ -44,6 +44,9 @@ function notify(title: string, body: string) {
 }
 
 export default function BankAccountSettingsScreen() {
+  const { t } = useTranslation();
+  const accountTypeText = (type: BankAccountType) =>
+    t(`bankAccount.accountType.${type}`);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isLoggedIn, openLogin } = useAuth();
@@ -73,7 +76,7 @@ export default function BankAccountSettingsScreen() {
     const result = await fetchOrganizerBankAccount(user.id);
     setLoading(false);
     if (!result.ok) {
-      notify('読み込めませんでした', result.error);
+      notify(t('bankAccount.loadFailedTitle'), result.error);
       return;
     }
     setSaved(result.account);
@@ -148,7 +151,7 @@ export default function BankAccountSettingsScreen() {
       setConfirmOpen(false);
       setConfirmDraft(null);
       setFieldError(result.error);
-      notify('保存できませんでした', result.error);
+      notify(t('bankAccount.saveFailedTitle'), result.error);
       return;
     }
     setConfirmOpen(false);
@@ -158,8 +161,8 @@ export default function BankAccountSettingsScreen() {
     setEditing(false);
     setFieldError('');
     notify(
-      '保存しました',
-      '振込口座を登録しました。売上確定後の振込に利用します。',
+      t('bankAccount.savedTitle'),
+      t('bankAccount.savedBody'),
     );
   };
 
@@ -170,43 +173,43 @@ export default function BankAccountSettingsScreen() {
       const result = await deleteOrganizerBankAccount(user.id);
       setSaving(false);
       if (!result.ok) {
-        notify('削除できませんでした', result.error);
+        notify(t('bankAccount.deleteFailedTitle'), result.error);
         return;
       }
       setSaved(null);
       setForm(EMPTY_BANK_ACCOUNT);
       setEditing(true);
       setFieldError('');
-      notify('削除しました', '登録済みの振込口座を削除しました。');
+      notify(t('bankAccount.deletedTitle'), t('bankAccount.deletedBody'));
     };
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm('登録済みの振込口座を削除しますか？')) {
+      if (window.confirm(t('bankAccount.deleteConfirm'))) {
         void run();
       }
       return;
     }
-    Alert.alert('口座を削除', '登録済みの振込口座を削除しますか？', [
-      { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: () => void run() },
+    Alert.alert(t('bankAccount.deleteTitle'), t('bankAccount.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => void run() },
     ]);
   };
 
   if (!isLoggedIn) {
     return (
       <View style={styles.root}>
-        <SettingsHeader title="振込口座" />
+        <SettingsHeader title={t('bankAccount.title')} />
         <View style={styles.loginGate}>
-          <Text style={styles.loginTitle}>ログインが必要です</Text>
+          <Text style={styles.loginTitle}>{t('bankAccount.loginRequired')}</Text>
           <Text style={styles.loginBody}>
-            売上の振込先口座は、ログイン中のアカウントにのみ紐付けて保存されます。
+            {t('bankAccount.loginBody')}
           </Text>
           <Pressable
             style={styles.loginBtn}
             onPress={() => openLogin()}
             accessibilityRole="button"
-            accessibilityLabel="ログイン"
+            accessibilityLabel={t('common.login')}
           >
-            <Text style={styles.loginBtnText}>ログイン</Text>
+            <Text style={styles.loginBtnText}>{t('common.login')}</Text>
           </Pressable>
         </View>
       </View>
@@ -215,13 +218,13 @@ export default function BankAccountSettingsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="振込口座" />
+      <SettingsHeader title={t('bankAccount.title')} />
       <KeyboardFormScrollView
         contentContainerStyle={styles.content}
         bottomGap={Math.max(insets.bottom, 24)}
       >
         <Text style={styles.lead}>
-          主催イベントの売上を受け取る銀行口座です。必ずご本人名義の口座を登録してください。
+          {t('bankAccount.lead')}
         </Text>
 
         {loading ? (
@@ -231,38 +234,38 @@ export default function BankAccountSettingsScreen() {
           />
         ) : !showForm && saved ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>登録済みの口座</Text>
+            <Text style={styles.cardTitle}>{t('bankAccount.registered')}</Text>
             <View style={styles.reviewRow}>
-              <Text style={styles.reviewKey}>銀行</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.bank')}</Text>
               <Text style={styles.reviewVal}>{saved.bankName}</Text>
             </View>
             <View style={styles.reviewRow}>
-              <Text style={styles.reviewKey}>支店</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.branch')}</Text>
               <Text style={styles.reviewVal}>
                 {saved.branchName}
                 {saved.branchNumber ? `（${saved.branchNumber}）` : ''}
               </Text>
             </View>
             <View style={styles.reviewRow}>
-              <Text style={styles.reviewKey}>口座種別</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.accountTypeLabel')}</Text>
               <Text style={styles.reviewVal}>
-                {accountTypeLabel(saved.accountType)}
+                {accountTypeText(saved.accountType)}
               </Text>
             </View>
             <View style={styles.reviewRow}>
-              <Text style={styles.reviewKey}>口座番号</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.accountNumber')}</Text>
               <Text style={styles.reviewVal}>
                 {maskAccountNumber(saved.accountNumber)}
               </Text>
             </View>
             <View style={styles.reviewRow}>
-              <Text style={styles.reviewKey}>口座名義</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.holder')}</Text>
               <Text style={styles.reviewVal}>{saved.accountHolderKana}</Text>
             </View>
             <View style={[styles.reviewRow, styles.reviewRowLast]}>
-              <Text style={styles.reviewKey}>通知用メール</Text>
+              <Text style={styles.reviewKey}>{t('bankAccount.notifyEmailShort')}</Text>
               <Text style={styles.reviewVal}>
-                {saved.notifyEmail || '未設定'}
+                {saved.notifyEmail || t('bankAccount.notSet')}
               </Text>
             </View>
 
@@ -270,32 +273,32 @@ export default function BankAccountSettingsScreen() {
               style={styles.saveBtn}
               onPress={startEdit}
               accessibilityRole="button"
-              accessibilityLabel="口座情報を変更する"
+              accessibilityLabel={t('bankAccount.changeA11y')}
             >
-              <Text style={styles.saveBtnText}>変更する</Text>
+              <Text style={styles.saveBtnText}>{t('bankAccount.change')}</Text>
             </Pressable>
             <Pressable
               style={styles.clearBtn}
               onPress={onClear}
               disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel="登録済み口座を削除"
+              accessibilityLabel={t('bankAccount.deleteA11y')}
             >
-              <Text style={styles.clearBtnText}>登録を削除</Text>
+              <Text style={styles.clearBtnText}>{t('bankAccount.clear')}</Text>
             </Pressable>
           </View>
         ) : (
           <View style={styles.card}>
             {saved && editing ? (
-              <Text style={styles.editHint}>口座情報を修正して保存してください。</Text>
+              <Text style={styles.editHint}>{t('bankAccount.editHint')}</Text>
             ) : null}
 
-            <Text style={styles.label}>銀行名</Text>
+            <Text style={styles.label}>{t('bankAccount.bankName')}</Text>
             <Pressable
               style={styles.selectBtn}
               onPress={() => setBankPickerOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="銀行を選択"
+              accessibilityLabel={t('bankAccount.pickerTitle')}
             >
               <Text
                 style={[
@@ -303,7 +306,7 @@ export default function BankAccountSettingsScreen() {
                   !form.bankName && styles.selectBtnPlaceholder,
                 ]}
               >
-                {form.bankName || 'リストから選択'}
+                {form.bankName || t('bankAccount.selectFromList')}
               </Text>
               <Text style={styles.selectChevron}>›</Text>
             </Pressable>
@@ -311,40 +314,40 @@ export default function BankAccountSettingsScreen() {
               style={styles.bankHint}
               onPress={() => router.push('/settings/contact')}
               accessibilityRole="link"
-              accessibilityLabel="リストにない銀行はお問い合わせへ"
+              accessibilityLabel={t('bankAccount.bankNotListedA11y')}
             >
               <Text style={styles.bankHintText}>
-                リストにない銀行（信用金庫など）をご希望の場合は、お問い合わせ窓口よりご相談ください。
+                {t('bankAccount.bankNotListed')}
               </Text>
-              <Text style={styles.bankHintLink}>お問い合わせへ ›</Text>
+              <Text style={styles.bankHintLink}>{t('bankAccount.contactLink')}</Text>
             </Pressable>
 
-            <Text style={styles.label}>支店名</Text>
+            <Text style={styles.label}>{t('bankAccount.branchName')}</Text>
             <TextInput
               style={styles.input}
               value={form.branchName}
               onChangeText={(v) => update('branchName', v)}
-              placeholder="例: 渋谷支店"
+              placeholder={t('bankAccount.branchNamePlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
-              accessibilityLabel="支店名"
+              accessibilityLabel={t('bankAccount.branchName')}
             />
 
-            <Text style={styles.label}>支店番号</Text>
+            <Text style={styles.label}>{t('bankAccount.branchNumber')}</Text>
             <TextInput
               style={styles.input}
               value={form.branchNumber}
               onChangeText={(v) =>
                 update('branchNumber', normalizeBranchNumber(v))
               }
-              placeholder="半角数字3桁"
+              placeholder={t('bankAccount.branchNumberPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="number-pad"
               maxLength={3}
               autoComplete="off"
-              accessibilityLabel="支店番号"
+              accessibilityLabel={t('bankAccount.branchNumber')}
             />
 
-            <Text style={styles.label}>口座種別</Text>
+            <Text style={styles.label}>{t('bankAccount.accountTypeLabel')}</Text>
             <View style={styles.chips}>
               {BANK_ACCOUNT_TYPE_OPTIONS.map((opt) => {
                 const on = form.accountType === opt.value;
@@ -357,32 +360,32 @@ export default function BankAccountSettingsScreen() {
                     style={[styles.chip, on && styles.chipOn]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: on }}
-                    accessibilityLabel={opt.label}
+                    accessibilityLabel={accountTypeText(opt.value)}
                   >
                     <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                      {opt.label}
+                      {accountTypeText(opt.value)}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
 
-            <Text style={styles.label}>口座番号</Text>
+            <Text style={styles.label}>{t('bankAccount.accountNumber')}</Text>
             <TextInput
               style={styles.input}
               value={form.accountNumber}
               onChangeText={(v) =>
                 update('accountNumber', normalizeAccountNumber(v))
               }
-              placeholder="半角数字7桁（ハイフンなし）"
+              placeholder={t('bankAccount.accountNumberPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="number-pad"
               maxLength={7}
               autoComplete="off"
-              accessibilityLabel="口座番号"
+              accessibilityLabel={t('bankAccount.accountNumber')}
             />
 
-            <Text style={styles.label}>口座名義（カタカナ）</Text>
+            <Text style={styles.label}>{t('bankAccount.holderKana')}</Text>
             <TextInput
               style={styles.input}
               value={form.accountHolderKana}
@@ -393,14 +396,14 @@ export default function BankAccountSettingsScreen() {
                   normalizeHolderKana(form.accountHolderKana),
                 )
               }
-              placeholder="例: ヤマダ タロウ"
+              placeholder={t('bankAccount.holderKanaPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               autoCapitalize="characters"
               autoCorrect={false}
-              accessibilityLabel="口座名義（カタカナ）"
+              accessibilityLabel={t('bankAccount.holderKana')}
             />
 
-            <Text style={styles.label}>通知用メールアドレス</Text>
+            <Text style={styles.label}>{t('bankAccount.notifyEmail')}</Text>
             <TextInput
               style={styles.input}
               value={form.notifyEmail}
@@ -408,17 +411,17 @@ export default function BankAccountSettingsScreen() {
               onBlur={() =>
                 update('notifyEmail', form.notifyEmail.trim().toLowerCase())
               }
-              placeholder="例: host@example.com"
+              placeholder={t('bankAccount.notifyEmailPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               autoComplete="email"
               textContentType="emailAddress"
-              accessibilityLabel="通知用メールアドレス"
+              accessibilityLabel={t('bankAccount.notifyEmail')}
             />
             <Text style={styles.fieldHint}>
-              振込完了などのお知らせをこのアドレスに送信します（ログイン用メールとは別に指定できます）。
+              {t('bankAccount.notifyEmailHint')}
             </Text>
 
             {fieldError ? (
@@ -430,9 +433,9 @@ export default function BankAccountSettingsScreen() {
               onPress={onPressSave}
               disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel="口座情報を確認して保存"
+              accessibilityLabel={t('bankAccount.saveReviewA11y')}
             >
-              <Text style={styles.saveBtnText}>保存する</Text>
+              <Text style={styles.saveBtnText}>{t('bankAccount.save')}</Text>
             </Pressable>
 
             {saved && editing ? (
@@ -441,9 +444,9 @@ export default function BankAccountSettingsScreen() {
                 onPress={cancelEdit}
                 disabled={saving}
                 accessibilityRole="button"
-                accessibilityLabel="変更をやめる"
+                accessibilityLabel={t('bankAccount.cancelEdit')}
               >
-                <Text style={styles.cancelEditText}>変更をやめる</Text>
+                <Text style={styles.cancelEditText}>{t('bankAccount.cancelEdit')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -461,7 +464,7 @@ export default function BankAccountSettingsScreen() {
             style={styles.pickerBackdrop}
             onPress={() => setBankPickerOpen(false)}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('common.close')}
           />
           <View
             style={[
@@ -470,13 +473,13 @@ export default function BankAccountSettingsScreen() {
             ]}
           >
             <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>銀行を選択</Text>
+              <Text style={styles.pickerTitle}>{t('bankAccount.pickerTitle')}</Text>
               <Pressable
                 onPress={() => setBankPickerOpen(false)}
                 hitSlop={12}
                 style={styles.pickerCloseBtn}
                 accessibilityRole="button"
-                accessibilityLabel="閉じる"
+                accessibilityLabel={t('common.close')}
               >
                 <Text style={styles.pickerCloseText}>×</Text>
               </Pressable>
@@ -515,9 +518,9 @@ export default function BankAccountSettingsScreen() {
               style={styles.pickerCancelBtn}
               onPress={() => setBankPickerOpen(false)}
               accessibilityRole="button"
-              accessibilityLabel="キャンセル"
+              accessibilityLabel={t('common.cancel')}
             >
-              <Text style={styles.pickerCancelText}>キャンセル</Text>
+              <Text style={styles.pickerCancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </View>
         </View>
@@ -533,7 +536,7 @@ export default function BankAccountSettingsScreen() {
             style={styles.confirmBackdrop}
             onPress={closeConfirm}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('common.close')}
           />
           <View
             style={[
@@ -541,43 +544,43 @@ export default function BankAccountSettingsScreen() {
               { marginBottom: Math.max(insets.bottom, 24) },
             ]}
           >
-            <Text style={styles.confirmTitle}>振込口座の確認</Text>
+            <Text style={styles.confirmTitle}>{t('bankAccount.confirmTitle')}</Text>
             <Text style={styles.confirmLead}>
-              以下の内容で登録します。誤りがないかご確認ください。
+              {t('bankAccount.confirmLead')}
             </Text>
 
             {confirmDraft ? (
               <View style={styles.confirmList}>
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmKey}>銀行名</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.bankName')}</Text>
                   <Text style={styles.confirmVal}>{confirmDraft.bankName}</Text>
                 </View>
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmKey}>支店名 / 支店番号</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.branchNameAndNumber')}</Text>
                   <Text style={styles.confirmVal}>
                     {confirmDraft.branchName}（{confirmDraft.branchNumber}）
                   </Text>
                 </View>
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmKey}>口座種別</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.accountTypeLabel')}</Text>
                   <Text style={styles.confirmVal}>
-                    {accountTypeLabel(confirmDraft.accountType)}
+                    {accountTypeText(confirmDraft.accountType)}
                   </Text>
                 </View>
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmKey}>口座番号</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.accountNumber')}</Text>
                   <Text style={styles.confirmVal}>
                     {confirmDraft.accountNumber}
                   </Text>
                 </View>
                 <View style={styles.confirmRow}>
-                  <Text style={styles.confirmKey}>口座名義</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.holder')}</Text>
                   <Text style={styles.confirmVal}>
                     {confirmDraft.accountHolderKana}
                   </Text>
                 </View>
                 <View style={[styles.confirmRow, styles.confirmRowLast]}>
-                  <Text style={styles.confirmKey}>通知用メール</Text>
+                  <Text style={styles.confirmKey}>{t('bankAccount.notifyEmailShort')}</Text>
                   <Text style={styles.confirmVal}>
                     {confirmDraft.notifyEmail}
                   </Text>
@@ -590,13 +593,13 @@ export default function BankAccountSettingsScreen() {
               onPress={() => void onConfirmSave()}
               disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel="この内容で登録する"
+              accessibilityLabel={t('bankAccount.confirmRegister')}
             >
               {saving ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.confirmPrimaryText}>
-                  この内容で登録する
+                  {t('bankAccount.confirmRegister')}
                 </Text>
               )}
             </Pressable>
@@ -605,9 +608,9 @@ export default function BankAccountSettingsScreen() {
               onPress={closeConfirm}
               disabled={saving}
               accessibilityRole="button"
-              accessibilityLabel="修正する（戻る）"
+              accessibilityLabel={t('bankAccount.confirmBack')}
             >
-              <Text style={styles.confirmSecondaryText}>修正する（戻る）</Text>
+              <Text style={styles.confirmSecondaryText}>{t('bankAccount.confirmBack')}</Text>
             </Pressable>
           </View>
         </View>

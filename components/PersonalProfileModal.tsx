@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -59,6 +60,7 @@ export default function PersonalProfileModal({
   onClose,
   onSave,
 }: PersonalProfileModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<UserProfile>(profile);
   const [imageUploading, setImageUploading] = useState(false);
@@ -78,7 +80,7 @@ export default function PersonalProfileModal({
     try {
       const uploaded = await uploadPublicImageOrLocal(localUri, 'profiles');
       if (uploaded.error) {
-        Alert.alert('クラウドに保存できませんでした', uploaded.error);
+        Alert.alert(t('errors.cloudSaveFailed'), uploaded.error);
       }
       setDraft((prev) => ({ ...prev, imageUri: uploaded.uri }));
     } finally {
@@ -88,19 +90,19 @@ export default function PersonalProfileModal({
 
   const handleSave = () => {
     if (imageUploading) {
-      Alert.alert(
-        '画像をアップロード中です',
-        '完了してから保存してください。',
-      );
+      Alert.alert(t('profile.uploadingTitle'), t('profile.uploadingBody'));
       return;
     }
     const next = sanitizeUserProfile(draft);
     if (!next.name) {
-      Alert.alert('表示名が未入力です', 'ユーザー名を入力してください。');
+      Alert.alert(t('profile.nameMissingTitle'), t('profile.nameMissingBody'));
       return;
     }
     if (!next.gender) {
-      Alert.alert('性別が未選択です', '男性または女性を選択してください。');
+      Alert.alert(
+        t('profile.genderMissingTitle'),
+        t('profile.genderMissingBody'),
+      );
       return;
     }
     onSave(next);
@@ -123,22 +125,22 @@ export default function PersonalProfileModal({
             onPress={onClose}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('profile.close')}
           >
-            <Text style={styles.cancel}>閉じる</Text>
+            <Text style={styles.cancel}>{t('profile.close')}</Text>
           </Pressable>
-          <Text style={styles.title}>個人プロフィール</Text>
+          <Text style={styles.title}>{t('profile.title')}</Text>
           <Pressable
             onPress={handleSave}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="保存"
+            accessibilityLabel={t('profile.save')}
             disabled={imageUploading}
           >
             <Text
               style={[styles.save, imageUploading && styles.saveDisabled]}
             >
-              保存
+              {t('profile.save')}
             </Text>
           </Pressable>
         </View>
@@ -148,21 +150,19 @@ export default function PersonalProfileModal({
           contentContainerStyle={styles.content}
           bottomGap={Math.max(insets.bottom, 24)}
         >
-          <Text style={styles.lead}>
-            参加時やチャットで他の人に見える、あなた自身のユーザー名・性別・アイコンです。
-          </Text>
+          <Text style={styles.lead}>{t('profile.lead')}</Text>
 
           <Pressable
             style={styles.iconBtn}
             onPress={() => void pickImage()}
             disabled={imageUploading}
             accessibilityRole="button"
-            accessibilityLabel="プロフィール写真を変更"
+            accessibilityLabel={t('profile.changePhoto')}
             accessibilityState={{ busy: imageUploading }}
           >
             <View style={styles.iconClip}>
               <HostAvatar
-                name={draft.name || 'ユ'}
+                name={draft.name || t('profile.avatarFallback')}
                 imageUri={draft.imageUri}
                 size={88}
                 gender={draft.gender}
@@ -176,26 +176,30 @@ export default function PersonalProfileModal({
             </View>
             <Text style={styles.iconHint}>
               {imageUploading
-                ? 'アップロード中…'
-                : 'プロフィール写真を変更'}
+                ? t('profile.uploading')
+                : t('profile.changePhoto')}
             </Text>
           </Pressable>
 
-          <Text style={styles.label}>ユーザー名</Text>
+          <Text style={styles.label}>{t('profile.usernameLabel')}</Text>
           <TextInput
             style={styles.input}
             value={draft.name}
             onChangeText={(name) => setDraft((prev) => ({ ...prev, name }))}
-            placeholder="例: Taiki"
+            placeholder={t('profile.usernamePlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             maxLength={24}
           />
 
-          <Text style={styles.label}>性別</Text>
+          <Text style={styles.label}>{t('profile.genderLabel')}</Text>
           <View style={styles.genderRow}>
             {USER_GENDER_OPTIONS.map((option) => {
               const selected = draft.gender === option;
               const ui = GENDER_UI[option];
+              const optionLabel =
+                option === '男性'
+                  ? t('profile.genderMale')
+                  : t('profile.genderFemale');
               return (
                 <Pressable
                   key={option}
@@ -211,7 +215,7 @@ export default function PersonalProfileModal({
                   onPress={() => selectGender(option)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={option}
+                  accessibilityLabel={optionLabel}
                 >
                   <MaterialCommunityIcons
                     name={ui.icon}
@@ -228,7 +232,7 @@ export default function PersonalProfileModal({
                       },
                     ]}
                   >
-                    {option}
+                    {optionLabel}
                   </Text>
                 </Pressable>
               );

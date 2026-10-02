@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import ChatRoomScreen from '@/components/ChatRoomScreen';
@@ -7,6 +8,7 @@ import { parseChatMode } from '@/lib/chats';
 import { useEvents } from '@/lib/eventsContext';
 
 export default function ChatRoomRoute() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{
     eventId: string;
@@ -35,12 +37,12 @@ export default function ChatRoomRoute() {
   if (!event) {
     return (
       <View style={styles.missing}>
-        <Text style={styles.missingTitle}>チャットが見つかりません</Text>
+        <Text style={styles.missingTitle}>{t('chat.notFoundTitle')}</Text>
         <Text style={styles.missingBody}>
-          このイベントの会話は、この端末では表示できません。
+          {t('chat.notFoundBody')}
         </Text>
         <Pressable style={styles.homeBtn} onPress={back}>
-          <Text style={styles.homeBtnText}>戻る</Text>
+          <Text style={styles.homeBtnText}>{t('chat.back')}</Text>
         </Pressable>
       </View>
     );

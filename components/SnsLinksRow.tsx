@@ -1,4 +1,5 @@
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import SnsBrandIcon from '@/components/SnsBrandIcon';
 import { theme } from '@/constants/theme';
@@ -15,6 +16,7 @@ type SnsLinksRowProps = {
 };
 
 export default function SnsLinksRow({ links, size = 'lg' }: SnsLinksRowProps) {
+  const { t } = useTranslation();
   if (!links.length) return null;
   const iconSize = size === 'lg' ? 44 : 36;
 
@@ -34,14 +36,14 @@ export default function SnsLinksRow({ links, size = 'lg' }: SnsLinksRowProps) {
                 const ok = await openSnsLink(link.url);
                 if (!ok) {
                   Alert.alert(
-                    '開けませんでした',
-                    'リンクを確認して、もう一度お試しください。',
+                    t('sns.openFailedTitle'),
+                    t('sns.openFailedBody'),
                   );
                 }
               })();
             }}
             accessibilityRole="link"
-            accessibilityLabel={`${meta.label}を開く`}
+            accessibilityLabel={t('sns.openA11y', { label: meta.label })}
           >
             <View style={styles.iconShadow}>
               <SnsBrandIcon kind={link.kind} size={iconSize} />

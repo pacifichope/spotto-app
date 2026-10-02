@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import {
   authenticateSocial,
   isSocialConfigured,
@@ -42,38 +43,51 @@ const SESSION_LEGACY_KEYS = ['@spotto/auth-session'];
 const ACCOUNTS_KEY = 'spotto.auth-accounts';
 const ACCOUNTS_LEGACY_KEYS = ['@spotto/auth-accounts'];
 
+const AUTH_REASON_KEYS: Record<AuthReason, string> = {
+  'join-event': 'joinEvent',
+  'send-chat': 'sendChat',
+  'join-club': 'joinClub',
+  'create-event': 'createEvent',
+  'favorite-event': 'favoriteEvent',
+  'watchlist-event': 'watchlistEvent',
+  mypage: 'mypage',
+};
+
+/** ログイン促しの文言（呼び出し時に現在の言語で解決） */
+export function getAuthReasonCopy(reason: AuthReason): {
+  title: string;
+  body: string;
+} {
+  const key = AUTH_REASON_KEYS[reason];
+  return {
+    title: i18n.t(`auth.reason.${key}.title`),
+    body: i18n.t(`auth.reason.${key}.body`),
+  };
+}
+
+function authReasonEntry(reason: AuthReason) {
+  return {
+    get title() {
+      return getAuthReasonCopy(reason).title;
+    },
+    get body() {
+      return getAuthReasonCopy(reason).body;
+    },
+  };
+}
+
+/** 互換用: アクセス時に現在の言語で解決されるゲッター付きオブジェクト */
 export const AUTH_REASON_COPY: Record<
   AuthReason,
   { title: string; body: string }
 > = {
-  'join-event': {
-    title: '参加するにはログイン',
-    body: 'イベントへの参加は、ログイン後にそのまま続けられます。',
-  },
-  'send-chat': {
-    title: '送信するにはログイン',
-    body: 'チャットの閲覧はゲストでもできます。メッセージを送るにはログインしてください。',
-  },
-  'join-club': {
-    title: 'クラブに参加するにはログイン',
-    body: 'ログイン後、このクラブの参加処理を続けます。',
-  },
-  'create-event': {
-    title: '主催するにはログイン',
-    body: 'LINE・Google・Apple でログイン後、電話番号認証を経てイベントを作成できます。',
-  },
-  'favorite-event': {
-    title: '保存するにはログイン',
-    body: 'お気に入りへの追加は、ログイン後にそのまま続けられます。',
-  },
-  'watchlist-event': {
-    title: '空き通知にはログイン',
-    body: '空きが出たときの通知は、ログイン後に設定できます。',
-  },
-  mypage: {
-    title: 'マイページを開くにはログイン',
-    body: '参加履歴やお気に入りなど、会員向けの内容を見るにはログインしてください。',
-  },
+  'join-event': authReasonEntry('join-event'),
+  'send-chat': authReasonEntry('send-chat'),
+  'join-club': authReasonEntry('join-club'),
+  'create-event': authReasonEntry('create-event'),
+  'favorite-event': authReasonEntry('favorite-event'),
+  'watchlist-event': authReasonEntry('watchlist-event'),
+  mypage: authReasonEntry('mypage'),
 };
 
 export function normalizeEmail(email: string) {
@@ -158,11 +172,11 @@ export async function saveAuthSession(user: AuthUser | null) {
 }
 
 export function loginMethodLabel(provider?: AuthUser['provider']) {
-  if (provider === 'apple') return 'Apple';
-  if (provider === 'google') return 'Google';
-  if (provider === 'line') return 'LINE';
-  if (provider === 'email') return 'メール（旧）';
-  return 'ソーシャルログイン';
+  if (provider === 'apple') return i18n.t('auth.loginMethod.apple');
+  if (provider === 'google') return i18n.t('auth.loginMethod.google');
+  if (provider === 'line') return i18n.t('auth.loginMethod.line');
+  if (provider === 'email') return i18n.t('auth.loginMethod.email');
+  return i18n.t('auth.loginMethod.social');
 }
 
 export async function deleteUserAccount(
@@ -170,7 +184,7 @@ export async function deleteUserAccount(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const id = userId.trim();
   if (!id) {
-    return { ok: false, error: 'アカウントを確認できませんでした。' };
+    return { ok: false, error: i18n.t('errors.accountNotVerified') };
   }
 
   // Firebase Auth + DB（profiles / blocks）を削除
@@ -184,22 +198,32 @@ export async function deleteUserAccount(
   return { ok: true };
 }
 
+/**
+ * `label` は参照時に現在の言語で解決されるゲッター。
+ * `name` / `email` は開発用モックアカウントの値（翻訳対象外）。
+ */
 export const SOCIAL_PROVIDER_COPY: Record<
   SocialProvider,
-  { label: string; name: string; email: string }
+  { readonly label: string; name: string; email: string }
 > = {
   line: {
-    label: 'LINEでログイン',
+    get label() {
+      return i18n.t('auth.social.line');
+    },
     name: 'みお',
     email: 'line.user@example.com',
   },
   google: {
-    label: 'Googleでログイン',
+    get label() {
+      return i18n.t('auth.social.google');
+    },
     name: 'ひかり',
     email: 'google.user@example.com',
   },
   apple: {
-    label: 'Appleでサインイン',
+    get label() {
+      return i18n.t('auth.social.apple');
+    },
     name: 'れん',
     email: 'apple.user@example.com',
   },
@@ -274,8 +298,8 @@ export async function signInWithSocial(
       ok: false,
       error:
         provider === 'line'
-          ? 'LINE ログインが未設定です。チャネル ID を確認してください。'
-          : 'Google ログインが未設定です。クライアント ID を確認してください。',
+          ? i18n.t('errors.lineNotConfigured')
+          : i18n.t('errors.googleNotConfigured'),
     };
   }
 

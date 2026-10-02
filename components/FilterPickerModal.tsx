@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,6 +25,7 @@ export default function FilterPickerModal({
   onChange,
   onClose,
 }: FilterPickerModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const selectLevel = (level: LevelFilterId) => {
@@ -60,18 +62,18 @@ export default function FilterPickerModal({
           <View style={styles.handle} />
           <View style={styles.titleRow}>
             <View>
-              <Text style={styles.title}>絞り込み</Text>
-              <Text style={styles.subtitle}>レベルと日時でイベントを選べます</Text>
+              <Text style={styles.title}>{t('home.filter.title')}</Text>
+              <Text style={styles.subtitle}>{t('home.filter.subtitle')}</Text>
             </View>
             <Pressable
               onPress={() => onChange(EMPTY_FILTERS)}
               hitSlop={8}
             >
-              <Text style={styles.reset}>リセット</Text>
+              <Text style={styles.reset}>{t('home.filter.reset')}</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.section}>レベル</Text>
+          <Text style={styles.section}>{t('home.filter.levelSection')}</Text>
           <View style={styles.levelList}>
             {LEVEL_FILTER_OPTIONS.map((option) => {
               const selected = filters.level === option.id;
@@ -105,7 +107,7 @@ export default function FilterPickerModal({
             })}
           </View>
 
-          <Text style={styles.section}>日時</Text>
+          <Text style={styles.section}>{t('home.filter.dateSection')}</Text>
           <View style={styles.chips}>
             {DATE_FILTER_OPTIONS.map((option) => {
               const selected = filters.date === option.id;
@@ -124,7 +126,7 @@ export default function FilterPickerModal({
           </View>
 
           <Pressable style={styles.doneBtn} onPress={onClose}>
-            <Text style={styles.doneText}>この条件で見る</Text>
+            <Text style={styles.doneText}>{t('home.filter.apply')}</Text>
           </Pressable>
         </View>
       </View>

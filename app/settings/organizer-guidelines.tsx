@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,33 +11,67 @@ import {
   ORGANIZER_GUIDELINE_UPDATED_AT,
 } from '@/lib/organizerGuidelines';
 
+function asStringArray(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+    ? (value as string[])
+    : fallback;
+}
+
 export default function OrganizerGuidelinesScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="主催者ガイドライン" />
+      <SettingsHeader title={t('organizerGuidelines.title')} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, 32) },
         ]}
       >
-        <Text style={styles.intro}>{ORGANIZER_GUIDELINE_INTRO}</Text>
-        <Text style={styles.updated}>更新日: {ORGANIZER_GUIDELINE_UPDATED_AT}</Text>
+        <Text style={styles.intro}>
+          {t('organizerGuidelines.intro', {
+            defaultValue: ORGANIZER_GUIDELINE_INTRO,
+          })}
+        </Text>
+        <Text style={styles.updated}>
+          {t('organizerGuidelines.updatedAt', {
+            date: ORGANIZER_GUIDELINE_UPDATED_AT,
+          })}
+        </Text>
 
-        {ORGANIZER_GUIDELINE_SECTIONS.map((section) => (
+        {ORGANIZER_GUIDELINE_SECTIONS.map((section) => {
+          const sectionKey = `organizerGuidelines.sections.${section.id}`;
+          const title = t(`${sectionKey}.title`, {
+            defaultValue: section.title,
+          });
+          const paragraphs = asStringArray(
+            t(`${sectionKey}.paragraphs`, {
+              returnObjects: true,
+              defaultValue: section.paragraphs,
+            }),
+            section.paragraphs,
+          );
+          const bullets = asStringArray(
+            t(`${sectionKey}.bullets`, {
+              returnObjects: true,
+              defaultValue: section.bullets ?? [],
+            }),
+            section.bullets ?? [],
+          );
+          return (
           <View key={section.id} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.paragraphs.map((p, index) => (
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {paragraphs.map((p, index) => (
               <Text key={`${section.id}-p-${index}`} style={styles.paragraph}>
                 {p}
               </Text>
             ))}
-            {section.bullets?.length ? (
+            {bullets.length ? (
               <View style={styles.bullets}>
-                {section.bullets.map((item, index) => (
+                {bullets.map((item, index) => (
                   <View key={`${section.id}-b-${index}`} style={styles.bulletRow}>
                     <Text style={styles.bulletMark}>・</Text>
                     <Text style={styles.bulletText}>{item}</Text>
@@ -45,16 +80,17 @@ export default function OrganizerGuidelinesScreen() {
               </View>
             ) : null}
           </View>
-        ))}
+          );
+        })}
 
         <View style={styles.links}>
           <Pressable
             style={styles.linkRow}
             onPress={() => router.push('/settings/contact')}
             accessibilityRole="button"
-            accessibilityLabel="お問い合わせへ"
+            accessibilityLabel={t('organizerGuidelines.contactA11y')}
           >
-            <Text style={styles.linkLabel}>お問い合わせ</Text>
+            <Text style={styles.linkLabel}>{t('organizerGuidelines.contact')}</Text>
             <Text style={styles.linkChevron}>›</Text>
           </Pressable>
         </View>

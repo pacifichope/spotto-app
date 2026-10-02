@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { theme } from '@/constants/theme';
 
@@ -6,14 +7,15 @@ type AppHeaderProps = {
   locationLabel?: string;
 };
 
-export default function AppHeader({
-  locationLabel = '現在地を取得中…',
-}: AppHeaderProps) {
+export default function AppHeader({ locationLabel }: AppHeaderProps) {
+  const { t } = useTranslation();
   return (
     <View style={styles.row}>
       <View>
         <Text style={styles.brand}>spotto</Text>
-        <Text style={styles.location}>{locationLabel}</Text>
+        <Text style={styles.location}>
+          {locationLabel ?? t('home.locating')}
+        </Text>
       </View>
       <View style={styles.badge}>
         <Text style={styles.badgeText}>LIVE</Text>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Pressable,
@@ -21,10 +22,10 @@ import {
   fetchOrganizerSalesSummary,
   formatSalesYearMonth,
   formatYenAmount,
-  payoutStatusLabel,
-  salesYearMonthLabel,
+  parseSalesYearMonth,
   shiftSalesYearMonth,
   subscribeOwnPayoutUpdates,
+  type MonthPayoutDisplayStatus,
   type OrganizerSalesSummary,
 } from '@/lib/organizerSales';
 
@@ -34,6 +35,14 @@ function currentYearMonth() {
 }
 
 export default function OrganizerSalesScreen() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'en' ? 'en-US' : 'ja-JP';
+  const monthLabel = (ym: string) => {
+    const parsed = parseSalesYearMonth(ym);
+    return parsed ? t('sales.monthLabel', parsed) : ym;
+  };
+  const statusLabel = (value: MonthPayoutDisplayStatus) =>
+    t(`sales.status.${value}`);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoggedIn, openLogin } = useAuth();
@@ -83,19 +92,19 @@ export default function OrganizerSalesScreen() {
   if (!isLoggedIn) {
     return (
       <View style={styles.root}>
-        <SettingsHeader title="売上管理" />
+        <SettingsHeader title={t('sales.title')} />
         <View style={styles.gate}>
-          <Text style={styles.gateTitle}>ログインが必要です</Text>
+          <Text style={styles.gateTitle}>{t('sales.gateTitle')}</Text>
           <Text style={styles.gateBody}>
-            主催イベントの売上は、ログイン中のアカウントに紐付いたデータのみ表示されます。
+            {t('sales.gateBody')}
           </Text>
           <Pressable
             style={styles.gateBtn}
             onPress={() => openLogin()}
             accessibilityRole="button"
-            accessibilityLabel="ログイン"
+            accessibilityLabel={t('common.login')}
           >
-            <Text style={styles.gateBtnText}>ログイン</Text>
+            <Text style={styles.gateBtnText}>{t('common.login')}</Text>
           </Pressable>
         </View>
       </View>
@@ -106,7 +115,7 @@ export default function OrganizerSalesScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="売上管理" />
+      <SettingsHeader title={t('sales.title')} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -125,15 +134,15 @@ export default function OrganizerSalesScreen() {
             style={styles.monthBtn}
             onPress={() => setYearMonth((ym) => shiftSalesYearMonth(ym, -1))}
             accessibilityRole="button"
-            accessibilityLabel="前月"
+            accessibilityLabel={t('sales.prevMonth')}
           >
             <Text style={styles.monthBtnText}>‹</Text>
           </Pressable>
           <View style={styles.monthCenter}>
             <Text style={styles.monthLabel}>
-              {summary?.periodLabel || salesYearMonthLabel(yearMonth)}
+              {monthLabel(summary?.yearMonth || yearMonth)}
             </Text>
-            <Text style={styles.monthHint}>イベント開催日ベースで集計</Text>
+            <Text style={styles.monthHint}>{t('sales.monthHint')}</Text>
           </View>
           <Pressable
             style={[styles.monthBtn, !canGoNext && styles.monthBtnDisabled]}
@@ -143,7 +152,7 @@ export default function OrganizerSalesScreen() {
             }}
             disabled={!canGoNext}
             accessibilityRole="button"
-            accessibilityLabel="翌月"
+            accessibilityLabel={t('sales.nextMonth')}
             accessibilityState={{ disabled: !canGoNext }}
           >
             <Text
@@ -166,7 +175,7 @@ export default function OrganizerSalesScreen() {
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
             <Pressable onPress={() => void load()} style={styles.retryBtn}>
-              <Text style={styles.retryText}>再読み込み</Text>
+              <Text style={styles.retryText}>{t('sales.reload')}</Text>
             </Pressable>
           </View>
         ) : summary ? (
@@ -187,51 +196,53 @@ export default function OrganizerSalesScreen() {
                     status === 'none' && styles.statusChipTextDark,
                   ]}
                 >
-                  {payoutStatusLabel(status)}
+                  {statusLabel(status)}
                 </Text>
               </View>
             </View>
             {status === 'paid' ? (
               <Text style={styles.statusHint}>
-                指定口座へのお振込が完了しています
                 {summary.payoutPaidAt
-                  ? `（${new Date(summary.payoutPaidAt).toLocaleDateString('ja-JP')}）`
-                  : ''}
-                。
+                  ? t('sales.paidHintWithDate', {
+                      date: new Date(summary.payoutPaidAt).toLocaleDateString(
+                        dateLocale,
+                      ),
+                    })
+                  : t('sales.paidHint')}
               </Text>
             ) : status === 'awaiting_payout' ? (
               <Text style={styles.statusHint}>
-                終了したイベントの売上は振込待ち（確定）です。翌月末の振込予定をご確認ください。
+                {t('sales.awaitingPayoutHint')}
               </Text>
             ) : status === 'awaiting_event' ? (
               <Text style={styles.statusHint}>
-                イベント終了後に自動で「振込待ち（確定）」へ切り替わります。
+                {t('sales.awaitingEventHint')}
               </Text>
             ) : (
               <Text style={styles.statusHint}>
-                この月のチケット売上はまだありません。
+                {t('sales.noneHint')}
               </Text>
             )}
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>
                 {status === 'paid'
-                  ? '振込金額（手取り）'
-                  : '受取予定額（手取り）'}
+                  ? t('sales.netPaid')
+                  : t('sales.netPlanned')}
               </Text>
               <Text style={styles.summaryNet}>
                 {formatYenAmount(summary.netYen)}
               </Text>
               <View style={styles.feeRows}>
                 <View style={styles.feeRow}>
-                  <Text style={styles.feeKey}>振込対象の売上（終了済み）</Text>
+                  <Text style={styles.feeKey}>{t('sales.confirmedGross')}</Text>
                   <Text style={styles.feeVal}>
                     {formatYenAmount(summary.confirmedGrossYen)}
                   </Text>
                 </View>
                 {summary.pendingGrossYen > 0 ? (
                   <View style={styles.feeRow}>
-                    <Text style={styles.feeKey}>開催待ちの売上（未確定）</Text>
+                    <Text style={styles.feeKey}>{t('sales.pendingGross')}</Text>
                     <Text style={styles.feeValMuted}>
                       {formatYenAmount(summary.pendingGrossYen)}
                     </Text>
@@ -239,7 +250,9 @@ export default function OrganizerSalesScreen() {
                 ) : null}
                 <View style={styles.feeRow}>
                   <Text style={styles.feeKey}>
-                    決済手数料（約{Math.round(PAYMENT_FEE_RATE * 1000) / 10}%）
+                    {t('sales.paymentFee', {
+                      rate: Math.round(PAYMENT_FEE_RATE * 1000) / 10,
+                    })}
                   </Text>
                   <Text style={styles.feeValMuted}>
                     −{formatYenAmount(summary.paymentFeeYen)}
@@ -247,8 +260,9 @@ export default function OrganizerSalesScreen() {
                 </View>
                 <View style={styles.feeRow}>
                   <Text style={styles.feeKey}>
-                    プラットフォーム利用料（
-                    {Math.round(PLATFORM_FEE_RATE * 100)}%）
+                    {t('sales.platformFee', {
+                      rate: Math.round(PLATFORM_FEE_RATE * 100),
+                    })}
                   </Text>
                   <Text style={styles.feeValMuted}>
                     −{formatYenAmount(summary.platformFeeYen)}
@@ -256,7 +270,9 @@ export default function OrganizerSalesScreen() {
                 </View>
                 <View style={styles.feeRow}>
                   <Text style={styles.feeKey}>
-                    振込手数料（一律{PAYOUT_FEE_YEN.toLocaleString('ja-JP')}円）
+                    {t('sales.payoutFee', {
+                      amount: formatYenAmount(PAYOUT_FEE_YEN),
+                    })}
                   </Text>
                   <Text style={styles.feeValMuted}>
                     −{formatYenAmount(summary.payoutFeeYen)}
@@ -264,28 +280,31 @@ export default function OrganizerSalesScreen() {
                 </View>
               </View>
               <Text style={styles.meta}>
-                販売チケット {summary.ticketCount}枚（うち確定{' '}
-                {summary.confirmedTicketCount}枚） · イベント{' '}
-                {summary.events.length}件
+                {t('sales.meta', {
+                  tickets: summary.ticketCount,
+                  confirmed: summary.confirmedTicketCount,
+                  events: summary.events.length,
+                })}
               </Text>
               <Text style={styles.calcNote}>
-                手取り = 確定売上 − 決済手数料 − 利用料10% − 振込手数料
-                {PAYOUT_FEE_YEN.toLocaleString('ja-JP')}円（月次1回）
+                {t('sales.calcNote', {
+                  platformRate: Math.round(PLATFORM_FEE_RATE * 100),
+                  amount: formatYenAmount(PAYOUT_FEE_YEN),
+                })}
               </Text>
             </View>
 
-            <Text style={styles.sectionTitle}>イベント別の内訳</Text>
+            <Text style={styles.sectionTitle}>{t('sales.breakdownTitle')}</Text>
             <Text style={styles.sectionHint}>
-              各イベントの売上は eventId
-              ごとに分離して集計しています。決済手数料・利用料はイベント単位、振込手数料は月次合算から控除します。
+              {t('sales.breakdownHint')}
             </Text>
             {summary.events.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>
-                  {salesYearMonthLabel(yearMonth)}の売上はまだありません
+                  {t('sales.emptyTitle', { period: monthLabel(yearMonth) })}
                 </Text>
                 <Text style={styles.emptyBody}>
-                  参加者がチケットを決済すると、ここに実績の内訳が表示されます。キャンセル・返金があった分は自動で相殺されます。
+                  {t('sales.emptyBody')}
                 </Text>
               </View>
             ) : (
@@ -296,28 +315,30 @@ export default function OrganizerSalesScreen() {
                     style={[styles.listRow, index > 0 && styles.listRowBorder]}
                     onPress={() => router.push(`/event/${item.eventId}`)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${item.eventTitle}の詳細`}
+                    accessibilityLabel={t('sales.eventA11y', { title: item.eventTitle })}
                   >
                     <View style={styles.listText}>
                       <Text style={styles.listTitle} numberOfLines={2}>
                         {item.eventTitle}
                       </Text>
                       <Text style={styles.listCaption}>
-                        {item.eventDate || '日程未設定'} · {item.ticketCount}枚
+                        {item.eventDate || t('sales.dateUnset')} ·{' '}
+                        {t('sales.ticketCount', { count: item.ticketCount })}
                         {item.unitPriceYen > 0
                           ? ` × ${formatYenAmount(item.unitPriceYen)}`
                           : ''}
                         {' · '}
-                        {item.confirmed ? '振込待ち（確定）' : '開催待ち'}
+                        {item.confirmed
+                          ? t('sales.status.awaiting_payout')
+                          : t('sales.waitingForEvent')}
                       </Text>
                       <Text style={styles.listFeeLine}>
-                        売上 {formatYenAmount(item.grossYen)}
-                        {' → '}
-                        決済手数料 −{formatYenAmount(item.paymentFeeYen)}
-                        {' → '}
-                        利用料 −{formatYenAmount(item.platformFeeYen)}
-                        {' → '}
-                        主催者分 {formatYenAmount(item.netAfterPlatformYen)}
+                        {t('sales.feeLine', {
+                          gross: formatYenAmount(item.grossYen),
+                          paymentFee: formatYenAmount(item.paymentFeeYen),
+                          platformFee: formatYenAmount(item.platformFeeYen),
+                          hostShare: formatYenAmount(item.netAfterPlatformYen),
+                        })}
                       </Text>
                     </View>
                     <View style={styles.listAmountCol}>
@@ -325,7 +346,9 @@ export default function OrganizerSalesScreen() {
                         {formatYenAmount(item.grossYen)}
                       </Text>
                       <Text style={styles.listAmountSub}>
-                        純額 {formatYenAmount(item.netAfterPlatformYen)}
+                        {t('sales.netLabel', {
+                          amount: formatYenAmount(item.netAfterPlatformYen),
+                        })}
                       </Text>
                     </View>
                   </Pressable>
@@ -338,18 +361,18 @@ export default function OrganizerSalesScreen() {
                 style={styles.linkRow}
                 onPress={() => router.push('/settings/bank-account')}
                 accessibilityRole="button"
-                accessibilityLabel="振込口座へ"
+                accessibilityLabel={t('sales.linkBankA11y')}
               >
-                <Text style={styles.linkLabel}>振込口座を確認・登録</Text>
+                <Text style={styles.linkLabel}>{t('sales.linkBank')}</Text>
                 <Text style={styles.linkChevron}>›</Text>
               </Pressable>
               <Pressable
                 style={[styles.linkRow, styles.linkRowBorder]}
                 onPress={() => router.push('/settings/organizer-guidelines')}
                 accessibilityRole="button"
-                accessibilityLabel="主催者ガイドラインへ"
+                accessibilityLabel={t('sales.linkGuideA11y')}
               >
-                <Text style={styles.linkLabel}>手数料・振込の説明</Text>
+                <Text style={styles.linkLabel}>{t('sales.linkGuide')}</Text>
                 <Text style={styles.linkChevron}>›</Text>
               </Pressable>
             </View>

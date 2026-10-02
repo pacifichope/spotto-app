@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +20,7 @@ function isLegalDocument(value: string): value is LegalDocumentId {
  * 利用規約・プライバシー・特商法表記は外部ブラウザへ。
  */
 export default function SettingsSectionScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ section?: string }>();
   const section = parseSettingsSection(params.section);
@@ -42,10 +44,10 @@ export default function SettingsSectionScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="設定" />
+      <SettingsHeader title={t('settings.title')} />
       <View style={styles.loading}>
         <ActivityIndicator color={theme.colors.primary} />
-        <Text style={styles.loadingText}>ページを開いています…</Text>
+        <Text style={styles.loadingText}>{t('settings.openingPage')}</Text>
       </View>
     </View>
   );

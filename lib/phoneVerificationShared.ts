@@ -1,5 +1,6 @@
 /** 電話認証まわりの共有ユーティリティ（Firebase / UI 共通） */
 
+import i18n from '@/lib/i18n';
 import {
   DEFAULT_PHONE_COUNTRY,
   findPhoneCountry,
@@ -240,8 +241,8 @@ export function validatePhoneInput(
     counterLabel: '',
     hint:
       country.iso2 === 'JP'
-        ? 'Enter a valid mobile number (e.g. 090…)'
-        : 'Enter a valid phone number',
+        ? i18n.t('auth.phoneInput.hintInvalidJp')
+        : i18n.t('auth.phoneInput.hintInvalid'),
     status: 'invalid',
     country,
   };
@@ -286,10 +287,10 @@ export function extractPhoneAuthErrorRaw(error: unknown): string {
   return String(error);
 }
 
-/** Auth の生エラーをユーザー向け日本語へ */
+/** Auth の生エラーをユーザー向け文言（現在の表示言語）へ */
 export function formatPhoneAuthError(
   raw: string | null | undefined,
-  fallback = '認証コードの送信に失敗しました。',
+  fallback = i18n.t('errors.phone.sendFailed'),
 ): string {
   const message = String(raw || '').trim();
   if (!message) return fallback;
@@ -300,7 +301,7 @@ export function formatPhoneAuthError(
       message,
     )
   ) {
-    return '電話番号の形式が正しくありません。番号と国番号を確認してください。';
+    return i18n.t('errors.phone.invalidNumber');
   }
   if (
     /rate.?limit|too many|quota|sms.*limit|exceeded|auth\/too-many-requests/i.test(
@@ -308,46 +309,42 @@ export function formatPhoneAuthError(
     ) ||
     /クォータ|回数制限|上限/.test(message)
   ) {
-    return '送信回数の上限に達しました。しばらく時間をおいてから再度お試しください。';
+    return i18n.t('errors.phone.rateLimit');
   }
   if (
     /auth\/missing-client-identifier|missing a valid app identifier|play integrity|app.?not.?authorized/i.test(
       lower,
     )
   ) {
-    return 'アプリの本人確認に失敗しました。通信環境を確認するか、しばらくしてから再度お試しください。';
+    return i18n.t('errors.phone.appVerification');
   }
   if (
     /auth\/captcha-check-failed|recaptcha|app.?verification/i.test(lower)
   ) {
-    return '本人確認（reCAPTCHA / アプリ検証）に失敗しました。通信環境を確認して再度お試しください。';
+    return i18n.t('errors.phone.recaptcha');
   }
   if (
     /auth\/invalid-verification-code|invalid.?code|code.?expired|auth\/code-expired/i.test(
       lower,
     )
   ) {
-    return '認証コードが正しくないか、有効期限が切れています。';
+    return i18n.t('errors.phone.codeInvalid');
   }
   if (
     /auth\/operation-not-allowed|operation-not-allowed|phone.*not.?enabled|provider.*disabled|sms.*unable.*region|region.*enabled/i.test(
       lower,
     )
   ) {
-    return (
-      '電話番号認証を利用できません。Firebase Console で次を確認してください: ' +
-      '① Authentication → Sign-in method → 電話番号を有効化 ② Authentication → Settings → ' +
-      'SMS region policy で日本（JP）を許可（新規プロジェクトは既定で全リージョン拒否）'
-    );
+    return i18n.t('errors.phone.operationNotAllowed');
   }
   if (/billing|BLAZE|upgrade.?project|payment/i.test(lower)) {
-    return 'SMS 送信には Firebase の課金プラン（Blaze）が必要な場合があります。しばらくしてから再度お試しください。';
+    return i18n.t('errors.phone.billing');
   }
   if (/not.?enabled/i.test(lower)) {
-    return 'ただいま電話番号認証を利用できません。Firebase の電話認証設定を確認してください。';
+    return i18n.t('errors.phone.notEnabled');
   }
   if (/network|fetch|failed to fetch|timeout|econnrefused/i.test(lower)) {
-    return '通信に失敗しました。ネットワーク接続を確認してください。';
+    return i18n.t('errors.phone.network');
   }
   if (message.startsWith('{') || message.startsWith('<') || message.length > 180) {
     try {

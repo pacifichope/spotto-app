@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import HeaderRoundButton from '@/components/HeaderRoundButton';
@@ -13,12 +14,14 @@ type HomeHeaderProps = {
 };
 
 export default function HomeHeader({
-  areaLabel = '現在地を取得中…',
+  areaLabel,
   query,
   onChangeQuery,
   onPressArea,
   onPressMap,
 }: HomeHeaderProps) {
+  const { t } = useTranslation();
+  const resolvedAreaLabel = areaLabel ?? t('areas.locating');
   return (
     <View style={styles.row}>
       <Pressable
@@ -26,10 +29,10 @@ export default function HomeHeader({
         onPress={onPressArea}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel={`エリア ${areaLabel}`}
+        accessibilityLabel={t('home.areaA11y', { area: resolvedAreaLabel })}
       >
         <Text style={styles.areaText} numberOfLines={1}>
-          {areaLabel}
+          {resolvedAreaLabel}
         </Text>
         <Text style={styles.chevron}>▾</Text>
       </Pressable>
@@ -40,7 +43,7 @@ export default function HomeHeader({
           style={styles.input}
           value={query}
           onChangeText={onChangeQuery}
-          placeholder="イベント・スポーツを検索"
+          placeholder={t('home.searchPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
           returnKeyType="search"
         />
@@ -49,7 +52,7 @@ export default function HomeHeader({
       {onPressMap ? (
         <HeaderRoundButton
           onPress={onPressMap}
-          accessibilityLabel="地図を表示"
+          accessibilityLabel={t('home.showMapA11y')}
         >
           <MapPinIcon size={20} color={theme.colors.onPrimary} />
         </HeaderRoundButton>

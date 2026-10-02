@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,6 +9,7 @@ import { LEGAL_EXTERNAL_URLS } from '@/lib/settings';
 
 /** 旧アプリ内ルート互換。外部ブラウザでプライバシーポリシーを開き設定へ戻る */
 export default function PrivacySettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
@@ -29,10 +31,10 @@ export default function PrivacySettingsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="プライバシーポリシー" />
+      <SettingsHeader title={t('settings.privacy')} />
       <View style={styles.loading}>
         <ActivityIndicator color={theme.colors.primary} />
-        <Text style={styles.loadingText}>ブラウザで開いています…</Text>
+        <Text style={styles.loadingText}>{t('settings.openingInBrowser')}</Text>
       </View>
     </View>
   );

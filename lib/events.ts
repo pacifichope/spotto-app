@@ -2,6 +2,7 @@ import type { PreQuestion } from '@/lib/preQuestions';
 import type { EventAttendee } from '@/lib/attendees';
 import type { SnsLink } from '@/lib/snsLinks';
 import { compactLocationAddress } from '@/lib/formatLocationAddress';
+import i18n from '@/lib/i18n';
 
 export { compactLocationAddress };
 
@@ -47,6 +48,18 @@ export type SportEvent = {
   vibe: string;
   /** 主催者による詳しい説明（イベント内容の本文） */
   description: string;
+  /** 作成時の原文言語（ja / en） */
+  sourceLang?: 'ja' | 'en';
+  /** 表示用タイトル（日本語） */
+  titleJa?: string;
+  /** 表示用タイトル（英語） */
+  titleEn?: string;
+  /** 表示用説明（日本語） */
+  descriptionJa?: string;
+  /** 表示用説明（英語） */
+  descriptionEn?: string;
+  /** 自動翻訳完了日時（ISO） */
+  translatedAt?: string;
   /** バナー / サムネイル画像 URL（先頭写真） */
   imageUri: string;
   /** ギャラリー画像（最大 MAX_EVENT_PHOTOS 枚）。未設定時は imageUri のみ */
@@ -180,6 +193,73 @@ export const CATEGORIES = [
 ] as const;
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
+
+/** DB 保存値（日本語のスポーツ名）→ i18n キー */
+const SPORT_LABEL_KEYS: Record<string, string> = {
+  サッカー: 'soccer',
+  バスケットボール: 'basketball',
+  テニス: 'tennis',
+  ランニング: 'running',
+  フットサル: 'futsal',
+  バドミントン: 'badminton',
+  バレーボール: 'volleyball',
+  野球: 'baseball',
+  その他: 'other',
+};
+
+/** スポーツ名（データ値）の表示ラベル。未知の値はそのまま返す。 */
+export function sportLabel(sport?: string | null) {
+  const raw = String(sport || '').trim();
+  if (!raw) return i18n.t('events.sport.other');
+  const key = SPORT_LABEL_KEYS[raw];
+  return key ? i18n.t(`events.sport.${key}`) : raw;
+}
+
+/** カテゴリチップ用ラベル（短縮名）。id はデータ値のまま。 */
+export function categoryLabel(id: CategoryId) {
+  switch (id) {
+    case 'all':
+      return i18n.t('events.category.all');
+    case 'hot':
+      return i18n.t('events.category.hot');
+    case 'バスケットボール':
+      return i18n.t('events.category.basketball');
+    case 'バレーボール':
+      return i18n.t('events.category.volleyball');
+    default:
+      return sportLabel(id);
+  }
+}
+
+const LEVEL_LABEL_KEYS: Record<string, string> = {
+  初心者: 'beginner',
+  中級: 'intermediate',
+  上級: 'advanced',
+  誰でも歓迎: 'everyone',
+};
+
+/** レベル（SkillLevel・データ値）の表示ラベル。 */
+export function levelLabel(level?: string | null) {
+  const raw = String(level || '').trim();
+  if (!raw) return i18n.t('events.level.everyone');
+  const key = LEVEL_LABEL_KEYS[raw];
+  return key ? i18n.t(`events.level.${key}`) : raw;
+}
+
+const AGE_GROUP_LABEL_KEYS: Record<string, string> = {
+  全世代ウェルカム: 'all',
+  学生向け: 'students',
+  '20代中心': 'twenties',
+  '20〜30代中心': 'twentiesThirties',
+  '30〜40代中心': 'thirtiesForties',
+  '40代以上歓迎': 'fortiesPlus',
+};
+
+/** 対象年齢層（プリセットのみ翻訳。自由入力はそのまま）。 */
+export function ageGroupLabel(value: string) {
+  const key = AGE_GROUP_LABEL_KEYS[String(value || '').trim()];
+  return key ? i18n.t(`events.ageGroup.${key}`) : value;
+}
 
 const PRIMARY_SPORT_SET = new Set<string>(
   CATEGORIES.filter(
@@ -1777,6 +1857,27 @@ export const CANCEL_POLICY_OPTIONS = [
 export const DEFAULT_CANCEL_POLICY = CANCEL_POLICY_OPTIONS[0].label;
 export const CANCEL_CONFIRM_TITLE = '本当にキャンセルしますか？';
 
+/** CANCEL_CONFIRM_TITLE の表示用（言語切替対応） */
+export function cancelConfirmTitle() {
+  return i18n.t('events.cancelConfirmTitle');
+}
+
+/** キャンセルポリシー選択肢（データ値）の表示ラベル。カスタム文言はそのまま。 */
+export function cancelPolicyOptionLabel(label?: string | null) {
+  const raw = String(label ?? '').trim();
+  const index = CANCEL_POLICY_OPTIONS.findIndex((option) => option.label === raw);
+  if (index < 0) return raw;
+  return i18n.t(`events.cancelPolicy.options.${index}.label`);
+}
+
+/** キャンセルポリシー選択肢の補足説明。 */
+export function cancelPolicyOptionHint(label?: string | null) {
+  const raw = String(label ?? '').trim();
+  const index = CANCEL_POLICY_OPTIONS.findIndex((option) => option.label === raw);
+  if (index < 0) return '';
+  return i18n.t(`events.cancelPolicy.options.${index}.hint`);
+}
+
 export type CancelPolicyRule =
   | { kind: 'none' }
   | { kind: 'days'; days: number }
@@ -1871,10 +1972,12 @@ export function formatRefundDeadline(date: Date) {
 }
 
 function formatRefundWindowLead(rule: CancelPolicyRule) {
-  if (rule.kind === 'none') return '返金不可';
-  if (rule.kind === 'hours') return `開催の${rule.hours}時間前まで`;
-  if (rule.days === 1) return '開催の前日まで';
-  return `開催の${rule.days}日前まで`;
+  if (rule.kind === 'none') return i18n.t('events.refund.leadNone');
+  if (rule.kind === 'hours') {
+    return i18n.t('events.refund.leadHours', { count: rule.hours });
+  }
+  if (rule.days === 1) return i18n.t('events.refund.leadDayBefore');
+  return i18n.t('events.refund.leadDays', { count: rule.days });
 }
 
 function refundYenForRate(totalYen: number, ratePercent: number) {
@@ -1901,7 +2004,7 @@ export function buildRefundPolicyRows(
   if (rule.kind === 'none') {
     return [
       {
-        requestTimeLabel: 'キャンセル時（常時）',
+        requestTimeLabel: i18n.t('events.refund.always'),
         refundRateLabel: '0%',
         refundRatePercent: 0,
         refundAmountYen: 0,
@@ -1916,13 +2019,13 @@ export function buildRefundPolicyRows(
   if (!cutoff || !isValidDate(start)) {
     return [
       {
-        requestTimeLabel: `${lead}\n（開催日時を確認できません）`,
+        requestTimeLabel: `${lead}\n${i18n.t('events.refund.unknownStart')}`,
         refundRateLabel: '100%',
         refundRatePercent: 100,
         refundAmountYen: refundYenForRate(paidYen, 100),
       },
       {
-        requestTimeLabel: '上記期限以降',
+        requestTimeLabel: i18n.t('events.refund.afterDeadlineAbove'),
         refundRateLabel: '0%',
         refundRatePercent: 0,
         refundAmountYen: 0,
@@ -1934,13 +2037,13 @@ export function buildRefundPolicyRows(
 
   return [
     {
-      requestTimeLabel: `${deadline} まで\n（${lead}）`,
+      requestTimeLabel: i18n.t('events.refund.until', { deadline, lead }),
       refundRateLabel: '100%',
       refundRatePercent: 100,
       refundAmountYen: refundYenForRate(paidYen, 100),
     },
     {
-      requestTimeLabel: `${deadline} 以降`,
+      requestTimeLabel: i18n.t('events.refund.after', { deadline }),
       refundRateLabel: '0%',
       refundRatePercent: 0,
       refundAmountYen: 0,
@@ -1962,11 +2065,11 @@ export function isRefundWindowClosed(
 }
 
 export function refundForfeitNotice() {
-  return 'キャンセル料が発生するため返金されません';
+  return i18n.t('events.refund.forfeitNotice');
 }
 
 export function refundEligibleNotice() {
-  return 'キャンセルポリシーの期限内のため、参加費は自動で返金されます。';
+  return i18n.t('events.refund.eligibleNotice');
 }
 
 export function shouldAutoRefundOnCancel(
@@ -1985,17 +2088,16 @@ function isPaidEvent(event: Pick<SportEvent, 'priceYen'>) {
 export function cancelPolicyTagLabel(
   event: Pick<SportEvent, 'cancelPolicy' | 'priceYen'>,
 ) {
-  if (!isPaidEvent(event)) return '当日キャンセル可';
+  if (!isPaidEvent(event)) return i18n.t('events.cancelPolicy.tagSameDay');
   const policy = event.cancelPolicy?.trim() || DEFAULT_CANCEL_POLICY;
   const hours = refundHoursBeforeStart(policy);
-  if (hours == null) return '返金不可';
+  if (hours == null) return i18n.t('events.cancelPolicy.tagNoRefund');
   if (hours % 24 === 0) {
     const days = hours / 24;
-    if (days <= 0) return '当日キャンセル可';
-    return `${days}日前までキャンセル可`;
+    if (days <= 0) return i18n.t('events.cancelPolicy.tagSameDay');
+    return i18n.t('events.cancelPolicy.tagDaysBefore', { count: days });
   }
-  if (hours === 24) return '24時間前まで返金可';
-  return `${hours}時間前までキャンセル可`;
+  return i18n.t('events.cancelPolicy.tagHoursBefore', { count: hours });
 }
 
 export function cancelPolicyCardText(
@@ -2004,16 +2106,16 @@ export function cancelPolicyCardText(
   const paid = isPaidEvent(event);
   const explicit = event.cancelPolicy?.trim() || '';
   if (paid) {
-    return explicit || DEFAULT_CANCEL_POLICY;
+    return cancelPolicyOptionLabel(explicit || DEFAULT_CANCEL_POLICY);
   }
   // 無料イベントは返金ポリシー未設定が通常。タグ「当日キャンセル可」と揃える
-  if (!explicit) return '当日までキャンセルできます';
+  if (!explicit) return i18n.t('events.cancelPolicy.cardSameDay');
   const hours = refundHoursBeforeStart(explicit);
-  if (hours == null) return 'イベント開始前までキャンセルできます';
+  if (hours == null) return i18n.t('events.cancelPolicy.cardBeforeStart');
   if (hours % 24 === 0) {
-    return `開始${hours / 24}日前まで無料でキャンセルできます`;
+    return i18n.t('events.cancelPolicy.cardDays', { count: hours / 24 });
   }
-  return `開始${hours}時間前まで無料でキャンセルできます`;
+  return i18n.t('events.cancelPolicy.cardHours', { count: hours });
 }
 
 export function eventEndAt(event: Pick<
@@ -2068,11 +2170,11 @@ export function getEventLifecycleStatus(
 export function eventLifecycleLabel(status: EventLifecycleStatus) {
   switch (status) {
     case 'cancelled':
-      return '中止';
+      return i18n.t('events.lifecycle.cancelled');
     case 'ended':
-      return '開催終了';
+      return i18n.t('events.lifecycle.ended');
     default:
-      return '開催予定';
+      return i18n.t('events.lifecycle.upcoming');
   }
 }
 
@@ -2201,7 +2303,7 @@ export function formatEventDate(
   const day = Number(parts[2]);
   const hasDate =
     Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day);
-  const monthDay = hasDate ? `${month}/${day}` : '日程未定';
+  const monthDay = hasDate ? `${month}/${day}` : i18n.t('events.scheduleUndecided');
   const range = formatTimeRange(dateRaw, time, endTime, endDate);
   return {
     monthDay,
@@ -2272,7 +2374,7 @@ export function deriveEventVibe(
     .find((line) => line.length > 0);
   if (first) return first.slice(0, 80);
   const fallback = String(title || '').trim();
-  return fallback.slice(0, 40) || 'イベント';
+  return fallback.slice(0, 40) || i18n.t('events.defaultTitle');
 }
 
 export type JoinActionResult =
@@ -2371,7 +2473,7 @@ export function formatSessionSlot(session: EventSession) {
   const dayLabel =
     Number.isFinite(month) && Number.isFinite(day)
       ? `${month}/${day}`
-      : '日程未定';
+      : i18n.t('events.scheduleUndecided');
   if (!session?.endTime) return `${dayLabel} ${timeRaw}`;
   if (session.endDate && session.endDate !== session.date) {
     const endParts = String(session.endDate || '').split(/[-/.]/);
@@ -2393,7 +2495,7 @@ export function sortEventSessions(sessions: EventSession[]) {
 export function formatSessionsSummary(sessions: EventSession[], max = 3) {
   const labels = sortEventSessions(sessions).map(formatSessionSlot);
   if (labels.length <= max) return labels.join(', ');
-  return `${labels.slice(0, max).join(', ')} ほか${labels.length - max}件`;
+  return `${labels.slice(0, max).join(', ')} ${i18n.t('events.sessionsMore', { count: labels.length - max })}`;
 }
 
 export function formatEventSchedule(
@@ -2423,7 +2525,7 @@ export function formatEventSchedule(
   if (sessions.length > 1) {
     const sorted = sortEventSessions(sessions);
     return {
-      monthDay: `${sorted.length}回`,
+      monthDay: i18n.t('events.sessionsCount', { count: sorted.length }),
       time: formatSessionsSummary(sorted, 2),
       full: formatSessionsSummary(sorted, 8),
     };
@@ -2535,7 +2637,6 @@ export function occurrenceSlotKey(
   return `${event.id}|${event.date}|${event.time}|${event.endTime ?? ''}`;
 }
 
-const WEEKDAY_SHORT = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 export function formatCompactWhen(
   date: string | null | undefined,
@@ -2544,9 +2645,9 @@ export function formatCompactWhen(
   const timeLabel = String(time || '').trim() || '--:--';
   const start = parseEventDateTime(String(date || ''), timeLabel);
   if (!Number.isFinite(start.getTime())) {
-    return timeLabel === '--:--' ? '日程未定' : timeLabel;
+    return timeLabel === '--:--' ? i18n.t('events.scheduleUndecided') : timeLabel;
   }
-  const weekday = WEEKDAY_SHORT[start.getDay()] ?? '';
+  const weekday = i18n.t(`events.weekdayShort.${start.getDay()}`);
   const month = String(start.getMonth() + 1).padStart(2, '0');
   const day = String(start.getDate()).padStart(2, '0');
   return `${weekday} ${month}.${day}  ${timeLabel}`;
@@ -2556,7 +2657,7 @@ export function formatEventWhenCompact(
   event: Pick<SportEvent, 'date' | 'time' | 'sessions'> | null | undefined,
   now = new Date(),
 ) {
-  if (!event) return '日程未定';
+  if (!event) return i18n.t('events.scheduleUndecided');
   try {
     const sessions = Array.isArray(event.sessions)
       ? event.sessions.filter(
@@ -2578,7 +2679,7 @@ export function formatEventWhenCompact(
     }
     return formatCompactWhen(event.date, event.time);
   } catch {
-    return '日程未定';
+    return i18n.t('events.scheduleUndecided');
   }
 }
 
@@ -2662,9 +2763,22 @@ export const REGISTRATION_DEADLINE_OPTIONS: {
   },
 ];
 
+/** 申込締切オプションの表示ラベル（言語切替対応）。 */
+export function deadlineOptionLabel(offset: RegistrationDeadlineOffset) {
+  if (offset === 0) return i18n.t('events.deadline.atStart');
+  if (offset === 'end') return i18n.t('events.deadline.atEnd');
+  if (offset === 24 || offset === 48 || offset === 72) {
+    return i18n.t('events.deadline.hoursBeforeDays', {
+      count: offset,
+      days: offset / 24,
+    });
+  }
+  return i18n.t('events.deadline.hoursBefore', { count: offset });
+}
+
 export function formatDeadlineLabel(offset: RegistrationDeadlineOffset) {
-  return (
-    REGISTRATION_DEADLINE_OPTIONS.find((option) => option.value === offset)
-      ?.label ?? '締切を選択'
+  const found = REGISTRATION_DEADLINE_OPTIONS.some(
+    (option) => option.value === offset,
   );
+  return found ? deadlineOptionLabel(offset) : i18n.t('events.deadline.select');
 }

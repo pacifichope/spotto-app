@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Image,
@@ -37,6 +38,7 @@ import {
   resolveClubsFromIds,
 } from '@/lib/clubsRemote';
 import { useClubs } from '@/lib/clubsContext';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import {
   useCreateEventAccess,
   useOrganizerEditor,
@@ -66,6 +68,7 @@ import { pushProfileToRemote } from '@/lib/userProfileRemote';
 type Segment = 'joined' | 'past' | 'favorites' | 'hosted' | 'drafts';
 
 export default function MyPageScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const {
@@ -219,12 +222,12 @@ export default function MyPageScreen() {
 
   const confirmDeleteDraft = (next: EventDraft) => {
     Alert.alert(
-      '下書きを削除しますか？',
+      t('mypage.deleteDraftTitle'),
       formatDraftTitle(next),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '削除',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: () => deleteEventDraft(next.id),
         },
@@ -240,7 +243,7 @@ export default function MyPageScreen() {
   const handleCreate = async (payload: CreateEventPayload) => {
     const result = await createEvent(payload);
     if (!result.ok) {
-      Alert.alert('保存に失敗しました', result.error);
+      Alert.alert(t('common.saveFailed'), result.error);
       return;
     }
     if (editingDraft) deleteEventDraft(editingDraft.id);
@@ -249,10 +252,13 @@ export default function MyPageScreen() {
     router.push(`/event/${result.event.id}`);
     const count = result.events.length;
     Alert.alert(
-      '主催しました',
+      t('common.eventPublishedTitle'),
       count > 1
-        ? `「${result.event.title}」を ${count} 件の独立したイベントとして公開しました。`
-        : result.event.title,
+        ? t('common.eventPublishedMultiple', {
+            title: localizedEventTitle(result.event),
+            count,
+          })
+        : localizedEventTitle(result.event),
     );
   };
 
@@ -260,7 +266,7 @@ export default function MyPageScreen() {
   const organizerName = organizerNameReady
     ? organizerDisplayName(organizerProfile)
     : '';
-  const accountTitle = isLoggedIn ? displayName : 'ログイン / 新規登録';
+  const accountTitle = isLoggedIn ? displayName : t('mypage.loginSignup');
   const hostedActiveCount = visibleUpcomingHosted.length;
   const hostedPastCount = visiblePastHosted.length;
   /** 主催イベントが1件以上あるとき、右下 FAB で追加作成できるようにする */
@@ -273,20 +279,20 @@ export default function MyPageScreen() {
   const segmentItems: { id: Segment; label: string; count: number }[] =
     isOrganizer
       ? [
-          { id: 'hosted', label: '主催', count: hostedActiveCount },
-          { id: 'past', label: '履歴', count: hostedPastCount },
-          { id: 'drafts', label: '下書き', count: visibleDrafts.length },
+          { id: 'hosted', label: t('mypage.segmentHosted'), count: hostedActiveCount },
+          { id: 'past', label: t('mypage.segmentHistory'), count: hostedPastCount },
+          { id: 'drafts', label: t('mypage.segmentDrafts'), count: visibleDrafts.length },
         ]
       : [
           {
             id: 'joined',
-            label: '参加予定',
+            label: t('mypage.segmentJoined'),
             count: visibleUpcomingJoined.length,
           },
-          { id: 'past', label: '履歴', count: visiblePastJoined.length },
+          { id: 'past', label: t('mypage.segmentHistory'), count: visiblePastJoined.length },
           {
             id: 'favorites',
-            label: 'お気に入り',
+            label: t('mypage.segmentFavorites'),
             count: visibleFavorites.length,
           },
         ];
@@ -294,13 +300,13 @@ export default function MyPageScreen() {
   const pageHeader = (
     <View style={styles.listHeaderWrap}>
       <View style={styles.titleRow}>
-        <Text style={styles.pageTitle}>マイページ</Text>
+        <Text style={styles.pageTitle}>{t('mypage.title')}</Text>
         <Pressable
           onPress={() => router.push('/settings')}
           hitSlop={8}
           style={styles.settingsBtn}
           accessibilityRole="button"
-          accessibilityLabel="設定"
+          accessibilityLabel={t('mypage.settings')}
         >
           <SymbolView
             name={{
@@ -324,7 +330,7 @@ export default function MyPageScreen() {
           onPress={() => switchMode('participant')}
           accessibilityRole="tab"
           accessibilityState={{ selected: !isOrganizer }}
-          accessibilityLabel="参加者モード"
+          accessibilityLabel={t('mypage.participantMode')}
         >
           <Text
             style={[
@@ -332,7 +338,7 @@ export default function MyPageScreen() {
               !isOrganizer && styles.modeChipTextActive,
             ]}
           >
-            参加者モード
+            {t('mypage.participantMode')}
           </Text>
         </Pressable>
         <Pressable
@@ -340,7 +346,7 @@ export default function MyPageScreen() {
           onPress={() => switchMode('organizer')}
           accessibilityRole="tab"
           accessibilityState={{ selected: isOrganizer }}
-          accessibilityLabel="主催者モード"
+          accessibilityLabel={t('mypage.organizerMode')}
         >
           <Text
             style={[
@@ -348,7 +354,7 @@ export default function MyPageScreen() {
               isOrganizer && styles.modeChipTextActive,
             ]}
           >
-            主催者モード
+            {t('mypage.organizerMode')}
           </Text>
         </Pressable>
       </View>
@@ -362,11 +368,11 @@ export default function MyPageScreen() {
             ]}
             onPress={openOrganizerEditor}
             accessibilityRole="button"
-            accessibilityLabel="主催者プロフィールを編集"
+            accessibilityLabel={t('mypage.editOrganizerProfileA11y')}
           >
             {organizerName || organizerProfile.imageUri ? (
               <HostAvatar
-                name={organizerName || '主催者'}
+                name={organizerName || t('mypage.organizerDefaultName')}
                 imageUri={organizerProfile.imageUri}
                 size={44}
               />
@@ -391,12 +397,12 @@ export default function MyPageScreen() {
             )}
             <View style={styles.heroBody}>
               <Text style={styles.heroNameSm} numberOfLines={1}>
-                {organizerName || '主催者プロフィール'}
+                {organizerName || t('mypage.organizerProfile')}
               </Text>
               <Text style={styles.heroMeta} numberOfLines={1}>
                 {organizerName
-                  ? 'サークル情報を編集'
-                  : 'サークル名を設定してイベントを公開'}
+                  ? t('mypage.editCircleInfo')
+                  : t('mypage.setCircleName')}
               </Text>
             </View>
             <View style={styles.chevronWrap}>
@@ -418,7 +424,9 @@ export default function MyPageScreen() {
             }}
             accessibilityRole="button"
             accessibilityLabel={
-              isLoggedIn ? '個人プロフィールを編集' : 'ログイン / 新規登録'
+              isLoggedIn
+                ? t('mypage.editPersonalProfile')
+                : t('mypage.loginSignup')
             }
           >
             {isLoggedIn ? (
@@ -451,7 +459,9 @@ export default function MyPageScreen() {
                 {accountTitle}
               </Text>
               {isLoggedIn ? (
-                <Text style={styles.heroMeta}>個人プロフィールを編集</Text>
+                <Text style={styles.heroMeta}>
+                  {t('mypage.editPersonalProfile')}
+                </Text>
               ) : null}
             </View>
             <View style={styles.chevronWrap}>
@@ -473,9 +483,9 @@ export default function MyPageScreen() {
               router.push('/settings/sales');
             }}
             accessibilityRole="button"
-            accessibilityLabel="売上管理"
+            accessibilityLabel={t('mypage.sales')}
           >
-            <Text style={styles.organizerLinkLabel}>売上管理</Text>
+            <Text style={styles.organizerLinkLabel}>{t('mypage.sales')}</Text>
             <Text style={styles.chevronMark}>›</Text>
           </Pressable>
           <Pressable
@@ -488,18 +498,22 @@ export default function MyPageScreen() {
               router.push('/settings/bank-account');
             }}
             accessibilityRole="button"
-            accessibilityLabel="振込口座"
+            accessibilityLabel={t('mypage.bankAccount')}
           >
-            <Text style={styles.organizerLinkLabel}>振込口座</Text>
+            <Text style={styles.organizerLinkLabel}>
+              {t('mypage.bankAccount')}
+            </Text>
             <Text style={styles.chevronMark}>›</Text>
           </Pressable>
           <Pressable
             style={[styles.organizerLinkRow, styles.organizerLinkBorder]}
             onPress={() => router.push('/settings/organizer-guidelines')}
             accessibilityRole="button"
-            accessibilityLabel="主催者ガイドライン"
+            accessibilityLabel={t('mypage.organizerGuidelines')}
           >
-            <Text style={styles.organizerLinkLabel}>主催者ガイドライン</Text>
+            <Text style={styles.organizerLinkLabel}>
+              {t('mypage.organizerGuidelines')}
+            </Text>
             <Text style={styles.chevronMark}>›</Text>
           </Pressable>
         </View>
@@ -510,9 +524,13 @@ export default function MyPageScreen() {
           style={styles.clubsBanner}
           onPress={() => router.push('/clubs')}
           accessibilityRole="button"
-          accessibilityLabel={`参加したクラブ ${joinedClubs.length}件`}
+          accessibilityLabel={t('mypage.joinedClubsA11y', {
+            count: joinedClubs.length,
+          })}
         >
-          <Text style={styles.clubsBannerLabel}>参加したクラブ</Text>
+          <Text style={styles.clubsBannerLabel}>
+            {t('mypage.joinedClubs')}
+          </Text>
           <Text style={styles.clubsBannerDot}>·</Text>
           <Text style={styles.clubsBannerCount}>{joinedClubs.length}</Text>
           <View style={styles.chevronWrap}>
@@ -570,24 +588,24 @@ export default function MyPageScreen() {
 
   const loginEmptyCopy = {
     joined: {
-      title: 'ログインして参加予定を確認する',
-      body: 'サインインすると、参加したイベントがここに表示されます。',
+      title: t('mypage.loginEmpty.joined.title'),
+      body: t('mypage.loginEmpty.joined.body'),
     },
     past: {
-      title: 'ログインして履歴を確認する',
-      body: 'サインインすると、これまでに参加・主催したイベントの履歴を確認できます。',
+      title: t('mypage.loginEmpty.past.title'),
+      body: t('mypage.loginEmpty.past.body'),
     },
     favorites: {
-      title: 'ログインしてお気に入りを確認する',
-      body: 'サインインすると、保存したイベントがここに表示されます。',
+      title: t('mypage.loginEmpty.favorites.title'),
+      body: t('mypage.loginEmpty.favorites.body'),
     },
     hosted: {
-      title: 'ログインして主催イベントを管理する',
-      body: 'サインインすると、開催予定の主催イベントを確認・管理できます。',
+      title: t('mypage.loginEmpty.hosted.title'),
+      body: t('mypage.loginEmpty.hosted.body'),
     },
     drafts: {
-      title: 'ログインして下書きを確認する',
-      body: 'サインインすると、保存した下書きを続きから編集できます。',
+      title: t('mypage.loginEmpty.drafts.title'),
+      body: t('mypage.loginEmpty.drafts.body'),
     },
   }[segment];
 
@@ -600,32 +618,32 @@ export default function MyPageScreen() {
     : {
         joined: {
           Icon: CalendarEmptyIcon,
-          title: '参加予定はまだありません',
-          body: 'ホームで気になるイベントを開き、「参加する」を押すとここに表示されます。',
+          title: t('mypage.empty.joined.title'),
+          body: t('mypage.empty.joined.body'),
         },
         past: {
           Icon: PackageEmptyIcon,
           title: isOrganizer
-            ? 'まだ終了した主催イベントはありません'
-            : 'まだ終了したイベントはありません',
+            ? t('mypage.empty.pastOrganizer.title')
+            : t('mypage.empty.pastParticipant.title'),
           body: isOrganizer
-            ? '開催が終わったイベントや中止したイベントは、ここにアーカイブされます。'
-            : '参加したイベントは、開催日時を過ぎるとここにアーカイブされます。',
+            ? t('mypage.empty.pastOrganizer.body')
+            : t('mypage.empty.pastParticipant.body'),
         },
         favorites: {
           Icon: HeartEmptyIcon,
-          title: 'お気に入りはまだありません',
-          body: 'イベント詳細のハートを押すと、ここに保存されます。',
+          title: t('mypage.empty.favorites.title'),
+          body: t('mypage.empty.favorites.body'),
         },
         hosted: {
           Icon: SparklesEmptyIcon,
-          title: '開催予定の主催イベントはありません',
-          body: '日時・場所・定員を決めて公開すると、参加者の募集を始められます。終了後は「履歴」タブに残ります。',
+          title: t('mypage.empty.hosted.title'),
+          body: t('mypage.empty.hosted.body'),
         },
         drafts: {
           Icon: EditEmptyIcon,
-          title: '下書きはまだありません',
-          body: 'イベント作成中に「下書き保存」を押すと、ここに保存されます。続きから編集して公開できます。',
+          title: t('mypage.empty.drafts.title'),
+          body: t('mypage.empty.drafts.body'),
         },
       }[segment];
 
@@ -643,19 +661,21 @@ export default function MyPageScreen() {
           style={styles.emptyCreateBtn}
           onPress={() => openLogin('mypage')}
           accessibilityRole="button"
-          accessibilityLabel="ログイン"
+          accessibilityLabel={t('common.login')}
         >
-          <Text style={styles.emptyCreateText}>ログイン</Text>
+          <Text style={styles.emptyCreateText}>{t('common.login')}</Text>
         </Pressable>
       ) : segment === 'hosted' || segment === 'drafts' ? (
         <Pressable
           style={styles.emptyCreateBtn}
           onPress={openCreate}
           accessibilityRole="button"
-          accessibilityLabel="新しいイベントを作成"
+          accessibilityLabel={t('mypage.createEventA11y')}
         >
           <Text style={styles.emptyCreatePlus}>＋</Text>
-          <Text style={styles.emptyCreateText}>イベントを作成</Text>
+          <Text style={styles.emptyCreateText}>
+            {t('mypage.createEvent')}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -690,7 +710,9 @@ export default function MyPageScreen() {
                     ]}
                     onPress={() => openDraft(item)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${formatDraftTitle(item)}の下書きを編集`}
+                    accessibilityLabel={t('mypage.editDraftA11y', {
+                      title: formatDraftTitle(item),
+                    })}
                   >
                     {item.imageUris[0] ? (
                       <Image
@@ -713,7 +735,9 @@ export default function MyPageScreen() {
                       <Text style={styles.draftMeta} numberOfLines={1}>
                         {formatDraftMeta(item)}
                       </Text>
-                      <Text style={styles.draftHint}>続きから編集</Text>
+                      <Text style={styles.draftHint}>
+                        {t('mypage.continueEditing')}
+                      </Text>
                     </View>
                   </Pressable>
                   <Pressable
@@ -721,9 +745,13 @@ export default function MyPageScreen() {
                     hitSlop={8}
                     style={styles.draftDeleteBtn}
                     accessibilityRole="button"
-                    accessibilityLabel={`${formatDraftTitle(item)}の下書きを削除`}
+                    accessibilityLabel={t('mypage.deleteDraftA11y', {
+                      title: formatDraftTitle(item),
+                    })}
                   >
-                    <Text style={styles.draftDeleteText}>削除</Text>
+                    <Text style={styles.draftDeleteText}>
+                      {t('common.delete')}
+                    </Text>
                   </Pressable>
                 </View>
               ))}
@@ -772,7 +800,7 @@ export default function MyPageScreen() {
         onSaveDraft={(snapshot) => {
           saveEventDraft(snapshot, editingDraft?.id);
           enterOrganizer('drafts');
-          setToast('下書きを保存しました');
+          setToast(t('common.draftSaved'));
         }}
       />
 
@@ -791,9 +819,8 @@ export default function MyPageScreen() {
               const result = await pushProfileToRemote(user.id, next);
               if (!result.ok) {
                 Alert.alert(
-                  '保存できませんでした',
-                  result.error ||
-                    'プロフィールをサーバーに保存できませんでした。',
+                  t('common.saveFailedShort'),
+                  result.error || t('common.profileSaveFailedBody'),
                 );
               }
             })();

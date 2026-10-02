@@ -44,6 +44,8 @@
 | `LINE_CHANNEL_ID` または `EXPO_PUBLIC_LINE_CHANNEL_ID` | LINE チャネル ID |
 | `RESEND_API_KEY` | お問い合わせメール用（使う場合） |
 
+| `GOOGLE_TRANSLATE_API_KEY` | Cloud Translation API キー（イベント作成時の日英自動翻訳。未設定時は `/events/translate` が 503） |
+
 任意: `ADMIN_USER_IDS`, `CRON_SECRET`, `CORS_ORIGIN`, `PAYOUT_NOTIFY_*`
 
 ### Firebase JSON の入れ方

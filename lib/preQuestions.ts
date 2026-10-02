@@ -1,3 +1,5 @@
+import i18n from '@/lib/i18n';
+
 export type PreQuestionType = 'text' | 'single' | 'multi';
 
 /**
@@ -14,20 +16,54 @@ export type PreQuestion = {
   options: string[];
 };
 
+/** label は参照時に現在の言語で解決 */
 export const PRE_QUESTION_TYPES: {
   value: PreQuestionType;
-  label: string;
+  readonly label: string;
 }[] = [
-  { value: 'text', label: 'テキスト回答' },
-  { value: 'single', label: '単一選択' },
-  { value: 'multi', label: '複数選択' },
+  {
+    value: 'text',
+    get label() {
+      return i18n.t('create.preQuestions.types.text');
+    },
+  },
+  {
+    value: 'single',
+    get label() {
+      return i18n.t('create.preQuestions.types.single');
+    },
+  },
+  {
+    value: 'multi',
+    get label() {
+      return i18n.t('create.preQuestions.types.multi');
+    },
+  },
 ];
 
-export const PRE_QUESTION_TYPE_LABELS: Record<PreQuestionType, string> = {
-  text: 'テキスト回答',
-  single: '単一選択',
-  multi: '複数選択',
-};
+export function preQuestionTypeLabel(type: PreQuestionType) {
+  return i18n.t(`create.preQuestions.types.${type}`);
+}
+
+/** @deprecated preQuestionTypeLabel() を使う */
+export const PRE_QUESTION_TYPE_LABELS: Record<PreQuestionType, string> =
+  Object.defineProperties(
+    {} as Record<PreQuestionType, string>,
+    {
+      text: {
+        enumerable: true,
+        get: () => preQuestionTypeLabel('text'),
+      },
+      single: {
+        enumerable: true,
+        get: () => preQuestionTypeLabel('single'),
+      },
+      multi: {
+        enumerable: true,
+        get: () => preQuestionTypeLabel('multi'),
+      },
+    },
+  );
 
 export const MAX_PRE_QUESTIONS = 15;
 export const MAX_PRE_QUESTION_OPTIONS = 8;
@@ -41,6 +77,7 @@ const LEGACY_PROFILE_PRESET_IDS = new Set([
   'preset-sns',
 ]);
 
+/** 保存済みタイトル照合用（日本語固定のレガシー ID） */
 const LEGACY_PROFILE_PRESET_TITLES = new Set([
   'ニックネーム',
   '性別',
@@ -112,7 +149,7 @@ export function questionTypeHint(question: PreQuestion) {
       .filter(Boolean)
       .join(' / ');
   }
-  return PRE_QUESTION_TYPE_LABELS[question.type];
+  return preQuestionTypeLabel(question.type);
 }
 
 /**

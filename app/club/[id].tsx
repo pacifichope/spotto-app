@@ -1,6 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -41,6 +43,7 @@ import {
 } from '@/lib/blocks';
 import { useBlocks } from '@/lib/blocksContext';
 import { formatEventSchedule, isEventCancelled, isEventPast } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { useEvents } from '@/lib/eventsContext';
 import { MY_ORGANIZER_ID } from '@/lib/organizerProfile';
 import { useOrganizerEditor } from '@/lib/createEventAccessContext';
@@ -50,14 +53,25 @@ import { useUserProfile } from '@/lib/userProfileContext';
 
 type ActivityFilter = 'all' | 'upcoming' | 'past' | `date:${string}`;
 
-function clubDateChipLabel(isoDate: string) {
+/** 取得失敗の理由。翻訳キーは表示時に解決し、言語切替に追従させる */
+type RemoteError = { key: string } | { raw: string } | null;
+
+function clubDateChipLabel(isoDate: string, t: TFunction) {
   const parsed = new Date(`${isoDate}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return isoDate;
-  const weekday = ['日', '月', '火', '水', '木', '金', '土'][parsed.getDay()];
-  return `${parsed.getMonth() + 1}/${parsed.getDate()}（${weekday}）`;
+  const weekdays = t('club.weekdays', { returnObjects: true }) as unknown;
+  const weekday = Array.isArray(weekdays)
+    ? String(weekdays[parsed.getDay()] ?? '')
+    : '';
+  return t('club.dateChip', {
+    month: parsed.getMonth() + 1,
+    day: parsed.getDate(),
+    weekday,
+  });
 }
 
 export default function ClubProfileScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -79,7 +93,7 @@ export default function ClubProfileScreen() {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [remoteClub, setRemoteClub] = useState<Club | null>(null);
   const [remoteLoading, setRemoteLoading] = useState(false);
-  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [remoteError, setRemoteError] = useState<RemoteError>(null);
   const [clubRowOverlay, setClubRowOverlay] = useState<Club | null>(null);
   const [enrichedMembers, setEnrichedMembers] = useState<ClubMember[] | null>(
     null,
@@ -138,7 +152,7 @@ export default function ClubProfileScreen() {
     let cancelled = false;
     if (!clubId) {
       setRemoteClub(null);
-      setRemoteError('クラブ ID が指定されていません。');
+      setRemoteError({ key: 'club.missingIdError' });
       return;
     }
     if (resolved) {
@@ -164,16 +178,15 @@ export default function ClubProfileScreen() {
         if (!result.ok) {
           setRemoteClub(null);
           setRemoteError(
-            result.error ||
-              'クラブ情報を取得できませんでした。時間をおいて再度お試しください。',
+            result.error
+              ? { raw: result.error }
+              : { key: 'club.fetchFailed' },
           );
           return;
         }
         if (!result.data.name.trim()) {
           setRemoteClub(null);
-          setRemoteError(
-            'このクラブは削除されたか、現在表示できません。',
-          );
+          setRemoteError({ key: 'club.unavailable' });
           return;
         }
         setRemoteClub(
@@ -188,9 +201,7 @@ export default function ClubProfileScreen() {
         if (cancelled) return;
         console.warn('[club] remote resolve failed', error);
         setRemoteClub(null);
-        setRemoteError(
-          'クラブ情報を取得できませんでした。時間をおいて再度お試しください。',
-        );
+        setRemoteError({ key: 'club.fetchFailed' });
       } finally {
         if (!cancelled) setRemoteLoading(false);
       }
@@ -314,14 +325,14 @@ export default function ClubProfileScreen() {
       if (Platform.OS === 'web') {
         const ok =
           typeof window !== 'undefined' &&
-          window.confirm(`${club.name} から退会しますか？`);
+          window.confirm(t('club.leaveConfirmWeb', { name: club.name }));
         if (ok) leave();
         return;
       }
-      Alert.alert('クラブを退会しますか？', `${club.name} から退会します。`, [
-        { text: 'キャンセル', style: 'cancel' },
+      Alert.alert(t('club.leaveTitle'), t('club.leaveBody', { name: club.name }), [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '退会する',
+          text: t('club.leave'),
           style: 'destructive',
           onPress: leave,
         },
@@ -341,12 +352,10 @@ export default function ClubProfileScreen() {
   if (!clubId) {
     return (
       <View style={[styles.missing, { paddingTop: insets.top + 24 }]}>
-        <Text style={styles.missingTitle}>クラブが見つかりません</Text>
-        <Text style={styles.missingBody}>
-          リンクが正しくないか、古いリンクの可能性があります。
-        </Text>
+        <Text style={styles.missingTitle}>{t('club.notFoundTitle')}</Text>
+        <Text style={styles.missingBody}>{t('club.invalidLink')}</Text>
         <Pressable style={styles.homeBtn} onPress={back}>
-          <Text style={styles.homeBtnText}>戻る</Text>
+          <Text style={styles.homeBtnText}>{t('club.back')}</Text>
         </Pressable>
       </View>
     );
@@ -357,7 +366,7 @@ export default function ClubProfileScreen() {
       <View style={[styles.missing, { paddingTop: insets.top + 24 }]}>
         <ActivityIndicator color={theme.colors.primary} size="large" />
         <Text style={[styles.missingBody, { marginTop: 16 }]}>
-          クラブ情報を読み込み中…
+          {t('club.loading')}
         </Text>
       </View>
     );
@@ -366,13 +375,16 @@ export default function ClubProfileScreen() {
   if (!club) {
     return (
       <View style={[styles.missing, { paddingTop: insets.top + 24 }]}>
-        <Text style={styles.missingTitle}>クラブが見つかりません</Text>
+        <Text style={styles.missingTitle}>{t('club.notFoundTitle')}</Text>
         <Text style={styles.missingBody}>
-          {remoteError ||
-            'このクラブは削除されたか、現在表示できません。参加一覧から再度お試しください。'}
+          {remoteError
+            ? 'key' in remoteError
+              ? t(remoteError.key)
+              : remoteError.raw
+            : t('club.unavailableWithHint')}
         </Text>
         <Pressable style={styles.homeBtn} onPress={back}>
-          <Text style={styles.homeBtnText}>戻る</Text>
+          <Text style={styles.homeBtnText}>{t('club.back')}</Text>
         </Pressable>
       </View>
     );
@@ -395,7 +407,7 @@ export default function ClubProfileScreen() {
             onPress={back}
             style={[styles.navBtn, { top: Math.max(insets.top, 10) }]}
             accessibilityRole="button"
-            accessibilityLabel="戻る"
+            accessibilityLabel={t('club.back')}
           >
             <SymbolView
               name={{
@@ -413,7 +425,7 @@ export default function ClubProfileScreen() {
               onPress={() => setSafetyOpen(true)}
               style={[styles.menuBtn, { top: Math.max(insets.top, 10) }]}
               accessibilityRole="button"
-              accessibilityLabel="メニュー"
+              accessibilityLabel={t('club.menu')}
             >
               <Text style={styles.menuMark}>⋯</Text>
             </Pressable>
@@ -422,9 +434,9 @@ export default function ClubProfileScreen() {
               onPress={openOrganizerEditor}
               style={[styles.menuBtn, styles.editCoverBtn, { top: Math.max(insets.top, 10) }]}
               accessibilityRole="button"
-              accessibilityLabel="クラブを編集"
+              accessibilityLabel={t('club.editLabel')}
             >
-              <Text style={styles.editCoverText}>編集</Text>
+              <Text style={styles.editCoverText}>{t('club.edit')}</Text>
             </Pressable>
           )}
         </View>
@@ -445,9 +457,14 @@ export default function ClubProfileScreen() {
           </View>
           <View style={styles.identityBody}>
             <Text style={styles.name}>{club.name}</Text>
-            <Text style={styles.hostLine}>主催 {club.hostName}</Text>
+            <Text style={styles.hostLine}>
+              {t('club.hostLine', { name: club.hostName })}
+            </Text>
             <Text style={styles.statsLine}>
-              主催イベント {activitiesWithRoute.length}件 · メンバー {members.length}人
+              {t('club.statsLine', {
+                events: activitiesWithRoute.length,
+                members: members.length,
+              })}
               {club.tag ? ` · ${club.tag}` : ''}
             </Text>
             {club.bio?.trim() ? (
@@ -455,7 +472,7 @@ export default function ClubProfileScreen() {
             ) : null}
             {club.snsLinks && club.snsLinks.length > 0 ? (
               <View style={styles.snsBlock}>
-                <Text style={styles.snsTitle}>SNS / Web</Text>
+                <Text style={styles.snsTitle}>{t('club.snsTitle')}</Text>
                 <SnsLinksRow links={club.snsLinks} />
               </View>
             ) : null}
@@ -464,7 +481,7 @@ export default function ClubProfileScreen() {
 
         <View style={styles.memberCard}>
           <Text style={styles.memberTitle}>
-            メンバー · {members.length}
+            {t('club.membersTitle', { count: members.length })}
           </Text>
           <ScrollView
             horizontal
@@ -483,11 +500,11 @@ export default function ClubProfileScreen() {
                 />
                 {member.role === 'host' ? (
                   <View style={styles.bossTag}>
-                    <Text style={styles.bossTagText}>主催</Text>
+                    <Text style={styles.bossTagText}>{t('club.hostTag')}</Text>
                   </View>
                 ) : member.self ? (
                   <View style={styles.selfTag}>
-                    <Text style={styles.selfTagText}>自分</Text>
+                    <Text style={styles.selfTagText}>{t('club.selfTag')}</Text>
                   </View>
                 ) : null}
                 <Text style={styles.memberName} numberOfLines={1}>
@@ -499,8 +516,8 @@ export default function ClubProfileScreen() {
         </View>
 
         <View style={styles.activityHead}>
-          <Text style={styles.sectionTitle}>Club activities</Text>
-          <Text style={styles.sectionHint}>このクラブのイベント</Text>
+          <Text style={styles.sectionTitle}>{t('club.activitiesTitle')}</Text>
+          <Text style={styles.sectionHint}>{t('club.activitiesHint')}</Text>
         </View>
         <ScrollView
           horizontal
@@ -509,12 +526,12 @@ export default function ClubProfileScreen() {
         >
           {(
             [
-              ['all', 'すべて'],
-              ['upcoming', `開催予定 · ${upcomingCount}`],
-              ['past', '終了'],
+              ['all', t('club.filterAll')],
+              ['upcoming', t('club.filterUpcoming', { count: upcomingCount })],
+              ['past', t('club.filterPast')],
               ...activityDates.map(
                 (date) =>
-                  [`date:${date}`, clubDateChipLabel(date)] as const,
+                  [`date:${date}`, clubDateChipLabel(date, t)] as const,
               ),
             ] as const
           ).map(([key, label]) => (
@@ -540,7 +557,9 @@ export default function ClubProfileScreen() {
 
         <View style={styles.activityList}>
           {visibleActivities.length === 0 ? (
-            <Text style={styles.emptyActivity}>該当するイベントはありません</Text>
+            <Text style={styles.emptyActivity}>
+              {t('club.activitiesEmpty')}
+            </Text>
           ) : (
             visibleActivities.map((event) => {
               const ended = isEventPast(event);
@@ -552,7 +571,7 @@ export default function ClubProfileScreen() {
                   style={styles.activityCard}
                   onPress={() => router.push(`/event/${event.id}`)}
                   accessibilityRole="button"
-                  accessibilityLabel={event.title}
+                  accessibilityLabel={localizedEventTitle(event)}
                 >
                   <Image
                     source={{ uri: event.imageUri }}
@@ -566,17 +585,24 @@ export default function ClubProfileScreen() {
                           (ended || cancelled) && styles.activityBadgeEnded,
                         ]}
                       >
-                        {cancelled ? '中止' : ended ? '開催終了' : '募集中'}
+                        {cancelled
+                          ? t('club.statusCancelled')
+                          : ended
+                            ? t('club.statusEnded')
+                            : t('club.statusOpen')}
                       </Text>
                       <Text style={styles.activityWhen}>
                         {monthDay} {time}
                       </Text>
                     </View>
                     <Text style={styles.activityTitle} numberOfLines={2}>
-                      {event.title}
+                      {localizedEventTitle(event)}
                     </Text>
                     <Text style={styles.activityMeta} numberOfLines={1}>
-                      {event.sport} · {event.joinedCount}人参加
+                      {t('club.activityMeta', {
+                        sport: event.sport,
+                        count: event.joinedCount,
+                      })}
                     </Text>
                   </View>
                 </Pressable>
@@ -594,7 +620,7 @@ export default function ClubProfileScreen() {
       >
         {isOwnClub ? (
           <View style={styles.ownClubNote}>
-            <Text style={styles.ownClubText}>あなたのクラブです</Text>
+            <Text style={styles.ownClubText}>{t('club.ownClub')}</Text>
           </View>
         ) : (
           <Pressable
@@ -602,11 +628,11 @@ export default function ClubProfileScreen() {
             onPress={handleJoin}
             accessibilityRole="button"
             accessibilityLabel={
-              joined ? '参加済み。タップするとクラブから退出します' : 'クラブに参加'
+              joined ? t('club.joinedLabel') : t('club.joinLabel')
             }
           >
             <Text style={[styles.joinBtnText, joined && styles.joinBtnTextOn]}>
-              {joined ? '参加済み（Joined）' : 'Join in  クラブに参加'}
+              {joined ? t('club.joined') : t('club.join')}
             </Text>
           </Pressable>
         )}

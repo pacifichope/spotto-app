@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import {
   sanitizeSnsLinks,
   type SnsLink,
@@ -42,13 +43,17 @@ export function normalizeOrganizerName(name: string) {
 export function getOrganizerNameError(name: string): string | null {
   const trimmed = String(name || '').replace(/\s+/g, ' ').trim();
   if (!trimmed) {
-    return 'サークル名を入力してください。';
+    return i18n.t('organizer.nameErrorEmpty');
   }
   if (trimmed.length < ORGANIZER_NAME_MIN_LENGTH) {
-    return `サークル名は${ORGANIZER_NAME_MIN_LENGTH}文字以上で入力してください。`;
+    return i18n.t('organizer.nameErrorTooShort', {
+      min: ORGANIZER_NAME_MIN_LENGTH,
+    });
   }
   if (trimmed.length > ORGANIZER_NAME_MAX_LENGTH) {
-    return `サークル名は${ORGANIZER_NAME_MAX_LENGTH}文字以内で入力してください。`;
+    return i18n.t('organizer.nameErrorTooLong', {
+      max: ORGANIZER_NAME_MAX_LENGTH,
+    });
   }
   return null;
 }
@@ -66,7 +71,7 @@ export function getOrganizerImageError(
   imageUri: string | null | undefined,
 ): string | null {
   if (!String(imageUri || '').trim()) {
-    return 'アイコン画像を設定してください。';
+    return i18n.t('organizer.iconError');
   }
   return null;
 }
@@ -82,12 +87,14 @@ export function hasOrganizerProfileReady(profile: OrganizerProfile) {
 
 export function organizerDisplayName(profile: OrganizerProfile) {
   const name = normalizeOrganizerName(profile.name);
-  return name || 'マイサークル';
+  return name || i18n.t('organizer.defaultName');
 }
 
 export function organizerInitial(name: string) {
   const trimmed = normalizeOrganizerName(name);
-  return trimmed ? trimmed.slice(0, 1).toUpperCase() : '主';
+  return trimmed
+    ? trimmed.slice(0, 1).toUpperCase()
+    : i18n.t('organizer.avatarFallback');
 }
 
 /**

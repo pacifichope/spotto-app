@@ -1,4 +1,5 @@
 import { theme } from '@/constants/theme';
+import i18n, { getCurrentAppLanguage } from '@/lib/i18n';
 import type { CreateEventPayload } from '@/components/createEventSheetTypes';
 import {
   DEFAULT_CANCEL_POLICY,
@@ -78,6 +79,12 @@ export type EventRow = {
   cancelled_at: string | null;
   cancel_reason: string | null;
   series_id?: string | null;
+  source_lang?: string | null;
+  title_ja?: string | null;
+  title_en?: string | null;
+  description_ja?: string | null;
+  description_en?: string | null;
+  translated_at?: string | null;
 };
 
 function asSkillLevel(raw: string): SkillLevel {
@@ -173,10 +180,10 @@ export function eventRowToSportEvent(row: EventRow): SportEvent {
 
   return {
     id: String(row.id || '').trim(),
-    title: String(row.title || '').trim() || '無題のイベント',
+    title: String(row.title || '').trim() || i18n.t('events.untitled'),
     sport: row.sport || 'その他',
     emoji: row.emoji || '🏅',
-    location: row.location || '場所未設定',
+    location: row.location || i18n.t('events.locationUnset'),
     locationNote: row.location_note?.trim() || undefined,
     date: String(row.event_date || '').trim() || '1970-01-01',
     time: String(row.event_time || '').trim() || '00:00',
@@ -193,7 +200,7 @@ export function eventRowToSportEvent(row: EventRow): SportEvent {
     capacity,
     joinedCount,
     spotsLeft: Math.max(0, capacity - joinedCount),
-    host: String(row.host_name || '').trim() || '主催者',
+    host: String(row.host_name || '').trim() || i18n.t('events.host'),
     hostId: row.host_id,
     hostImageUri,
     hostBio: row.host_bio?.trim() || undefined,
@@ -201,6 +208,15 @@ export function eventRowToSportEvent(row: EventRow): SportEvent {
     hostSnsLinks: snsLinks,
     vibe: row.vibe || '',
     description: row.description || '',
+    sourceLang:
+      row.source_lang === 'en' || row.source_lang === 'ja'
+        ? row.source_lang
+        : undefined,
+    titleJa: row.title_ja?.trim() || undefined,
+    titleEn: row.title_en?.trim() || undefined,
+    descriptionJa: row.description_ja?.trim() || undefined,
+    descriptionEn: row.description_en?.trim() || undefined,
+    translatedAt: row.translated_at?.trim() || undefined,
     imageUri,
     imageUris,
     accent: row.accent?.trim() || theme.colors.primary,
@@ -258,9 +274,13 @@ export function buildEventInsertRow(input: {
       endTime: payload.endTime,
     } satisfies EventSession);
 
+  const title = payload.title.trim().slice(0, 80);
+  const description = sanitizeEventContentText(payload.description);
+  const sourceLang = getCurrentAppLanguage();
+
   return {
     host_id: hostId,
-    title: payload.title.trim().slice(0, 80),
+    title,
     sport: payload.sport,
     emoji: payload.emoji,
     location: payload.location.trim(),
@@ -283,8 +303,14 @@ export function buildEventInsertRow(input: {
     host_image_uri: organizer.imageUri?.trim() || null,
     host_bio: organizer.bio.trim() || null,
     host_sns_links: snsLinks,
-    vibe: deriveEventVibe(payload.description, payload.title),
-    description: sanitizeEventContentText(payload.description),
+    vibe: deriveEventVibe(description, title),
+    description,
+    source_lang: sourceLang,
+    title_ja: sourceLang === 'ja' ? title : null,
+    title_en: sourceLang === 'en' ? title : null,
+    description_ja: sourceLang === 'ja' ? description || null : null,
+    description_en: sourceLang === 'en' ? description || null : null,
+    translated_at: null,
     image_uri: imageUri,
     image_uris: imageUris,
     accent: theme.colors.primary,

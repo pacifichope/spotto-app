@@ -1804,6 +1804,213 @@ function supabaseBaseUrl() {
     .replace(/\/auth\/v1$/i, '');
 }
 
+function normalizeAppLang(raw) {
+  const code = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .split(/[-_]/)[0];
+  if (code === 'en') return 'en';
+  if (code === 'ja') return 'ja';
+  return '';
+}
+
+/** 簡易言語推定（API detect のフォールバック） */
+function guessSourceLang(text) {
+  const sample = String(text || '');
+  if (/[\u3040-\u30ff\u3400-\u9fff]/.test(sample)) return 'ja';
+  if (/[A-Za-z]/.test(sample)) return 'en';
+  return 'ja';
+}
+
+async function translateWithGoogleApi(texts, { source, target }) {
+  const apiKey = env('GOOGLE_TRANSLATE_API_KEY');
+  if (!apiKey) {
+    const err = new Error(
+      'GOOGLE_TRANSLATE_API_KEY が未設定です。Render の環境変数を確認してください。',
+    );
+    err.status = 503;
+    throw err;
+  }
+
+  const payloads = (Array.isArray(texts) ? texts : [texts]).map((item) =>
+    String(item ?? ''),
+  );
+  if (payloads.length === 0) return [];
+
+  // 空文字は API に送らず、位置を保ったまま戻す
+  const indexMap = [];
+  const nonEmpty = [];
+  payloads.forEach((text, index) => {
+    if (text.trim()) {
+      indexMap.push(index);
+      nonEmpty.push(text);
+    }
+  });
+  if (nonEmpty.length === 0) return payloads.map(() => '');
+
+  const url = `https://translation.googleapis.com/language/translate/v2?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    q: nonEmpty,
+    target,
+    format: 'text',
+  };
+  if (source) body.source = source;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail =
+      json?.error?.message ||
+      json?.error?.status ||
+      `HTTP ${res.status}`;
+    const err = new Error(`Cloud Translation API エラー: ${detail}`);
+    err.status = res.status >= 400 && res.status < 600 ? res.status : 502;
+    throw err;
+  }
+
+  const translations = Array.isArray(json?.data?.translations)
+    ? json.data.translations
+    : [];
+  const out = payloads.map(() => '');
+  indexMap.forEach((originalIndex, i) => {
+    out[originalIndex] = String(translations[i]?.translatedText || '').trim();
+  });
+  return out;
+}
+
+/**
+ * POST /events/translate
+ * body: { eventIds: string[], title: string, description?: string, sourceLang?: 'ja'|'en' }
+ */
+async function handleEventsTranslate(req, body) {
+  const user = await resolveAuthUserDetailed(req);
+  if (!user?.id) {
+    const err = new Error('ログインが必要です。');
+    err.status = 401;
+    throw err;
+  }
+
+  const supabaseUrl = supabaseBaseUrl();
+  const serviceKey = env('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceKey) {
+    const err = new Error(
+      'サーバー設定が不足しています（SUPABASE_URL / SERVICE_ROLE）。',
+    );
+    err.status = 500;
+    throw err;
+  }
+  if (!env('GOOGLE_TRANSLATE_API_KEY')) {
+    const err = new Error(
+      'GOOGLE_TRANSLATE_API_KEY が未設定です。Render の環境変数を確認してください。',
+    );
+    err.status = 503;
+    throw err;
+  }
+
+  const eventIds = Array.from(
+    new Set(
+      (Array.isArray(body?.eventIds) ? body.eventIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 40);
+  const title = String(body?.title || '').trim().slice(0, 200);
+  const description = String(body?.description || '').trim().slice(0, 8000);
+  if (eventIds.length === 0 || !title) {
+    const err = new Error('eventIds と title は必須です。');
+    err.status = 400;
+    throw err;
+  }
+
+  // 主催者本人のイベントだけ更新
+  const inList = `(${eventIds.map((id) => `"${id.replace(/"/g, '')}"`).join(',')})`;
+  const ownedRes = await fetch(
+    `${supabaseUrl}/rest/v1/events?id=in.${inList}&host_id=eq.${encodeURIComponent(user.id)}&select=id`,
+    { headers: serviceRoleHeaders() },
+  );
+  const ownedRows = await ownedRes.json().catch(() => []);
+  if (!ownedRes.ok) {
+    const err = new Error(
+      (ownedRows && ownedRows.message) || 'イベントの確認に失敗しました。',
+    );
+    err.status = 502;
+    throw err;
+  }
+  const ownedIds = Array.isArray(ownedRows)
+    ? ownedRows.map((row) => String(row.id || '').trim()).filter(Boolean)
+    : [];
+  if (ownedIds.length === 0) {
+    const err = new Error('更新可能なイベントが見つかりません。');
+    err.status = 403;
+    throw err;
+  }
+
+  let sourceLang = normalizeAppLang(body?.sourceLang);
+  if (!sourceLang) {
+    sourceLang = guessSourceLang(`${title}\n${description}`);
+  }
+  const targetLang = sourceLang === 'ja' ? 'en' : 'ja';
+
+  const [translatedTitle, translatedDescription] = await translateWithGoogleApi(
+    [title, description],
+    { source: sourceLang, target: targetLang },
+  );
+
+  const titleJa = sourceLang === 'ja' ? title : translatedTitle || title;
+  const titleEn = sourceLang === 'en' ? title : translatedTitle || title;
+  const descriptionJa =
+    sourceLang === 'ja' ? description : translatedDescription || description;
+  const descriptionEn =
+    sourceLang === 'en' ? description : translatedDescription || description;
+
+  const patch = {
+    source_lang: sourceLang,
+    title_ja: titleJa,
+    title_en: titleEn,
+    description_ja: descriptionJa,
+    description_en: descriptionEn,
+    translated_at: new Date().toISOString(),
+  };
+
+  const ownedInList = `(${ownedIds.map((id) => `"${id.replace(/"/g, '')}"`).join(',')})`;
+  const updateRes = await fetch(
+    `${supabaseUrl}/rest/v1/events?id=in.${ownedInList}&host_id=eq.${encodeURIComponent(user.id)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        ...serviceRoleHeaders(),
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(patch),
+    },
+  );
+  if (!updateRes.ok) {
+    const errBody = await updateRes.json().catch(() => ({}));
+    const err = new Error(
+      errBody?.message ||
+        errBody?.error ||
+        `イベント翻訳の保存に失敗しました（${updateRes.status}）`,
+    );
+    err.status = 502;
+    throw err;
+  }
+
+  return {
+    ok: true,
+    sourceLang,
+    titleJa,
+    titleEn,
+    descriptionJa,
+    descriptionEn,
+    updatedIds: ownedIds,
+  };
+}
+
 function supabaseAnonKey() {
   return (
     env('EXPO_PUBLIC_SUPABASE_ANON_KEY') ||
@@ -2281,6 +2488,10 @@ const server = http.createServer(async (req, res) => {
           ensureClaims: 'POST /auth/firebase-ensure-claims',
           firebaseAdmin: fbOk,
         },
+        events: {
+          translate: 'POST /events/translate',
+          translateConfigured: Boolean(env('GOOGLE_TRANSLATE_API_KEY')),
+        },
         stripe: {
           mode,
           configured: Boolean(stripeSecretKey()),
@@ -2398,6 +2609,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/account/delete') {
       json(res, 200, await handleAccountDelete(req));
+      return;
+    }
+    if (pathname === '/events/translate') {
+      json(res, 200, await handleEventsTranslate(req, body));
       return;
     }
     if (pathname === '/cron/reminders') {

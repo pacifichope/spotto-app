@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +48,7 @@ export default function LocationPickerModal({
   onClose,
   onConfirm,
 }: LocationPickerModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [latitude, setLatitude] = useState(
     String(initial?.latitude ?? FALLBACK_COORDS.latitude),
@@ -127,8 +129,8 @@ export default function LocationPickerModal({
     const trimmed = label.trim();
     if (!trimmed || looksLikeCoordinateLabel(trimmed)) {
       Alert.alert(
-        '場所の名称を入力',
-        '施設名・会場名など、場所の名前を入力してください。',
+        t('create.location.nameRequiredTitle'),
+        t('create.location.nameRequiredBody'),
       );
       return;
     }
@@ -149,11 +151,11 @@ export default function LocationPickerModal({
       <View style={[styles.root, { paddingTop: insets.top || 12 }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={12}>
-            <Text style={styles.cancel}>キャンセル</Text>
+            <Text style={styles.cancel}>{t('common.cancel')}</Text>
           </Pressable>
-          <Text style={styles.title}>活動地点</Text>
+          <Text style={styles.title}>{t('create.location.titleWeb')}</Text>
           <Pressable onPress={handleConfirm} hitSlop={12}>
-            <Text style={styles.confirm}>決定</Text>
+            <Text style={styles.confirm}>{t('common.confirm')}</Text>
           </Pressable>
         </View>
 
@@ -162,18 +164,15 @@ export default function LocationPickerModal({
           contentContainerStyle={styles.body}
           bottomGap={Math.max(insets.bottom, 24)}
         >
-          <Text style={styles.note}>
-            Web では地図ピンの代わりに座標を指定できます。iOS / Android
-            ではマップ上でピン留めできます。
-          </Text>
+          <Text style={styles.note}>{t('create.location.webNote')}</Text>
 
-          <Text style={styles.label}>場所を検索</Text>
+          <Text style={styles.label}>{t('create.location.searchLabel')}</Text>
           <View style={styles.searchRow}>
             <TextInput
               style={styles.input}
               value={query}
               onChangeText={setQuery}
-              placeholder="施設名・住所で検索"
+              placeholder={t('create.location.searchPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -217,21 +216,19 @@ export default function LocationPickerModal({
               ))}
             </ScrollView>
           ) : query.trim().length >= 2 && !searching ? (
-            <Text style={styles.note}>
-              候補が見つかりませんでした。名称と座標を手入力できます。
-            </Text>
+            <Text style={styles.note}>{t('create.location.noResultsWeb')}</Text>
           ) : null}
 
-          <Text style={styles.label}>場所の名称</Text>
+          <Text style={styles.label}>{t('create.location.nameLabel')}</Text>
           <TextInput
             style={styles.input}
             value={label}
             onChangeText={setLabel}
-            placeholder="例: 代々木公園グラウンド"
+            placeholder={t('create.location.namePlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
           />
 
-          <Text style={styles.label}>緯度</Text>
+          <Text style={styles.label}>{t('create.location.latitude')}</Text>
           <TextInput
             style={styles.input}
             value={latitude}
@@ -240,7 +237,7 @@ export default function LocationPickerModal({
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>経度</Text>
+          <Text style={styles.label}>{t('create.location.longitude')}</Text>
           <TextInput
             style={styles.input}
             value={longitude}
@@ -265,11 +262,13 @@ export default function LocationPickerModal({
               })();
             }}
           >
-            <Text style={styles.myLocationText}>現在地を取得</Text>
+            <Text style={styles.myLocationText}>
+              {t('create.location.myLocationFetch')}
+            </Text>
           </Pressable>
 
           <Pressable style={styles.doneBtn} onPress={handleConfirm}>
-            <Text style={styles.doneText}>この位置に決定</Text>
+            <Text style={styles.doneText}>{t('create.location.confirm')}</Text>
           </Pressable>
         </KeyboardFormScrollView>
       </View>

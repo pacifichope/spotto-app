@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -27,14 +28,14 @@ import SortFilterBar from '@/components/SortFilterBar';
 import SortPickerModal from '@/components/SortPickerModal';
 import { ListIcon } from '@/components/icons';
 import { theme } from '@/constants/theme';
+import { filterEventsByMapRegion } from '@/lib/areas';
 import {
-  AREA_LABEL_LOCATING,
-  AREA_LABEL_UNSET,
-  filterEventsByMapRegion,
-  getAreaLabel,
-  getPrefectureById,
-  labelForMapRegion,
-} from '@/lib/areas';
+  areaLocatingLabel,
+  areaUnsetLabel,
+  localizedAreaLabel,
+  localizedMapRegionLabel,
+  prefectureDisplayLabel,
+} from '@/lib/areaLabels';
 import {
   activeFilterCount,
   buildBrowseInterestProfile,
@@ -59,6 +60,7 @@ import { eventMatchesSearchQuery } from '@/lib/searchText';
  * リストの地理範囲はマップの mapRegion と連動する。
  */
 export default function SportsAppScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const mapRef = useRef<EventsMapRef>(null);
@@ -120,28 +122,28 @@ export default function SportsAppScreen() {
     }
     if (shownEventsErrorRef.current === eventsError) return;
     shownEventsErrorRef.current = eventsError;
-    Alert.alert('読み込みに失敗しました', eventsError, [
-      { text: '閉じる', style: 'cancel', onPress: () => clearEventsError() },
+    Alert.alert(t('home.loadFailedTitle'), eventsError, [
+      { text: t('common.close'), style: 'cancel', onPress: () => clearEventsError() },
       {
-        text: '再試行',
+        text: t('common.retry'),
         onPress: () => {
           clearEventsError();
           void refreshEvents();
         },
       },
     ]);
-  }, [eventsError, clearEventsError, refreshEvents]);
+  }, [eventsError, clearEventsError, refreshEvents, t]);
 
   const topPad = insets.top + 8;
   const bottomPad = Math.max(insets.bottom, 10) + 8;
-  const mapAreaLabel = labelForMapRegion(mapRegion);
+  const mapAreaLabel = localizedMapRegionLabel(mapRegion);
   const areaLabel = locating
-    ? AREA_LABEL_LOCATING
+    ? areaLocatingLabel()
     : mapMovedByUser && mapAreaLabel
       ? mapAreaLabel
       : area
-        ? getAreaLabel(area)
-        : mapAreaLabel ?? AREA_LABEL_UNSET;
+        ? localizedAreaLabel(area)
+        : mapAreaLabel ?? areaUnsetLabel();
 
   useEffect(() => {
     if (view === 'map') setMapMounted(true);
@@ -160,17 +162,20 @@ export default function SportsAppScreen() {
       if (!homeMountedRef.current) return;
       if (!ok) {
         Alert.alert(
-          '現在地を取得できません',
-          '位置情報の許可をオンにすると、いまいる場所の周辺イベントを探せます。',
+          t('home.locationUnavailableTitle'),
+          t('home.locationPermissionNearbyBody'),
         );
         return;
       }
       setAreaPickerVisible(false);
     } catch {
       if (!homeMountedRef.current) return;
-      Alert.alert('現在地を取得できません', '時間をおいて再度お試しください。');
+      Alert.alert(
+        t('home.locationUnavailableTitle'),
+        t('home.tryAgainLater'),
+      );
     }
-  }, [resetToCurrentLocation, setAreaPickerVisible]);
+  }, [resetToCurrentLocation, setAreaPickerVisible, t]);
 
   const handleSelectPrefecture = useCallback(
     (prefectureId: string) => {
@@ -190,16 +195,19 @@ export default function SportsAppScreen() {
         if (!homeMountedRef.current) return;
         if (!ok) {
           Alert.alert(
-            '現在地を取得できません',
-            '位置情報の許可をオンにすると、いまいる場所の周辺へ戻れます。',
+            t('home.locationUnavailableTitle'),
+            t('home.locationPermissionReturnBody'),
           );
         }
       } catch {
         if (!homeMountedRef.current) return;
-        Alert.alert('現在地を取得できません', '時間をおいて再度お試しください。');
+        Alert.alert(
+          t('home.locationUnavailableTitle'),
+          t('home.tryAgainLater'),
+        );
       }
     })();
-  }, [resetToCurrentLocation]);
+  }, [resetToCurrentLocation, t]);
 
   const mapBrowseCenter = useMemo(
     () => ({
@@ -373,16 +381,19 @@ export default function SportsAppScreen() {
   const handleCreate = async (payload: CreateEventPayload) => {
     const result = await createEvent(payload);
     if (!result.ok) {
-      Alert.alert('保存に失敗しました', result.error);
+      Alert.alert(t('common.saveFailed'), result.error);
       return;
     }
     setCreating(false);
     router.push(`/event/${result.event.id}`);
     const count = result.events.length;
     Alert.alert(
-      '主催しました',
+      t('common.eventPublishedTitle'),
       count > 1
-        ? `「${result.event.title}」を ${count} 件の独立したイベントとして公開しました。`
+        ? t('common.eventPublishedMultiple', {
+            title: result.event.title,
+            count,
+          })
         : result.event.title,
     );
   };
@@ -421,7 +432,7 @@ export default function SportsAppScreen() {
             mapMovedByUser
               ? mapAreaLabel
               : area?.mode === 'prefecture'
-                ? getPrefectureById(area.prefectureId).label
+                ? prefectureDisplayLabel(area.prefectureId)
                 : null
           }
           onPressSort={() => setSortPickerVisible(true)}
@@ -466,7 +477,7 @@ export default function SportsAppScreen() {
           >
             <HeaderRoundButton
               onPress={handleResetToLocation}
-              accessibilityLabel="現在地へ戻る"
+              accessibilityLabel={t('home.backToLocationA11y')}
             >
               <SymbolView
                 name={{
@@ -483,7 +494,7 @@ export default function SportsAppScreen() {
                 setSelectedId(null);
                 setView('list');
               }}
-              accessibilityLabel="リスト表示に戻る"
+              accessibilityLabel={t('home.backToListA11y')}
             >
               <ListIcon size={20} color={theme.colors.onPrimary} />
             </HeaderRoundButton>
@@ -540,7 +551,7 @@ export default function SportsAppScreen() {
         onSubmit={handleCreate}
         onSaveDraft={(snapshot) => {
           saveEventDraft(snapshot);
-          setToast('下書きを保存しました');
+          setToast(t('common.draftSaved'));
         }}
       />
 

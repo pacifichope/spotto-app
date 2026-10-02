@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -88,6 +89,7 @@ export default function OrganizerProfileModal({
   onClose,
   onSave,
 }: OrganizerProfileModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<OrganizerProfile>(profile);
   const [snsDrafts, setSnsDrafts] = useState<DraftLink[]>(
@@ -119,12 +121,12 @@ export default function OrganizerProfileModal({
       return;
     }
     Alert.alert(
-      '変更を破棄しますか？',
-      '変更内容が破棄されますがよろしいですか？',
+      t('organizer.discardTitle'),
+      t('organizer.discardBody'),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '破棄する',
+          text: t('organizer.discardConfirm'),
           style: 'destructive',
           onPress: onClose,
         },
@@ -141,7 +143,7 @@ export default function OrganizerProfileModal({
     try {
       const uploaded = await uploadPublicImageOrLocal(localUri, 'profiles');
       if (uploaded.error) {
-        Alert.alert('クラウドに保存できませんでした', uploaded.error);
+        Alert.alert(t('errors.cloudSaveFailed'), uploaded.error);
       }
       setDraft((prev) => ({ ...prev, imageUri: uploaded.uri }));
     } finally {
@@ -158,7 +160,7 @@ export default function OrganizerProfileModal({
     try {
       const uploaded = await uploadPublicImageOrLocal(localUri, 'clubs');
       if (uploaded.error) {
-        Alert.alert('クラウドに保存できませんでした', uploaded.error);
+        Alert.alert(t('errors.cloudSaveFailed'), uploaded.error);
       }
       setDraft((prev) => ({ ...prev, coverUri: uploaded.uri }));
     } finally {
@@ -181,15 +183,12 @@ export default function OrganizerProfileModal({
 
   const handleSave = () => {
     if (imageUploading || coverUploading) {
-      Alert.alert(
-        '画像をアップロード中です',
-        '完了してから保存してください。',
-      );
+      Alert.alert(t('organizer.uploadingTitle'), t('organizer.uploadingBody'));
       return;
     }
     const nameError = getOrganizerNameError(draft.name);
     if (nameError) {
-      Alert.alert('サークル名を確認してください', nameError);
+      Alert.alert(t('organizer.nameCheckTitle'), nameError);
       return;
     }
     const next = sanitizeOrganizerProfile({
@@ -203,10 +202,7 @@ export default function OrganizerProfileModal({
     });
     const invalid = next.snsLinks.find((item) => !isValidHttpUrl(item.url));
     if (invalid) {
-      Alert.alert(
-        'SNSリンクを確認してください',
-        'https:// から始まる正しいURLを入力してください。',
-      );
+      Alert.alert(t('organizer.snsCheckTitle'), t('organizer.snsCheckBody'));
       return;
     }
     onSave(next);
@@ -234,21 +230,23 @@ export default function OrganizerProfileModal({
               hitSlop={12}
               style={[styles.headerSide, styles.headerSideLeft]}
               accessibilityRole="button"
-              accessibilityLabel="閉じる"
+              accessibilityLabel={t('organizer.close')}
             >
-              <Text style={styles.cancel}>閉じる</Text>
+              <Text style={styles.cancel}>{t('organizer.close')}</Text>
             </Pressable>
             <Text style={styles.title} numberOfLines={1}>
-              {setupMode ? '主催者アカウント登録' : '主催者プロフィール'}
+              {setupMode ? t('organizer.titleSetup') : t('organizer.title')}
             </Text>
             <Pressable
               onPress={handleSave}
               hitSlop={12}
               style={[styles.headerSide, styles.headerSideRight]}
               accessibilityRole="button"
-              accessibilityLabel={setupMode ? '次へ' : '保存'}
+              accessibilityLabel={setupMode ? t('organizer.next') : t('organizer.save')}
             >
-              <Text style={styles.save}>{setupMode ? '次へ' : '保存'}</Text>
+              <Text style={styles.save}>
+                {setupMode ? t('organizer.next') : t('organizer.save')}
+              </Text>
             </Pressable>
           </View>
 
@@ -259,17 +257,17 @@ export default function OrganizerProfileModal({
           >
             <Text style={styles.lead}>
               {setupMode
-                ? 'イベントを作成するには、主催者名の登録が必要です。アイコンやカバー写真は任意で設定できます。電話番号認証の次のステップです。'
-                : 'イベント公開時に参加者へ表示される、サークル／チーム用の情報です。個人アカウントとは別に管理されます。'}
+                ? t('organizer.leadSetup')
+                : t('organizer.lead')}
             </Text>
 
-            <Text style={styles.label}>カバー写真</Text>
+            <Text style={styles.label}>{t('organizer.coverLabel')}</Text>
             <Pressable
               style={styles.coverBtn}
               onPress={() => void pickCover()}
               disabled={coverUploading || imageUploading}
               accessibilityRole="button"
-              accessibilityLabel="カバー写真を変更"
+              accessibilityLabel={t('organizer.coverChangeLabel')}
             >
               {(() => {
                 const coverSrc =
@@ -285,7 +283,7 @@ export default function OrganizerProfileModal({
                 ) : (
                   <View style={[styles.coverPreview, styles.coverPlaceholder]}>
                     <Text style={styles.coverPlaceholderText}>
-                      カバー写真を追加
+                      {t('organizer.coverAdd')}
                     </Text>
                   </View>
                 );
@@ -296,14 +294,14 @@ export default function OrganizerProfileModal({
                 ) : (
                   <Text style={styles.coverOverlayText}>
                     {draft.coverUri
-                      ? 'カバー写真を変更'
-                      : 'カバー写真を設定'}
+                      ? t('organizer.coverChange')
+                      : t('organizer.coverSet')}
                   </Text>
                 )}
               </View>
             </Pressable>
             <Text style={styles.coverHint}>
-              クラブプロフィール上部に表示される横長のヘッダー画像です（任意）
+              {t('organizer.coverHint')}
             </Text>
 
             <Pressable
@@ -313,7 +311,7 @@ export default function OrganizerProfileModal({
             >
               <View style={styles.iconClip}>
                 <HostAvatar
-                  name={draft.name || '主'}
+                  name={draft.name || t('organizer.avatarFallback')}
                   imageUri={draft.imageUri}
                   size={88}
                   borderWidth={2}
@@ -326,12 +324,12 @@ export default function OrganizerProfileModal({
               </View>
               <Text style={styles.iconHint}>
                 {imageUploading
-                  ? 'アップロード中…'
-                  : 'アイコン・ロゴを設定'}
+                  ? t('organizer.uploading')
+                  : t('organizer.iconSet')}
               </Text>
             </Pressable>
 
-            <Text style={styles.label}>サークル名（主催者名）</Text>
+            <Text style={styles.label}>{t('organizer.nameLabel')}</Text>
             <TextInput
               style={styles.input}
               value={draft.name}
@@ -341,7 +339,7 @@ export default function OrganizerProfileModal({
                   name: name.slice(0, ORGANIZER_NAME_MAX_LENGTH),
                 }))
               }
-              placeholder="例: Yoyogi FC / 朝ランサークル"
+              placeholder={t('organizer.namePlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               maxLength={ORGANIZER_NAME_MAX_LENGTH}
               autoCapitalize="none"
@@ -355,29 +353,35 @@ export default function OrganizerProfileModal({
             >
               {nameFieldError
                 ? nameFieldError
-                : `${ORGANIZER_NAME_MIN_LENGTH}〜${ORGANIZER_NAME_MAX_LENGTH}文字（${nameLen}/${ORGANIZER_NAME_MAX_LENGTH}）`}
+                : t('organizer.nameMeta', {
+                    min: ORGANIZER_NAME_MIN_LENGTH,
+                    max: ORGANIZER_NAME_MAX_LENGTH,
+                    len: nameLen,
+                  })}
             </Text>
 
-            <Text style={styles.label}>紹介文・活動内容</Text>
+            <Text style={styles.label}>{t('organizer.bioLabel')}</Text>
             <TextInput
               style={[styles.input, styles.multiline]}
               value={draft.bio}
               onChangeText={(bio) => setDraft((prev) => ({ ...prev, bio }))}
-              placeholder="どんなメンバーで、どんな活動をしているかを紹介"
+              placeholder={t('organizer.bioPlaceholder')}
               placeholderTextColor={theme.colors.textMuted}
               multiline
               textAlignVertical="top"
             />
 
-            <Text style={styles.label}>SNS / Web（任意・複数可）</Text>
+            <Text style={styles.label}>{t('organizer.snsLabel')}</Text>
             <Text style={styles.hint}>
-              Instagram・X・LINE・公式サイトを複数登録できます。クラブページにブランドアイコンで表示されます。
+              {t('organizer.snsHint')}
             </Text>
 
             {snsDrafts.map((link, index) => (
               <View key={link.id} style={styles.snsCard}>
                 <View style={styles.snsCardHeader}>
-                  <Text style={styles.snsCardTitle}>リンク {index + 1}</Text>
+                  <Text style={styles.snsCardTitle}>
+                    {t('organizer.snsLinkN', { n: index + 1 })}
+                  </Text>
                   <Pressable
                     onPress={() =>
                       setSnsDrafts((prev) =>
@@ -386,9 +390,9 @@ export default function OrganizerProfileModal({
                     }
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="このリンクを削除"
+                    accessibilityLabel={t('organizer.snsRemoveLabel')}
                   >
-                    <Text style={styles.removeText}>削除</Text>
+                    <Text style={styles.removeText}>{t('organizer.snsRemove')}</Text>
                   </Pressable>
                 </View>
 
@@ -399,6 +403,10 @@ export default function OrganizerProfileModal({
                 >
                   {SNS_KIND_OPTIONS.map((option) => {
                     const active = link.kind === option.kind;
+                    const optionLabel =
+                      option.kind === 'web'
+                        ? t('organizer.snsWeb')
+                        : option.label;
                     return (
                       <Pressable
                         key={option.kind}
@@ -411,7 +419,7 @@ export default function OrganizerProfileModal({
                         }
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
-                        accessibilityLabel={option.label}
+                        accessibilityLabel={optionLabel}
                       >
                         <SnsBrandIcon kind={option.kind} size={28} />
                         <Text
@@ -420,7 +428,7 @@ export default function OrganizerProfileModal({
                             active && styles.kindChipTextActive,
                           ]}
                         >
-                          {option.label}
+                          {optionLabel}
                         </Text>
                       </Pressable>
                     );
@@ -447,9 +455,9 @@ export default function OrganizerProfileModal({
                   setSnsDrafts((prev) => [...prev, emptyLink('web')])
                 }
                 accessibilityRole="button"
-                accessibilityLabel="SNSリンクを追加"
+                accessibilityLabel={t('organizer.snsAddLabel')}
               >
-                <Text style={styles.addBtnText}>＋ リンクを追加</Text>
+                <Text style={styles.addBtnText}>{t('organizer.snsAdd')}</Text>
               </Pressable>
             ) : null}
           </KeyboardFormScrollView>

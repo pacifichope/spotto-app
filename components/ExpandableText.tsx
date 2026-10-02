@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutAnimation,
   Platform,
@@ -34,9 +35,12 @@ export default function ExpandableText({
   text,
   collapsedLines = DEFAULT_COLLAPSED_LINES,
   style,
-  expandLabel = '続きを読む',
-  collapseLabel = '折りたたむ',
+  expandLabel,
+  collapseLabel,
 }: ExpandableTextProps) {
+  const { t } = useTranslation();
+  const expandText = expandLabel ?? t('common.readMore');
+  const collapseText = collapseLabel ?? t('common.collapse');
   const [expanded, setExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
   const [measured, setMeasured] = useState(false);
@@ -83,11 +87,11 @@ export default function ExpandableText({
           hitSlop={8}
           style={styles.toggle}
           accessibilityRole="button"
-          accessibilityLabel={expanded ? collapseLabel : expandLabel}
+          accessibilityLabel={expanded ? collapseText : expandText}
           accessibilityState={{ expanded }}
         >
           <Text style={styles.toggleLabel}>
-            {expanded ? collapseLabel : expandLabel}
+            {expanded ? collapseText : expandText}
           </Text>
         </Pressable>
       ) : null}

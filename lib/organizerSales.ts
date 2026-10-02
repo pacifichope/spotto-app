@@ -1,6 +1,7 @@
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { ALLOW_HOST_SELF_TEST_SALE } from '@/lib/devTestFlags';
+import i18n from '@/lib/i18n';
 import { formatYenAmount } from '@/lib/payments';
 
 /** ガイドライン: プラットフォーム利用料 一律 10% */
@@ -123,8 +124,8 @@ function monthBoundsFromParts(year: number, month: number) {
     yearMonth,
     startDate: `${y}-${pad(m)}-01`,
     endDate: `${y}-${pad(m)}-${pad(end.getDate())}`,
-    periodLabel: `${y}年${m}月分`,
-    periodHint: '翌月末振込予定（イベント開催日ベース）',
+    periodLabel: i18n.t('sales.monthLabel', { year: y, month: m }),
+    periodHint: i18n.t('sales.periodHint'),
   };
 }
 
@@ -161,7 +162,10 @@ export function shiftSalesYearMonth(yearMonth: string, delta: number) {
 export function salesYearMonthLabel(yearMonth: string) {
   const parsed = parseSalesYearMonth(yearMonth);
   if (!parsed) return yearMonth;
-  return `${parsed.year}年${parsed.month}月分`;
+  return i18n.t('sales.monthLabel', {
+    year: parsed.year,
+    month: parsed.month,
+  });
 }
 
 export function calcPayoutBreakdown(grossYen: number) {
@@ -221,7 +225,7 @@ function remoteToSale(row: RemoteSale): TicketSaleRow {
     status: row.status === 'refunded' ? 'refunded' : 'paid',
     paidAt: row.paid_at,
     refundedAt: row.refunded_at || undefined,
-    eventTitle: String(row.event_title || '').trim() || 'イベント',
+    eventTitle: String(row.event_title || '').trim() || i18n.t('events.defaultTitle'),
     eventDate: row.event_date || undefined,
     eventEndsAt: row.event_ends_at || undefined,
   };
@@ -242,14 +246,14 @@ export async function recordTicketSale(input: {
   eventEndsAt?: string;
 }): Promise<SalesResult<TicketSaleRow | null>> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'データベースが未設定です。' };
+    return { ok: false, error: i18n.t('errors.dbNotConfigured') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'データベースに接続できません。' };
+  if (!client) return { ok: false, error: i18n.t('errors.dbUnavailable') };
 
   const buyerId = await resolveAuthUserId();
   if (!buyerId) {
-    return { ok: false, error: 'ログインが必要です。' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   const amountYen = Math.max(0, Math.floor(Number(input.amountYen) || 0));
@@ -343,7 +347,7 @@ export async function recordTicketSale(input: {
       if (__DEV__) console.warn('[sales] accumulate failed', error);
       return {
         ok: false,
-        error: error.message || '売上の更新に失敗しました。',
+        error: error.message || i18n.t('sales.errors.updateFailed'),
       };
     }
     if (__DEV__) {
@@ -415,8 +419,8 @@ export async function recordTicketSale(input: {
       ok: false,
       error:
         error.message.includes('schema cache') || error.code === 'PGRST205'
-          ? '売上テーブルが未作成です。'
-          : error.message || '売上の記録に失敗しました。',
+          ? i18n.t('sales.errors.tableMissing')
+          : error.message || i18n.t('sales.errors.recordFailed'),
     };
   }
   if (__DEV__) {
@@ -443,14 +447,14 @@ export async function recordSelfTestTicketSale(input: {
   eventEndsAt?: string;
 }): Promise<SalesResult<TicketSaleRow | null>> {
   if (typeof __DEV__ === 'undefined' || !__DEV__) {
-    return { ok: false, error: '開発ビルドでのみ利用できます。' };
+    return { ok: false, error: i18n.t('sales.errors.devOnly') };
   }
   if (!ALLOW_HOST_SELF_TEST_SALE) {
-    return { ok: false, error: 'テスト売上の記録は無効です。' };
+    return { ok: false, error: i18n.t('sales.errors.testSaleDisabled') };
   }
   const eventId = String(input.eventId || '').trim();
   if (!eventId) {
-    return { ok: false, error: 'イベントが指定されていません。' };
+    return { ok: false, error: i18n.t('sales.errors.eventRequired') };
   }
   return recordTicketSale({
     eventId,
@@ -475,14 +479,14 @@ export async function applyTicketSaleRefund(input: {
   refundYen: number;
 }): Promise<SalesResult<true>> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'データベースが未設定です。' };
+    return { ok: false, error: i18n.t('errors.dbNotConfigured') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'データベースに接続できません。' };
+  if (!client) return { ok: false, error: i18n.t('errors.dbUnavailable') };
 
   const buyerId = await resolveAuthUserId();
   if (!buyerId) {
-    return { ok: false, error: 'ログインが必要です。' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   const refundYen = Math.max(0, Math.floor(Number(input.refundYen) || 0));
@@ -500,7 +504,7 @@ export async function applyTicketSaleRefund(input: {
 
   const { data: existing, error: fetchError } = await select;
   if (fetchError) {
-    return { ok: false, error: fetchError.message || '売上の取得に失敗しました。' };
+    return { ok: false, error: fetchError.message || i18n.t('sales.errors.fetchFailed') };
   }
   if (!existing) {
     return { ok: true, data: true };
@@ -537,7 +541,7 @@ export async function applyTicketSaleRefund(input: {
       if (fallback.error) {
         return {
           ok: false,
-          error: fallback.error.message || '返金記録に失敗しました。',
+          error: fallback.error.message || i18n.t('sales.errors.refundFailed'),
         };
       }
     }
@@ -565,7 +569,7 @@ export async function applyTicketSaleRefund(input: {
     if (fallback.error) {
       return {
         ok: false,
-        error: fallback.error.message || '返金の相殺に失敗しました。',
+        error: fallback.error.message || i18n.t('sales.errors.refundOffsetFailed'),
       };
     }
   }
@@ -593,14 +597,14 @@ export async function markEventTicketSalesRefunded(
   eventId: string,
 ): Promise<SalesResult<true>> {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'データベースが未設定です。' };
+    return { ok: false, error: i18n.t('errors.dbNotConfigured') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'データベースに接続できません。' };
+  if (!client) return { ok: false, error: i18n.t('errors.dbUnavailable') };
 
   const hostId = await resolveAuthUserId();
   if (!hostId) {
-    return { ok: false, error: 'ログインが必要です。' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   const nowIso = new Date().toISOString();
@@ -615,7 +619,7 @@ export async function markEventTicketSalesRefunded(
     .eq('status', 'paid');
 
   if (error) {
-    return { ok: false, error: error.message || '売上の相殺に失敗しました。' };
+    return { ok: false, error: error.message || i18n.t('sales.errors.offsetFailed') };
   }
   return { ok: true, data: true };
 }
@@ -624,7 +628,7 @@ async function fetchHostSalesLedger(
   hostId: string,
 ): Promise<SalesResult<TicketSaleRow[]>> {
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'データベースに接続できません。' };
+  if (!client) return { ok: false, error: i18n.t('errors.dbUnavailable') };
 
   const { data, error } = await client
     .from('event_ticket_sales')
@@ -638,8 +642,8 @@ async function fetchHostSalesLedger(
       ok: false,
       error:
         error.message.includes('schema cache') || error.code === 'PGRST205'
-          ? '売上テーブルが未作成です。'
-          : error.message || '売上の取得に失敗しました。',
+          ? i18n.t('sales.errors.tableMissing')
+          : error.message || i18n.t('sales.errors.fetchFailed'),
     };
   }
 
@@ -748,10 +752,10 @@ export async function fetchOrganizerSalesSummary(
 ): Promise<SalesResult<OrganizerSalesSummary>> {
   const hostId = await resolveAuthUserId();
   if (!hostId) {
-    return { ok: false, error: 'ログインが必要です。' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'データベースが未設定です。' };
+    return { ok: false, error: i18n.t('errors.dbNotConfigured') };
   }
 
   const now = new Date();
@@ -894,13 +898,13 @@ export function subscribeOwnPayoutUpdates(
 export function payoutStatusLabel(status: MonthPayoutDisplayStatus) {
   switch (status) {
     case 'paid':
-      return '振込完了';
+      return i18n.t('sales.status.paid');
     case 'awaiting_payout':
-      return '振込待ち（確定）';
+      return i18n.t('sales.status.awaiting_payout');
     case 'awaiting_event':
-      return '開催待ち（未確定）';
+      return i18n.t('sales.status.awaiting_event');
     default:
-      return '売上なし';
+      return i18n.t('sales.status.none');
   }
 }
 

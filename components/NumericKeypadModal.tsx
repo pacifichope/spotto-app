@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Modal,
   Pressable,
@@ -9,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
+import { numberLocale } from '@/lib/createEventLabels';
 
 type NumericKeypadModalProps = {
   visible: boolean;
@@ -16,7 +18,7 @@ type NumericKeypadModalProps = {
   onCancel: () => void;
   onConfirm: (next: string) => void;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   note: string;
   prefix?: string;
   suffix?: string;
@@ -39,7 +41,7 @@ function toDraft(value: string) {
 
 function formatDisplay(draft: string) {
   const n = Math.floor(Math.abs(Number(draft) || 0));
-  return n.toLocaleString('ja-JP');
+  return n.toLocaleString(numberLocale());
 }
 
 function applyKey(draft: string, key: string, max: number) {
@@ -66,6 +68,7 @@ export default function NumericKeypadModal({
   max,
   min = 0,
 }: NumericKeypadModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState('0');
 
@@ -103,16 +106,14 @@ export default function NumericKeypadModal({
         >
           <View style={styles.header}>
             <Pressable onPress={onCancel} hitSlop={10} style={styles.headerSide}>
-              <Text style={styles.cancel}>Cancel</Text>
-              <Text style={styles.cancelJp}>キャンセル</Text>
+              <Text style={styles.cancel}>{t('common.cancel')}</Text>
             </Pressable>
             <View style={styles.headerCenter}>
               <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{subtitle}</Text>
+              {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
             </View>
             <Pressable onPress={handleConfirm} hitSlop={10} style={styles.headerSideRight}>
-              <Text style={styles.confirm}>Confirm</Text>
-              <Text style={styles.confirmJp}>確定</Text>
+              <Text style={styles.confirm}>{t('common.confirm')}</Text>
             </Pressable>
           </View>
 

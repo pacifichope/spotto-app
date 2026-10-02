@@ -4,6 +4,7 @@ import {
   parseEventDateTime,
   type SportEvent,
 } from '@/lib/events';
+import i18n from '@/lib/i18n';
 import type { LatLng } from '@/lib/userLocation';
 
 export type SortKey = 'recommended' | 'soonest';
@@ -61,48 +62,84 @@ export function filterActiveBrowseEvents<T extends SportEvent>(
   });
 }
 
+/**
+ * label / hint は getter。参照のたびに現在の言語で解決される
+ * （言語切替後の再レンダーで最新の文言になる）。
+ */
 export const SORT_OPTIONS: {
   key: SortKey;
-  label: string;
-  hint: string;
+  readonly label: string;
+  readonly hint: string;
 }[] = [
   {
     key: 'recommended',
-    label: 'おすすめ順',
-    hint: '開催の近さ・人気・あなたの興味傾向を総合して並べます',
+    get label() {
+      return i18n.t('home.sort.recommended.label');
+    },
+    get hint() {
+      return i18n.t('home.sort.recommended.hint');
+    },
   },
   {
     key: 'soonest',
-    label: '開催日が近い順',
-    hint: '開催が近いイベントから表示します',
+    get label() {
+      return i18n.t('home.sort.soonest.label');
+    },
+    get hint() {
+      return i18n.t('home.sort.soonest.hint');
+    },
   },
 ];
 
+function levelFilterOption(id: LevelFilterId) {
+  return {
+    id,
+    get label() {
+      return i18n.t(`home.filter.level.${id}.label`);
+    },
+    get hint() {
+      return i18n.t(`home.filter.level.${id}.hint`);
+    },
+  };
+}
+
+function dateFilterOption(id: DateFilterId) {
+  return {
+    id,
+    get label() {
+      return i18n.t(`home.filter.date.${id}.label`);
+    },
+    get hint() {
+      return i18n.t(`home.filter.date.${id}.hint`);
+    },
+  };
+}
+
 export const LEVEL_FILTER_OPTIONS: {
   id: LevelFilterId;
-  label: string;
-  hint: string;
+  readonly label: string;
+  readonly hint: string;
 }[] = [
-  { id: 'all', label: 'すべて', hint: '指定なし' },
-  { id: 'beginner', label: '初心者向け', hint: 'ビギナー・未経験者歓迎' },
-  { id: 'intermediate', label: '中級', hint: 'ある程度経験がある方向け' },
-  { id: 'advanced', label: '上級', hint: 'ガチ勢・競技志向向け' },
+  levelFilterOption('all'),
+  levelFilterOption('beginner'),
+  levelFilterOption('intermediate'),
+  levelFilterOption('advanced'),
 ];
 
 export const DATE_FILTER_OPTIONS: {
   id: DateFilterId;
-  label: string;
-  hint: string;
+  readonly label: string;
+  readonly hint: string;
 }[] = [
-  { id: 'today', label: '今日', hint: '本日開催' },
-  { id: 'tomorrow', label: '明日', hint: '翌日開催' },
-  { id: 'weekend', label: '今週末', hint: '土・日' },
-  { id: 'week', label: '今週', hint: '今日〜日曜' },
-  { id: 'nextWeek', label: '来週', hint: '翌月曜〜日曜' },
+  dateFilterOption('today'),
+  dateFilterOption('tomorrow'),
+  dateFilterOption('weekend'),
+  dateFilterOption('week'),
+  dateFilterOption('nextWeek'),
 ];
 
 export function sortLabel(sortKey: SortKey) {
-  return SORT_OPTIONS.find((option) => option.key === sortKey)?.label ?? '並び替え';
+  return SORT_OPTIONS.find((option) => option.key === sortKey)?.label ?? i18n.t('home.sort.title');
 }
 
 export function activeFilterCount(filters: EventFilters) {

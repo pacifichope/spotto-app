@@ -1,11 +1,13 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import SettingsHeader from '@/components/SettingsHeader';
 import { theme } from '@/constants/theme';
 import {
-  LEGAL_DOC_META,
   LEGAL_UPDATED_AT,
+  legalDocIntro,
+  legalDocTitle,
   legalSections,
   type LegalDocumentId,
 } from '@/lib/legalDocuments';
@@ -15,21 +17,25 @@ export default function LegalDocumentScreen({
 }: {
   document: LegalDocumentId;
 }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const meta = LEGAL_DOC_META[document];
+  const title = legalDocTitle(document);
+  const intro = legalDocIntro(document);
   const sections = legalSections(document);
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title={meta.title} />
+      <SettingsHeader title={title} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, 32) },
         ]}
       >
-        <Text style={styles.intro}>{meta.intro}</Text>
-        <Text style={styles.updated}>更新日: {LEGAL_UPDATED_AT}</Text>
+        <Text style={styles.intro}>{intro}</Text>
+        <Text style={styles.updated}>
+          {t('settings.updatedOn', { date: LEGAL_UPDATED_AT })}
+        </Text>
 
         {sections.map((section) => (
           <View key={section.id} style={styles.section}>

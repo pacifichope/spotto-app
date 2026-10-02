@@ -272,6 +272,7 @@ const plugins = [
         '周辺のスポーツイベントを地図に表示するために、現在地を使用します。',
     },
   ],
+  'expo-localization',
   [
     'expo-image-picker',
     {

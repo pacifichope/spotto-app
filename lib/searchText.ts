@@ -125,6 +125,11 @@ export function matchesFuzzySearch(
 
 type SearchableEvent = {
   title?: string | null;
+  titleJa?: string | null;
+  titleEn?: string | null;
+  description?: string | null;
+  descriptionJa?: string | null;
+  descriptionEn?: string | null;
   sport?: string | null;
   location?: string | null;
   locationNote?: string | null;
@@ -143,6 +148,11 @@ export function eventMatchesSearchQuery(
 
   const blob = [
     event.title,
+    event.titleJa,
+    event.titleEn,
+    event.description,
+    event.descriptionJa,
+    event.descriptionEn,
     event.sport,
     event.location,
     event.locationNote,

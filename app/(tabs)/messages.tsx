@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   FlatList,
@@ -34,6 +35,7 @@ import {
 } from '@/lib/chats';
 import { useChats, dmUserIdFromThreadId } from '@/lib/chatsContext';
 import { useEvents } from '@/lib/eventsContext';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { isHostedByMe } from '@/lib/organizerProfile';
 import type { SportEvent } from '@/lib/events';
 import { resolveDisplayImageUrl } from '@/lib/storage';
@@ -54,6 +56,7 @@ function setKey(ids: Set<string> | string[]) {
 }
 
 export default function MessagesScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { events, joinedIds, hostedIds, currentUserId } = useEvents();
@@ -169,25 +172,25 @@ export default function MessagesScreen() {
   const confirmHideThread = useCallback(
     (thread: ChatThread, displayName: string) => {
       Alert.alert(
-        'チャットを削除',
-        `「${displayName}」を一覧から非表示にします。\n相手側のチャットやメッセージ履歴は削除されません。`,
+        t('messages.deleteChatTitle'),
+        t('messages.deleteChatMessage', { name: displayName }),
         [
-          { text: 'キャンセル', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: '非表示にする',
+            text: t('messages.hide'),
             style: 'destructive',
             onPress: () => hideThread(thread.id),
           },
         ],
       );
     },
-    [hideThread],
+    [hideThread, t],
   );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>メッセージ</Text>
+        <Text style={styles.headerTitle}>{t('messages.title')}</Text>
       </View>
 
       <FlatList
@@ -208,20 +211,20 @@ export default function MessagesScreen() {
             </EmptyStateIcon>
             <Text style={styles.emptyTitle}>
               {currentUserId
-                ? 'まだトークはありません'
-                : 'ログインするとトークが表示されます'}
+                ? t('messages.emptyTitleLoggedIn')
+                : t('messages.emptyTitleGuest')}
             </Text>
             <Text style={styles.emptyBody}>
               {currentUserId
-                ? 'イベントに参加するか、主催者にメッセージを送ると、ここにトークルームが表示されます。'
-                : '参加中・主催中のイベントのメッセージは、ログイン後にここに表示されます。'}
+                ? t('messages.emptyBodyLoggedIn')
+                : t('messages.emptyBodyGuest')}
             </Text>
           </View>
         }
         renderItem={({ item }) => {
           const { thread, event, preview, lastAt, unread } = item;
           const isGroup = thread.mode === 'group';
-          const name = isGroup ? event.title : event.host;
+          const name = isGroup ? localizedEventTitle(event) : event.host;
           const unreadLabel = formatUnreadBadge(unread);
           const hasUnread = unread > 0;
           return (
@@ -238,9 +241,9 @@ export default function MessagesScreen() {
                       pressed && styles.hideActionPressed,
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel="チャットを非表示"
+                    accessibilityLabel={t('messages.hideChatA11y')}
                   >
-                    <Text style={styles.hideActionText}>削除</Text>
+                    <Text style={styles.hideActionText}>{t('common.delete')}</Text>
                   </Pressable>
                 </View>
               )}
@@ -261,10 +264,10 @@ export default function MessagesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={
                   hasUnread
-                    ? `${name}、未読${unread}件、${preview}`
-                    : `${name}、${preview}`
+                    ? t('messages.rowA11yUnread', { name, unread, preview })
+                    : t('messages.rowA11y', { name, preview })
                 }
-                accessibilityHint="長押しで一覧から非表示にできます"
+                accessibilityHint={t('messages.rowHint')}
               >
                 {isGroup ? (
                   <GroupThreadAvatar event={event} />
@@ -297,7 +300,7 @@ export default function MessagesScreen() {
                       ]}
                       numberOfLines={1}
                     >
-                      {preview || 'メッセージはありません'}
+                      {preview || t('messages.noMessages')}
                     </Text>
                     {unreadLabel != null ? (
                       <View style={styles.unreadBadge}>

@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth';
 
 import { getFirebaseJsApp, isFirebaseWebConfigured } from '@/lib/firebaseApp';
+import i18n from '@/lib/i18n';
 import {
   extractPhoneAuthErrorRaw,
   formatPhoneAuthError,
@@ -35,7 +36,7 @@ export function ensureWebRecaptchaVerifier(
 ): ApplicationVerifier {
   const auth = getAuth(getFirebaseJsApp());
   if (typeof document === 'undefined') {
-    throw new Error('reCAPTCHA はブラウザ環境でのみ利用できます。');
+    throw new Error(i18n.t('errors.phone.recaptchaWebOnly'));
   }
 
   try {
@@ -78,7 +79,7 @@ async function applyPhoneCredential(verificationId: string, code: string) {
   const user = auth.currentUser;
   if (!user) {
     throw new Error(
-      'ログインセッションがありません。先にソーシャルログインしてください。',
+      i18n.t('errors.phone.sessionMissing'),
     );
   }
   const credential = PhoneAuthProvider.credential(verificationId, code);
@@ -127,14 +128,14 @@ export async function sendFirebasePhoneOtp(
       return {
         ok: false,
         error:
-          'Firebase が未設定です。EXPO_PUBLIC_FIREBASE_* を .env に設定してください。',
+          i18n.t('errors.phone.webNotConfigured'),
       };
     }
     const auth = getAuth(getFirebaseJsApp());
     if (!auth.currentUser) {
       return {
         ok: false,
-        error: '電話番号認証にはログインが必要です。先にログインしてください。',
+        error: i18n.t('errors.phone.loginRequired'),
       };
     }
 
@@ -152,7 +153,7 @@ export async function sendFirebasePhoneOtp(
       confirmation: {
         confirm: async (code: string) => {
           if (!pendingVerificationId) {
-            throw new Error('先に認証コードを送信してください。');
+            throw new Error(i18n.t('errors.phone.sendCodeFirst'));
           }
           await applyPhoneCredential(pendingVerificationId, code.trim());
           pendingVerificationId = null;
@@ -175,7 +176,7 @@ export async function sendFirebasePhoneOtp(
       ok: false,
       error: formatPhoneAuthError(
         message,
-        'SMS の送信に失敗しました。番号と Firebase / reCAPTCHA 設定を確認してください。',
+        i18n.t('errors.phone.smsSendFailedWeb'),
       ),
     };
   }
@@ -187,7 +188,7 @@ export async function confirmFirebasePhoneOtp(
   if (!pendingVerificationId) {
     return {
       ok: false,
-      error: '先に認証コードを送信してください。',
+      error: i18n.t('errors.phone.sendCodeFirst'),
     };
   }
   try {
@@ -203,7 +204,7 @@ export async function confirmFirebasePhoneOtp(
       ok: false,
       error: formatPhoneAuthError(
         message,
-        '認証コードが正しくありません。',
+        i18n.t('errors.phone.codeInvalid'),
       ),
     };
   }

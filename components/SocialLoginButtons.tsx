@@ -1,11 +1,12 @@
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   AppleLogoMark,
   GoogleGMark,
   LineSpeechMark,
 } from '@/components/socialBrandMarks';
-import { SOCIAL_PROVIDER_COPY, type SocialProvider } from '@/lib/auth';
+import type { SocialProvider } from '@/lib/auth';
 
 type SocialLoginButtonsProps = {
   disabled?: boolean;
@@ -21,13 +22,14 @@ export default function SocialLoginButtons({
   disabled,
   onPress,
 }: SocialLoginButtonsProps) {
+  const { t } = useTranslation();
   const showApple = Platform.OS === 'ios' || Platform.OS === 'web';
 
   return (
     <View style={styles.stack}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={SOCIAL_PROVIDER_COPY.line.label}
+        accessibilityLabel={t('auth.social.line')}
         accessibilityState={{ disabled: !!disabled }}
         disabled={disabled}
         onPress={() => onPress('line')}
@@ -41,13 +43,13 @@ export default function SocialLoginButtons({
           <LineSpeechMark size={22} color="#FFFFFF" />
         </View>
         <Text style={styles.lineText} numberOfLines={1}>
-          {SOCIAL_PROVIDER_COPY.line.label}
+          {t('auth.social.line')}
         </Text>
       </Pressable>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={SOCIAL_PROVIDER_COPY.google.label}
+        accessibilityLabel={t('auth.social.google')}
         accessibilityState={{ disabled: !!disabled }}
         disabled={disabled}
         onPress={() => onPress('google')}
@@ -61,14 +63,14 @@ export default function SocialLoginButtons({
           <GoogleGMark size={20} />
         </View>
         <Text style={styles.googleText} numberOfLines={1}>
-          {SOCIAL_PROVIDER_COPY.google.label}
+          {t('auth.social.google')}
         </Text>
       </Pressable>
 
       {showApple ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={SOCIAL_PROVIDER_COPY.apple.label}
+          accessibilityLabel={t('auth.social.apple')}
           accessibilityState={{ disabled: !!disabled }}
           disabled={disabled}
           onPress={() => onPress('apple')}
@@ -82,7 +84,7 @@ export default function SocialLoginButtons({
             <AppleLogoMark size={18} color="#FFFFFF" />
           </View>
           <Text style={styles.appleText} numberOfLines={1}>
-            {SOCIAL_PROVIDER_COPY.apple.label}
+            {t('auth.social.apple')}
           </Text>
         </Pressable>
       ) : null}

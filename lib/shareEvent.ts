@@ -5,11 +5,17 @@ import {
   createEventWebUrl,
 } from '@/lib/appLinking';
 import {
+  levelDisplayLabel,
+  sportDisplayLabel,
+} from '@/lib/createEventLabels';
+import {
   formatEventDate,
   formatLocationLabel,
   sortEventSessions,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
+import i18n from '@/lib/i18n';
 
 /** アプリ内ディープリンク（spotto://event/... / Expo 開発 URI） */
 export function getEventDeepLink(eventId: string) {
@@ -40,7 +46,10 @@ function formatShareDateTime(event: SportEvent) {
       first.endTime,
       first.endDate,
     ).full;
-    return `${firstLabel} ほか全${sorted.length}回`;
+    return i18n.t('share.sessionsMore', {
+      first: firstLabel,
+      count: sorted.length,
+    });
   }
   return formatEventDate(
     event.date,
@@ -61,29 +70,29 @@ export function buildEventShareMessage(
   const deepLink = getEventDeepLink(event.id);
 
   const lines = [
-    event.title,
+    localizedEventTitle(event),
     '',
     `📅 ${dateTime}`,
     `📍 ${location}`,
   ];
 
   if (event.sport) {
-    lines.push(
-      `🏷 ${event.sport}${event.level ? ` · ${event.level}` : ''}`,
-    );
+    const sport = sportDisplayLabel(event.sport);
+    const level = event.level ? levelDisplayLabel(event.level) : '';
+    lines.push(`🏷 ${sport}${level ? ` · ${level}` : ''}`);
   }
 
   const host = String(event.host || '').trim();
   if (host) {
-    lines.push(`👤 主催: ${host}`);
+    lines.push(`👤 ${i18n.t('share.host', { name: host })}`);
   }
 
   if (includeUrl) {
-    lines.push('', '──', '詳細・参加はこちら', webUrl);
+    lines.push('', '──', i18n.t('share.cta'), webUrl);
 
     // 開発ビルドなど Web とディープリンクが異なる場合のみ併記
     if (deepLink && deepLink !== webUrl && !deepLink.startsWith('https://')) {
-      lines.push('', `アプリで開く: ${deepLink}`);
+      lines.push('', i18n.t('share.openInApp', { url: deepLink }));
     }
   }
 
@@ -92,7 +101,8 @@ export function buildEventShareMessage(
 
 export async function shareEvent(event: SportEvent) {
   const url = getEventShareUrl(event.id);
-  const title = event.title.trim() || 'イベント';
+  const title =
+    localizedEventTitle(event).trim() || i18n.t('events.defaultTitle');
 
   try {
     // iOS は url を別フィールドで渡すと共有シートが綺麗に載る（message 内の重複を避ける）。
@@ -115,7 +125,7 @@ export async function shareEvent(event: SportEvent) {
           message: buildEventShareMessage(event),
         },
         {
-          dialogTitle: 'イベントをシェア',
+          dialogTitle: i18n.t('share.dialogTitle'),
           subject: title,
         },
       );

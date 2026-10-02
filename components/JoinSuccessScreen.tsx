@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Modal,
   Pressable,
@@ -28,6 +29,7 @@ import {
   formatLocationLabel,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 
 type JoinSuccessScreenProps = {
   visible: boolean;
@@ -187,6 +189,7 @@ export default function JoinSuccessScreen({
   onOpenGroupChat,
   onGoHome,
 }: JoinSuccessScreenProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const handleViewTicket = onViewTicket ?? onViewEvent ?? onClose;
@@ -320,17 +323,17 @@ export default function JoinSuccessScreen({
             <Animated.View style={[styles.copy, titleStyle]}>
               <Text style={styles.eyebrow}>Registration Confirmed!</Text>
               <Text style={styles.title} accessibilityRole="header">
-                参加が確定しました！
+                {t('join.success.title')}
               </Text>
               <Text style={styles.subtitle}>
-                当日お会いできるのを楽しみにしています
+                {t('join.success.subtitle')}
               </Text>
             </Animated.View>
 
             {event ? (
               <Animated.View style={[styles.eventCard, cardStyle]}>
                 <Text style={styles.eventTitle} numberOfLines={2}>
-                  {event.title}
+                  {localizedEventTitle(event)}
                 </Text>
                 {schedule ? (
                   <Text style={styles.eventMeta} numberOfLines={2}>
@@ -357,10 +360,10 @@ export default function JoinSuccessScreen({
               ]}
               onPress={handleViewTicket}
               accessibilityRole="button"
-              accessibilityLabel="チケットを見る"
+              accessibilityLabel={t('join.success.viewTicket')}
             >
               <BrandGradient style={styles.primaryBtn}>
-                <Text style={styles.primaryBtnText}>チケットを見る</Text>
+                <Text style={styles.primaryBtnText}>{t('join.success.viewTicket')}</Text>
               </BrandGradient>
             </Pressable>
 
@@ -372,9 +375,9 @@ export default function JoinSuccessScreen({
                 ]}
                 onPress={handleViewEvent}
                 accessibilityRole="button"
-                accessibilityLabel="イベントを確認する"
+                accessibilityLabel={t('join.success.viewEvent')}
               >
-                <Text style={styles.secondaryBtnText}>イベントを確認する</Text>
+                <Text style={styles.secondaryBtnText}>{t('join.success.viewEvent')}</Text>
               </Pressable>
             ) : null}
 
@@ -386,10 +389,10 @@ export default function JoinSuccessScreen({
                 ]}
                 onPress={onOpenGroupChat}
                 accessibilityRole="button"
-                accessibilityLabel="グループチャットへ移動する"
+                accessibilityLabel={t('join.success.openGroupChat')}
               >
                 <Text style={styles.secondaryBtnText}>
-                  グループチャットへ移動する
+                  {t('join.success.openGroupChat')}
                 </Text>
               </Pressable>
             ) : null}
@@ -402,9 +405,9 @@ export default function JoinSuccessScreen({
                 ]}
                 onPress={onGoHome}
                 accessibilityRole="button"
-                accessibilityLabel="ホームに戻る"
+                accessibilityLabel={t('common.backToHome')}
               >
-                <Text style={styles.ghostBtnText}>ホームに戻る</Text>
+                <Text style={styles.ghostBtnText}>{t('common.backToHome')}</Text>
               </Pressable>
             ) : (
               <Pressable
@@ -414,9 +417,9 @@ export default function JoinSuccessScreen({
                 ]}
                 onPress={onClose}
                 accessibilityRole="button"
-                accessibilityLabel="閉じる"
+                accessibilityLabel={t('common.close')}
               >
-                <Text style={styles.ghostBtnText}>閉じる</Text>
+                <Text style={styles.ghostBtnText}>{t('common.close')}</Text>
               </Pressable>
             )}
           </Animated.View>

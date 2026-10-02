@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -7,6 +8,7 @@ import { confirmCheckoutSession } from '@/lib/stripePayments';
 
 /** Stripe Checkout 完了後の戻り先。セッション確認後にホームへ戻す。 */
 export default function PaymentCompleteScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{
     status?: string | string[];
@@ -21,7 +23,8 @@ export default function PaymentCompleteScreen() {
     return String(Array.isArray(raw) ? raw[0] : raw || '');
   }, [params.session_id]);
 
-  const [message, setMessage] = useState('決済結果を確認しています…');
+  const [messageKey, setMessageKey] = useState('payment.complete.checkingMessage');
+  const [errorText, setErrorText] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -30,14 +33,14 @@ export default function PaymentCompleteScreen() {
       if (/cancel/i.test(status)) {
         if (!cancelled) {
           setOk(false);
-          setMessage('決済はキャンセルされました。');
+          setMessageKey('payment.complete.cancelledMessage');
         }
         return;
       }
       if (!sessionId) {
         if (!cancelled) {
           setOk(true);
-          setMessage('決済が完了しました。アプリに戻って参加状況を確認してください。');
+          setMessageKey('payment.complete.noSessionMessage');
         }
         return;
       }
@@ -46,19 +49,20 @@ export default function PaymentCompleteScreen() {
         if (cancelled) return;
         if (confirmed.paid) {
           setOk(true);
-          setMessage('お支払いが完了しました。ホームに戻ってイベントを確認できます。');
+          setMessageKey('payment.complete.paidMessage');
         } else {
           setOk(false);
-          setMessage('決済はまだ完了していないようです。Stripe の画面を確認してください。');
+          setMessageKey('payment.complete.unpaidMessage');
         }
       } catch (error) {
         if (cancelled) return;
         setOk(false);
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : '決済の確認に失敗しました。',
-        );
+        if (error instanceof Error && error.message) {
+          setErrorText(error.message);
+        } else {
+          setErrorText(null);
+          setMessageKey('payment.complete.confirmFailedMessage');
+        }
       }
     })();
     return () => {
@@ -72,16 +76,20 @@ export default function PaymentCompleteScreen() {
         <ActivityIndicator color={theme.colors.primaryDark} size="large" />
       ) : null}
       <Text style={styles.title}>
-        {ok == null ? '確認中' : ok ? '決済完了' : '決済未完了'}
+        {ok == null
+          ? t('payment.complete.checkingTitle')
+          : ok
+            ? t('payment.complete.doneTitle')
+            : t('payment.complete.notDoneTitle')}
       </Text>
-      <Text style={styles.message}>{message}</Text>
+      <Text style={styles.message}>{errorText ?? t(messageKey)}</Text>
       <Pressable
         style={styles.btn}
         onPress={() => router.replace('/(tabs)/home')}
         accessibilityRole="button"
-        accessibilityLabel="ホームに戻る"
+        accessibilityLabel={t('common.backToHome')}
       >
-        <Text style={styles.btnText}>ホームに戻る</Text>
+        <Text style={styles.btnText}>{t('common.backToHome')}</Text>
       </Pressable>
     </View>
   );

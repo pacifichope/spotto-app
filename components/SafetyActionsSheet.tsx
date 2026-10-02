@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
 import {
-  REPORT_SUCCESS_MESSAGE,
+  getReportSuccessMessage,
   submitUserReport,
   type ReportTargetType,
 } from '@/lib/reports';
@@ -44,6 +45,7 @@ export default function SafetyActionsSheet({
   onBlock,
   onUnblock,
 }: SafetyActionsSheetProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('menu');
   const [reason, setReason] = useState('');
@@ -72,7 +74,10 @@ export default function SafetyActionsSheet({
     if (!trimmed || submitting) return;
     const id = String(targetId || '').trim();
     if (!id) {
-      Alert.alert('通報できません', '通報対象を特定できませんでした。');
+      Alert.alert(
+        t('safety.cannotReportTitle'),
+        t('safety.cannotReportBody'),
+      );
       return;
     }
 
@@ -85,11 +90,11 @@ export default function SafetyActionsSheet({
         reason: trimmed,
       });
       if (!result.ok) {
-        Alert.alert('送信できませんでした', result.error);
+        Alert.alert(t('safety.submitFailedTitle'), result.error);
         return;
       }
       setStep('done');
-      Alert.alert('通報を受け付けました', REPORT_SUCCESS_MESSAGE);
+      Alert.alert(t('safety.receivedTitle'), getReportSuccessMessage());
     } finally {
       setSubmitting(false);
     }
@@ -111,7 +116,7 @@ export default function SafetyActionsSheet({
               : finish
         }
         accessibilityRole="button"
-        accessibilityLabel="閉じる"
+        accessibilityLabel={t('safety.closeLabel')}
       />
       {step === 'menu' ? (
         <View
@@ -130,12 +135,12 @@ export default function SafetyActionsSheet({
               accessibilityRole="button"
               accessibilityLabel={
                 isBlocked
-                  ? `${name}のブロックを解除`
-                  : 'このユーザーをブロックする'
+                  ? t('safety.unblockActionLabel', { name })
+                  : t('safety.blockAction')
               }
             >
               <Text style={[styles.rowLabel, !isBlocked && styles.danger]}>
-                {isBlocked ? 'ブロックを解除' : 'このユーザーをブロックする'}
+                {isBlocked ? t('safety.unblockAction') : t('safety.blockAction')}
               </Text>
             </Pressable>
             <View style={styles.divider} />
@@ -143,18 +148,20 @@ export default function SafetyActionsSheet({
               style={styles.row}
               onPress={() => setStep('form')}
               accessibilityRole="button"
-              accessibilityLabel={`${name}を通報する`}
+              accessibilityLabel={t('safety.reportActionLabel', { name })}
             >
-              <Text style={[styles.rowLabel, styles.danger]}>通報する</Text>
+              <Text style={[styles.rowLabel, styles.danger]}>
+                {t('safety.reportAction')}
+              </Text>
             </Pressable>
           </View>
           <Pressable
             style={styles.cancel}
             onPress={finish}
             accessibilityRole="button"
-            accessibilityLabel="キャンセル"
+            accessibilityLabel={t('safety.cancel')}
           >
-            <Text style={styles.cancelLabel}>キャンセル</Text>
+            <Text style={styles.cancelLabel}>{t('safety.cancel')}</Text>
           </Pressable>
         </View>
       ) : (
@@ -167,23 +174,22 @@ export default function SafetyActionsSheet({
           >
             {step === 'form' ? (
               <>
-                <Text style={styles.popupTitle}>通報</Text>
+                <Text style={styles.popupTitle}>{t('safety.reportTitle')}</Text>
                 <Text style={styles.popupLead}>
-                  {name}{' '}
-                  について、通報の理由や詳しい内容を入力してください。
+                  {t('safety.reportLead', { name })}
                 </Text>
                 <TextInput
                   style={styles.textarea}
                   value={reason}
                   onChangeText={setReason}
-                  placeholder="通報の理由や詳細な内容"
+                  placeholder={t('safety.reportPlaceholder')}
                   placeholderTextColor={theme.colors.textMuted}
                   multiline
                   textAlignVertical="top"
                   maxLength={MAX_REASON_LENGTH}
                   autoFocus
                   editable={!submitting}
-                  accessibilityLabel="通報の理由や詳細な内容"
+                  accessibilityLabel={t('safety.reportPlaceholder')}
                 />
                 <Text style={styles.counter}>
                   {reason.length}/{MAX_REASON_LENGTH}
@@ -198,9 +204,9 @@ export default function SafetyActionsSheet({
                     }}
                     disabled={submitting}
                     accessibilityRole="button"
-                    accessibilityLabel="キャンセル"
+                    accessibilityLabel={t('safety.cancel')}
                   >
-                    <Text style={styles.secondaryBtnText}>キャンセル</Text>
+                    <Text style={styles.secondaryBtnText}>{t('safety.cancel')}</Text>
                   </Pressable>
                   <Pressable
                     style={[
@@ -217,27 +223,27 @@ export default function SafetyActionsSheet({
                       disabled: !reason.trim() || submitting,
                       busy: submitting,
                     }}
-                    accessibilityLabel="送信する"
+                    accessibilityLabel={t('safety.submit')}
                   >
                     {submitting ? (
                       <ActivityIndicator color={theme.colors.onPrimary} />
                     ) : (
-                      <Text style={styles.primaryBtnText}>送信する</Text>
+                      <Text style={styles.primaryBtnText}>{t('safety.submit')}</Text>
                     )}
                   </Pressable>
                 </View>
               </>
             ) : (
               <>
-                <Text style={styles.popupTitle}>通報を受け付けました</Text>
-                <Text style={styles.popupLead}>{REPORT_SUCCESS_MESSAGE}</Text>
+                <Text style={styles.popupTitle}>{t('safety.receivedTitle')}</Text>
+                <Text style={styles.popupLead}>{getReportSuccessMessage()}</Text>
                 <Pressable
                   style={styles.okBtn}
                   onPress={finish}
                   accessibilityRole="button"
-                  accessibilityLabel="OK"
+                  accessibilityLabel={t('safety.ok')}
                 >
-                  <Text style={styles.okBtnText}>OK</Text>
+                  <Text style={styles.okBtnText}>{t('safety.ok')}</Text>
                 </Pressable>
               </>
             )}

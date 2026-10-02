@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +31,7 @@ type LoginProps = {
 };
 
 export default function Login({ allowGuest = true }: LoginProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signInWithSocial, continueAsGuest } = useAuth();
@@ -60,7 +62,7 @@ export default function Login({ allowGuest = true }: LoginProps) {
         showAccountBannedAlert(message);
         return;
       }
-      Alert.alert('ログインエラー', message);
+      Alert.alert(t('auth.loginErrorTitle'), message);
     };
 
     // UI 側の最終ガード: 内部がハングしてもローディングを必ず解除
@@ -107,16 +109,14 @@ export default function Login({ allowGuest = true }: LoginProps) {
       <View style={styles.card}>
         <View style={styles.header}>
           <Text style={styles.brand}>spotto</Text>
-          <Text style={styles.title}>ようこそ</Text>
-          <Text style={styles.subtitle}>
-            LINE・Google・Apple のいずれかでログインしてください
-          </Text>
+          <Text style={styles.title}>{t('auth.welcomeTitle')}</Text>
+          <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
         </View>
 
         {loading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator color={theme.colors.primaryDark} />
-            <Text style={styles.loadingText}>認証を処理しています…</Text>
+            <Text style={styles.loadingText}>{t('auth.processing')}</Text>
           </View>
         ) : null}
 
@@ -130,9 +130,9 @@ export default function Login({ allowGuest = true }: LoginProps) {
             style={styles.guestText}
             onPress={loading ? undefined : handleGuest}
             accessibilityRole="button"
-            accessibilityLabel="ゲストとして続ける"
+            accessibilityLabel={t('auth.continueAsGuest')}
           >
-            ゲストとして続ける
+            {t('auth.continueAsGuest')}
           </Text>
         ) : null}
       </View>

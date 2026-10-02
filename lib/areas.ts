@@ -1,4 +1,5 @@
 import { getNearbyEvents, type SportEvent } from '@/lib/events';
+import i18n from '@/lib/i18n';
 import {
   regionFromCoords,
   type LatLng,
@@ -196,7 +197,9 @@ export function getPrefectureById(id: string | null | undefined): Prefecture {
 }
 
 export function getAreaLabel(selection?: AreaSelection | null) {
-  if (!selection) return AREA_LABEL_UNSET;
+  if (!selection) {
+    return i18n.t('areas.unset', { defaultValue: AREA_LABEL_UNSET });
+  }
   if (selection.mode === 'nearby') {
     const detected = selection.detectedLabel?.trim();
     if (detected) return detected;
@@ -206,11 +209,14 @@ export function getAreaLabel(selection?: AreaSelection | null) {
       Number.isFinite(selection.latitude) &&
       Number.isFinite(selection.longitude)
     ) {
-      return AREA_LABEL_NEARBY;
+      return i18n.t('areas.nearby', { defaultValue: AREA_LABEL_NEARBY });
     }
-    return AREA_LABEL_UNSET;
+    return i18n.t('areas.unset', { defaultValue: AREA_LABEL_UNSET });
   }
-  return getPrefectureById(selection.prefectureId).label;
+  const prefecture = getPrefectureById(selection.prefectureId);
+  return i18n.t(`areas.prefectures.${prefecture.id}`, {
+    defaultValue: prefecture.label,
+  });
 }
 
 export type GeocodeHint = {
@@ -525,9 +531,12 @@ export function formatDetectedLabel(hint: GeocodeHint | null, prefecture: Prefec
     if (localized) return localized;
   }
 
-  if (prefecture?.shortLabel) return prefecture.shortLabel;
-  if (prefecture?.label) return prefecture.label;
-  return '現在地';
+  if (prefecture) {
+    return i18n.t(`areas.prefecturesShort.${prefecture.id}`, {
+      defaultValue: prefecture.shortLabel || prefecture.label,
+    });
+  }
+  return i18n.t('areas.nearby', { defaultValue: AREA_LABEL_NEARBY });
 }
 
 export function resolveSelectionCenter(
@@ -665,7 +674,10 @@ export function labelForMapRegion(region?: MapRegion | null): string | null {
   }
   const prefectureId = nearestPrefectureId(region.latitude, region.longitude);
   if (!prefectureId) return null;
-  return getPrefectureById(prefectureId).shortLabel;
+  const prefecture = getPrefectureById(prefectureId);
+  return i18n.t(`areas.prefecturesShort.${prefecture.id}`, {
+    defaultValue: prefecture.shortLabel,
+  });
 }
 
 /** @deprecated filterEventsByArea を使ってください */

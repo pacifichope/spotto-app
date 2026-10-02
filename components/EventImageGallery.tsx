@@ -17,6 +17,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   Easing,
   Extrapolation,
@@ -176,6 +177,7 @@ function EventImageFullscreen({
   onClose,
   onIndexChange,
 }: FullscreenProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(initialIndex);
@@ -184,13 +186,13 @@ function EventImageFullscreen({
   useEffect(() => {
     if (!visible) return;
     setIndex(initialIndex);
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({
         x: initialIndex * width,
         animated: false,
       });
     }, 16);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [visible, initialIndex, width]);
 
   const syncIndex = (offsetX: number) => {
@@ -220,7 +222,7 @@ function EventImageFullscreen({
           style={StyleSheet.absoluteFill}
           onPress={onClose}
           accessibilityRole="button"
-          accessibilityLabel="詳細に戻る"
+          accessibilityLabel={t('gallery.backToDetail')}
         />
         <View
           style={[styles.fullscreenChrome, { paddingTop: Math.max(insets.top, 8) }]}
@@ -247,7 +249,7 @@ function EventImageFullscreen({
               onPress={onClose}
               style={{ width, height: '100%' }}
               accessibilityRole="imagebutton"
-              accessibilityLabel="タップして詳細に戻る"
+              accessibilityLabel={t('gallery.tapToBack')}
             >
               <CoverPhoto
                 uri={uri}
@@ -284,6 +286,7 @@ export default function EventImageGallery({
   collapseRange = EVENT_HEADER_COLLAPSE_RANGE,
   onFullscreenChange,
 }: EventImageGalleryProps) {
+  const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
@@ -445,7 +448,7 @@ export default function EventImageGallery({
                 key={`${uri}-${i}`}
                 onPress={openFullscreen}
                 accessibilityRole="imagebutton"
-                accessibilityLabel={`写真 ${i + 1}を全画面表示`}
+                accessibilityLabel={t('gallery.photoFullscreen', { n: i + 1 })}
                 style={{ width, height: pageH }}
               >
                 <KenBurnsPhoto
@@ -464,7 +467,7 @@ export default function EventImageGallery({
             onPress={openFullscreen}
             style={StyleSheet.absoluteFill}
             accessibilityRole="imagebutton"
-            accessibilityLabel="写真を全画面表示"
+            accessibilityLabel={t('gallery.photoFullscreenSimple')}
           >
             <CoverPhoto
               uri={safeUris[0]}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
+import i18n from '@/lib/i18n';
 import {
   buildRefundPolicyRows,
   cancelPolicyCardText,
@@ -29,6 +31,7 @@ import {
   type EventSession,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { formatYenAmount, isPaidEvent } from '@/lib/payments';
 import {
   sanitizePreQuestions,
@@ -119,10 +122,10 @@ function validateAnswers(
     const value = answers[q.id];
     if (q.type === 'multi') {
       if (!Array.isArray(value) || value.length === 0) {
-        return `「${q.title}」への回答が必要です`;
+        return i18n.t('payment.answerRequired', { title: q.title });
       }
     } else if (typeof value !== 'string' || !value.trim()) {
-      return `「${q.title}」への回答が必要です`;
+      return i18n.t('payment.answerRequired', { title: q.title });
     }
   }
   return null;
@@ -136,6 +139,7 @@ export default function PaymentCheckoutSheet({
   onClose,
   onConfirm,
 }: PaymentCheckoutSheetProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const paid = isPaidEvent({ priceYen: amountYen });
   const questions = useMemo(() => activeQuestions(event), [event]);
@@ -191,6 +195,7 @@ export default function PaymentCheckoutSheet({
     selectedSession?.date,
     selectedSession?.time,
     event?.cancelPolicy,
+    t,
   ]);
   const payInFlightRef = useRef(false);
 
@@ -232,7 +237,7 @@ export default function PaymentCheckoutSheet({
     setBusy(false);
     setPreparingPay(false);
     payInFlightRef.current = false;
-    Alert.alert('決済を開始できません', message);
+    Alert.alert(t('payment.cannotStartTitle'), message);
   };
 
   const resetAndClose = () => {
@@ -284,7 +289,7 @@ export default function PaymentCheckoutSheet({
     });
     if (!hosted?.checkoutUrl) {
       showPayError(
-        '決済ページを準備できませんでした。もう一度お試しください。',
+        t('payment.errorPrepareFailed'),
       );
       return false;
     }
@@ -300,7 +305,7 @@ export default function PaymentCheckoutSheet({
     const sessionId = result.sessionId || hosted.checkoutSessionId || '';
     if (!sessionId) {
       showPayError(
-        '決済情報を確認できませんでした。もう一度お試しください。',
+        t('payment.errorConfirmInfoFailed'),
       );
       return false;
     }
@@ -308,7 +313,7 @@ export default function PaymentCheckoutSheet({
     const confirmed = await confirmCheckoutSession(sessionId);
     if (!confirmed.paid || !confirmed.paymentIntentId) {
       showPayError(
-        '決済の完了を確認できませんでした。もう一度お試しください。',
+        t('payment.errorCompletionFailed'),
       );
       return false;
     }
@@ -386,8 +391,8 @@ export default function PaymentCheckoutSheet({
         if (!confirmed.paid) {
           showPayError(
             confirmed.status
-              ? `決済が完了していません（status: ${confirmed.status}）。`
-              : '決済が完了していません。もう一度お試しください。',
+              ? t('payment.errorNotCompletedStatus', { status: confirmed.status })
+              : t('payment.errorNotCompleted'),
           );
           return;
         }
@@ -401,7 +406,7 @@ export default function PaymentCheckoutSheet({
       payInFlightRef.current = false;
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : '決済を開始できませんでした';
+        err instanceof Error ? err.message : t('payment.errorStartFailed');
       if (__DEV__) console.error('[payments] payViaStripe failed', err);
       showPayError(message);
     }
@@ -412,7 +417,7 @@ export default function PaymentCheckoutSheet({
     if (method === 'card') {
       const number = digitsOnly(cardNumber);
       if (number.length < 13 || expiry.length < 4 || digitsOnly(cvc).length < 3) {
-        setError('カード番号・有効期限・セキュリティコードを入力してください');
+        setError(t('payment.errorCardIncomplete'));
         return;
       }
     }
@@ -425,7 +430,7 @@ export default function PaymentCheckoutSheet({
   const handleConfirm = () => {
     if (!event || busy || preparingPay || payInFlightRef.current) return;
     if (quantity > maxQty) {
-      setError(`残り ${maxQty} 枚までしか選べません`);
+      setError(t('payment.errorMaxQty', { count: maxQty }));
       return;
     }
     const answerError = validateAnswers(questions, answers);
@@ -447,7 +452,7 @@ export default function PaymentCheckoutSheet({
     }
     if (!stripeReady) {
       showPayError(
-        'Stripe の設定が完了していません。公開鍵と API サーバー（npm run api）を確認してください。',
+        t('payment.errorStripeNotConfigured'),
       );
       return;
     }
@@ -461,8 +466,8 @@ export default function PaymentCheckoutSheet({
   if (!visible || !event) return null;
 
   const ctaLabel = paid
-    ? `確認して支払う ${formatYenAmount(totalYen)}`
-    : '参加を確定する';
+    ? t('payment.ctaPay', { amount: formatYenAmount(totalYen) })
+    : t('payment.ctaConfirm');
   const payBlocked = busy || preparingPay;
 
   const sheetBody = (
@@ -479,11 +484,11 @@ export default function PaymentCheckoutSheet({
           hitSlop={12}
           style={styles.headerSide}
           accessibilityRole="button"
-          accessibilityLabel="戻る"
+          accessibilityLabel={t('common.back')}
         >
           <Text style={styles.backChevron}>‹</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>参加・購入確認</Text>
+        <Text style={styles.headerTitle}>{t('payment.title')}</Text>
         <View style={styles.headerSide} />
       </View>
 
@@ -508,7 +513,7 @@ export default function PaymentCheckoutSheet({
             )}
             <View style={styles.eventMeta}>
               <Text style={styles.eventTitle} numberOfLines={2}>
-                {event.title}
+                {localizedEventTitle(event)}
               </Text>
               {schedule ? (
                 <Text style={styles.eventSchedule} numberOfLines={2}>
@@ -526,9 +531,9 @@ export default function PaymentCheckoutSheet({
           {/* 枚数・金額 */}
           <View style={styles.rowBetween}>
             <View style={styles.rowLabelCol}>
-              <Text style={styles.rowLabel}>チケット枚数</Text>
+              <Text style={styles.rowLabel}>{t('payment.ticketQuantity')}</Text>
               <Text style={styles.rowHint}>
-                残り {spotsLeft} 枚まで選択できます
+                {t('payment.spotsSelectable', { count: spotsLeft })}
               </Text>
             </View>
             <View style={styles.stepper}>
@@ -539,7 +544,7 @@ export default function PaymentCheckoutSheet({
                 ]}
                 disabled={quantity <= 1 || busy}
                 onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-                accessibilityLabel="枚数を減らす"
+                accessibilityLabel={t('payment.decreaseQty')}
               >
                 <Text style={styles.stepBtnText}>−</Text>
               </Pressable>
@@ -551,7 +556,7 @@ export default function PaymentCheckoutSheet({
                 ]}
                 disabled={quantity >= maxQty || busy}
                 onPress={() => setQuantity((q) => Math.min(maxQty, q + 1))}
-                accessibilityLabel="枚数を増やす"
+                accessibilityLabel={t('payment.increaseQty')}
               >
                 <Text style={styles.stepBtnText}>＋</Text>
               </Pressable>
@@ -560,17 +565,22 @@ export default function PaymentCheckoutSheet({
 
           <View style={styles.rowBetween}>
             <View style={styles.rowLabelCol}>
-              <Text style={styles.rowLabel}>お支払い金額</Text>
+              <Text style={styles.rowLabel}>{t('payment.amountLabel')}</Text>
               {paid && quantity > 1 ? (
                 <Text style={styles.rowHint}>
-                  {formatYenAmount(unitYen)} × {quantity}枚
+                  {t('payment.unitTimesQty', {
+                    unit: formatYenAmount(unitYen),
+                    count: quantity,
+                  })}
                 </Text>
               ) : paid ? (
-                <Text style={styles.rowHint}>1枚あたり {formatYenAmount(unitYen)}</Text>
+                <Text style={styles.rowHint}>
+                  {t('payment.perTicket', { amount: formatYenAmount(unitYen) })}
+                </Text>
               ) : null}
             </View>
             <Text style={[styles.amountValue, paid && styles.amountPaid]}>
-              {paid ? formatYenAmount(totalYen) : '無料'}
+              {paid ? formatYenAmount(totalYen) : t('events.free')}
             </Text>
           </View>
 
@@ -579,7 +589,7 @@ export default function PaymentCheckoutSheet({
           {/* 支払い方法（有料のみ） */}
           {paid ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>お支払い方法</Text>
+              <Text style={styles.sectionTitle}>{t('payment.methodTitle')}</Text>
               {stripeReady ? (
                 <Pressable
                   style={[
@@ -588,7 +598,7 @@ export default function PaymentCheckoutSheet({
                   ]}
                   onPress={() => setPaymentMethod('stripe')}
                 >
-                  <Text style={styles.payMethodLabel}>クレジットカード / Stripe</Text>
+                  <Text style={styles.payMethodLabel}>{t('payment.methodStripe')}</Text>
                   <View
                     style={[
                       styles.check,
@@ -628,7 +638,7 @@ export default function PaymentCheckoutSheet({
                     ]}
                     onPress={() => setPaymentMethod('card_demo')}
                   >
-                    <Text style={styles.payMethodLabel}>クレジットカード</Text>
+                    <Text style={styles.payMethodLabel}>{t('payment.methodCard')}</Text>
                     <View
                       style={[
                         styles.check,
@@ -648,7 +658,7 @@ export default function PaymentCheckoutSheet({
                         onChangeText={(value) =>
                           setCardNumber(formatCardNumber(value))
                         }
-                        placeholder="カード番号"
+                        placeholder={t('payment.cardNumber')}
                         placeholderTextColor={MUTED}
                         keyboardType="number-pad"
                         maxLength={19}
@@ -690,11 +700,11 @@ export default function PaymentCheckoutSheet({
             <View style={[styles.section, styles.sectionTint]}>
               <View style={styles.sectionTitleRow}>
                 <Text style={styles.sectionTitle}>
-                  参加情報（{questions.length}問）
+                  {t('payment.questionsTitle', { count: questions.length })}
                 </Text>
               </View>
               <Text style={styles.sectionHint}>
-                主催者が設定した追加の質問です。必須項目はすべてご回答ください。氏名・連絡先はアカウント情報を利用します。
+                {t('payment.questionsHint')}
               </Text>
               {questions.map((q) => (
                 <View key={q.id} style={styles.questionBlock}>
@@ -703,7 +713,7 @@ export default function PaymentCheckoutSheet({
                     {q.required ? (
                       <Text style={styles.requiredMark}> ＊</Text>
                     ) : (
-                      <Text style={styles.optionalMark}>（任意）</Text>
+                      <Text style={styles.optionalMark}>{t('payment.optionalMark')}</Text>
                     )}
                   </Text>
                   {q.type === 'text' ? (
@@ -715,7 +725,7 @@ export default function PaymentCheckoutSheet({
                           : ''
                       }
                       onChangeText={(value) => setTextAnswer(q.id, value)}
-                      placeholder="回答を入力"
+                      placeholder={t('payment.answerPlaceholder')}
                       placeholderTextColor={MUTED}
                     />
                   ) : null}
@@ -780,7 +790,7 @@ export default function PaymentCheckoutSheet({
           {paid ? (
             <View style={styles.section}>
               <View style={styles.sectionTitleRow}>
-                <Text style={styles.sectionTitle}>キャンセル・返金ポリシー</Text>
+                <Text style={styles.sectionTitle}>{t('payment.policyTitle')}</Text>
                 <View
                   style={[
                     styles.badge,
@@ -793,7 +803,7 @@ export default function PaymentCheckoutSheet({
                       !refundable && styles.badgeTextMuted,
                     ]}
                   >
-                    {refundable ? '自動返金' : '返金なし'}
+                    {refundable ? t('payment.autoRefund') : t('payment.noRefund')}
                   </Text>
                 </View>
               </View>
@@ -802,13 +812,13 @@ export default function PaymentCheckoutSheet({
               ) : null}
               {eventStartLabel ? (
                 <Text style={styles.sectionHint}>
-                  開催日時 {eventStartLabel} を基準に期限を計算しています。
+                  {t('payment.deadlineBasis', { when: eventStartLabel })}
                 </Text>
               ) : null}
               <Text style={styles.sectionHint}>
                 {refundable
-                  ? '期限内のキャンセルはアプリから申請すると、選択枚数の合計金額に対して自動で返金手続きが開始されます。'
-                  : 'このイベントは返金不可のポリシーです。キャンセルしても参加費は返金されません。'}
+                  ? t('payment.refundableNote')
+                  : t('payment.nonRefundableNote')}
               </Text>
               <View style={styles.table}>
                 <View style={[styles.tableRow, styles.tableHeader]}>
@@ -820,7 +830,7 @@ export default function PaymentCheckoutSheet({
                       styles.tableCellBorder,
                     ]}
                   >
-                    キャンセル申請期限
+                    {t('payment.tableDeadline')}
                   </Text>
                   <Text
                     style={[
@@ -829,10 +839,10 @@ export default function PaymentCheckoutSheet({
                       styles.tableCellBorder,
                     ]}
                   >
-                    返金率
+                    {t('payment.tableRate')}
                   </Text>
                   <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                    返金額
+                    {t('payment.tableAmount')}
                   </Text>
                 </View>
                 {refundRows.map((row, index) => (
@@ -868,11 +878,16 @@ export default function PaymentCheckoutSheet({
                 ))}
               </View>
               <Text style={styles.tableFootnote}>
-                ※返金額は現在の選択合計 {formatYenAmount(totalYen)}
-                {quantity > 1
-                  ? `（${formatYenAmount(unitYen)} × ${quantity}枚）`
-                  : ''}
-                に基づきます
+                {t('payment.tableFootnote', {
+                  total: formatYenAmount(totalYen),
+                  detail:
+                    quantity > 1
+                      ? t('payment.tableFootnoteDetail', {
+                          unit: formatYenAmount(unitYen),
+                          count: quantity,
+                        })
+                      : '',
+                })}
               </Text>
             </View>
           ) : null}
@@ -883,20 +898,24 @@ export default function PaymentCheckoutSheet({
               <View style={styles.disclaimerIcon}>
                 <Text style={styles.disclaimerIconText}>!</Text>
               </View>
-              <Text style={styles.sectionTitle}>免責事項</Text>
+              <Text style={styles.sectionTitle}>{t('payment.disclaimerTitle')}</Text>
             </View>
             <Text style={styles.disclaimerText}>
-              • 本アプリはイベント掲載・決済のプラットフォームです。開催内容・安全管理の責任は主催者にあります。{'\n'}
-              • 参加費の設定・返金ポリシーは主催者が定めます。期限内キャンセルは上記表に従い処理されます。{'\n'}
-              • 体調不良や持病がある場合は、自己判断のうえご参加ください。{'\n'}
-              • イベント中の事故等について、運営は法令上必要な範囲を超える責任を負いません。
+              {[
+                t('payment.disclaimer1'),
+                t('payment.disclaimer2'),
+                t('payment.disclaimer3'),
+                t('payment.disclaimer4'),
+              ]
+                .map((line) => `• ${line}`)
+                .join('\n')}
             </Text>
           </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {showDevHints ? (
             <Text style={styles.devHint}>
-              開発モード · カード例 4242 4242 4242 4242
+              {t('payment.devHint')}
             </Text>
           ) : null}
 
@@ -928,9 +947,9 @@ export default function PaymentCheckoutSheet({
           <View style={styles.preparingOverlay} pointerEvents="auto">
             <View style={styles.preparingCard}>
               <ActivityIndicator size="large" color={ACCENT_GREEN} />
-              <Text style={styles.preparingTitle}>決済画面を準備中…</Text>
+              <Text style={styles.preparingTitle}>{t('payment.preparingTitle')}</Text>
               <Text style={styles.preparingBody}>
-                このままお待ちください
+                {t('payment.preparingBody')}
               </Text>
             </View>
           </View>

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +13,7 @@ import { usePhoneVerification } from '@/lib/phoneVerificationContext';
  * 設定などから `/auth/phone` へ遷移してモーダルを開く。
  */
 export default function PhoneAuthScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isLoggedIn, requireAuth, isReady: authReady } = useAuth();
@@ -68,7 +70,7 @@ export default function PhoneAuthScreen() {
       ]}
     >
       <ActivityIndicator color={theme.colors.primaryDark} />
-      <Text style={styles.label}>電話番号認証を準備しています…</Text>
+      <Text style={styles.label}>{t('auth.phonePreparing')}</Text>
     </View>
   );
 }

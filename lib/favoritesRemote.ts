@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { isRemoteEventId } from '@/lib/chatsRemote';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { ensureFirebaseAuthenticatedClaim } from '@/lib/firebaseEnsureClaims';
@@ -21,26 +22,18 @@ function formatFavoritesError(
   const raw = String(message || '').trim();
   if (!raw) return fallback;
   const lower = raw.toLowerCase();
-  if (
+  const isTech =
     lower.includes('row-level security') ||
-    lower.includes('violates row-level security')
-  ) {
-    return (
-      'お気に入りの権限エラーです。event_favorites の RLS を Firebase JWT 向けに更新してください（apply_event_favorites_firebase_rls.sql）。'
-    );
-  }
-  if (
+    lower.includes('violates row-level security') ||
     lower.includes('invalid input syntax for type uuid') ||
-    lower.includes('column "user_id" is of type uuid')
-  ) {
-    return (
-      'お気に入りテーブルの user_id が uuid のままです。apply_event_favorites_firebase_rls.sql を適用してください。'
-    );
-  }
-  if (lower.includes('permission denied') || lower.includes('42501')) {
-    return (
-      'お気に入りテーブルへの権限がありません。GRANT と RLS を確認してください。'
-    );
+    lower.includes('column "user_id" is of type uuid') ||
+    lower.includes('permission denied') ||
+    lower.includes('42501');
+  if (isTech) {
+    if (__DEV__) {
+      console.warn('[favorites] technical', raw);
+    }
+    return fallback;
   }
   return raw || fallback;
 }
@@ -50,10 +43,10 @@ async function prepareFavoritesClient(): Promise<
   | { ok: false; error: string }
 > {
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('errors.supabaseNotConfigured') };
 
   try {
     await ensureFirebaseAuthenticatedClaim();
@@ -65,7 +58,7 @@ async function prepareFavoritesClient(): Promise<
 
   const userId = await resolveAuthUserId();
   if (!userId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
   return { ok: true, client, userId };
 }
@@ -75,7 +68,7 @@ export async function fetchFavoriteEventIds(): Promise<
 > {
   const prepared = await prepareFavoritesClient();
   if (!prepared.ok) {
-    if (prepared.error === 'ログインが必要です') {
+    if (prepared.error === i18n.t('errors.loginRequired')) {
       return { ok: true, data: [] };
     }
     return prepared;
@@ -101,7 +94,7 @@ export async function fetchFavoriteEventIds(): Promise<
         ok: false,
         error: formatFavoritesError(
           error.message,
-          'お気に入りの取得に失敗しました',
+          i18n.t('errors.favoriteFetchFailed'),
         ),
       };
     }
@@ -120,7 +113,7 @@ export async function fetchFavoriteEventIds(): Promise<
       error:
         error instanceof Error
           ? error.message
-          : 'お気に入りの取得に失敗しました',
+          : i18n.t('errors.favoriteFetchFailed'),
     };
   }
 }
@@ -129,7 +122,7 @@ export async function addFavoriteRemote(
   eventId: string,
 ): Promise<FavoritesRemoteResult<void>> {
   if (!isRemoteEventId(eventId)) {
-    return { ok: false, error: 'このイベントはクラウド同期できません' };
+    return { ok: false, error: i18n.t('errors.cloudSyncUnavailable') };
   }
   const prepared = await prepareFavoritesClient();
   if (!prepared.ok) return prepared;
@@ -173,7 +166,7 @@ export async function addFavoriteRemote(
             ok: false,
             error: formatFavoritesError(
               inserted.error.message,
-              'お気に入りの保存に失敗しました',
+              i18n.t('errors.favoriteSaveFailed'),
             ),
           };
         }
@@ -192,7 +185,7 @@ export async function addFavoriteRemote(
         ok: false,
         error: formatFavoritesError(
           error.message,
-          'お気に入りの保存に失敗しました',
+          i18n.t('errors.favoriteSaveFailed'),
         ),
       };
     }
@@ -208,7 +201,7 @@ export async function addFavoriteRemote(
       error:
         error instanceof Error
           ? error.message
-          : 'お気に入りの保存に失敗しました',
+          : i18n.t('errors.favoriteSaveFailed'),
     };
   }
 }
@@ -217,7 +210,7 @@ export async function removeFavoriteRemote(
   eventId: string,
 ): Promise<FavoritesRemoteResult<void>> {
   if (!isRemoteEventId(eventId)) {
-    return { ok: false, error: 'このイベントはクラウド同期できません' };
+    return { ok: false, error: i18n.t('errors.cloudSyncUnavailable') };
   }
   const prepared = await prepareFavoritesClient();
   if (!prepared.ok) return prepared;
@@ -243,7 +236,7 @@ export async function removeFavoriteRemote(
         ok: false,
         error: formatFavoritesError(
           error.message,
-          'お気に入りの削除に失敗しました',
+          i18n.t('errors.favoriteRemoveFailed'),
         ),
       };
     }
@@ -259,7 +252,7 @@ export async function removeFavoriteRemote(
       error:
         error instanceof Error
           ? error.message
-          : 'お気に入りの削除に失敗しました',
+          : i18n.t('errors.favoriteRemoveFailed'),
     };
   }
 }

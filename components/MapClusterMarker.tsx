@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '@/constants/theme';
@@ -8,7 +9,9 @@ type MapClusterMarkerProps = {
 
 /** 地図上の集約ピン（件数バッジ） */
 export default function MapClusterMarker({ count }: MapClusterMarkerProps) {
+  const { t } = useTranslation();
   const label = count > 99 ? '99+' : String(count);
+  const unit = t('map.clusterUnit');
   const size = count >= 50 ? 58 : count >= 20 ? 52 : count >= 10 ? 48 : 44;
 
   return (
@@ -17,7 +20,7 @@ export default function MapClusterMarker({ count }: MapClusterMarkerProps) {
       style={[styles.wrap, { width: size, height: size }]}
       pointerEvents="none"
       accessibilityRole="button"
-      accessibilityLabel={`${label}件のイベント`}
+      accessibilityLabel={t('map.clusterA11y', { label })}
     >
       <View
         style={[
@@ -36,7 +39,7 @@ export default function MapClusterMarker({ count }: MapClusterMarkerProps) {
         ]}
       >
         <Text style={styles.count}>{label}</Text>
-        <Text style={styles.unit}>件</Text>
+        {unit ? <Text style={styles.unit}>{unit}</Text> : null}
       </View>
     </View>
   );

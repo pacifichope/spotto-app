@@ -9,6 +9,7 @@ import {
   publicApiUrl,
   readPublicEnv,
 } from '@/lib/env';
+import i18n from '@/lib/i18n';
 
 export type CheckoutRequest = {
   eventId: string;
@@ -164,8 +165,7 @@ export async function createPaymentSession(
   }
 
   if (!url) {
-    const msg =
-      '決済 API の URL が空です。EXPO_PUBLIC_API_BASE_URL（例: http://localhost:8787）を設定してください。';
+    const msg = i18n.t('payment.errorApiUrlEmpty');
     if (__DEV__) console.warn('[payments]', msg);
     return null;
   }
@@ -235,9 +235,10 @@ export async function createPaymentSession(
         detail = `: ${responseText.trim().slice(0, 180)}`;
       }
     }
+    const base = i18n.t('payment.errorSessionCreateFailed');
     const msg = __DEV__
-      ? `決済セッションの作成に失敗しました${detail}（URL: ${url}, status: ${response.status}）`
-      : `決済セッションの作成に失敗しました${detail}`;
+      ? `${base}${detail}（URL: ${url}, status: ${response.status}）`
+      : `${base}${detail}`;
     if (__DEV__) console.error('[payments]', msg);
     throw new Error(msg);
   }
@@ -282,8 +283,8 @@ export async function createPaymentSession(
     }
     throw new Error(
       __DEV__
-        ? `決済 API の応答が不正です（URL: ${url}）`
-        : '決済 API の応答が不正です',
+        ? `${i18n.t('payment.errorApiInvalidResponse')}（URL: ${url}）`
+        : i18n.t('payment.errorApiInvalidResponse'),
     );
   }
 }
@@ -325,7 +326,7 @@ export async function confirmPaymentIntentStatus(
     } catch {
       detail = text.trim() ? `: ${text.trim().slice(0, 120)}` : '';
     }
-    throw new Error(`決済状態の確認に失敗しました${detail}`);
+    throw new Error(`${i18n.t('payment.errorStatusCheckFailed')}${detail}`);
   }
   const data = JSON.parse(text) as {
     paid?: boolean;
@@ -356,7 +357,7 @@ export async function confirmCheckoutSession(
     body: JSON.stringify({ sessionId: sessionId.trim() }),
   });
   if (!response.ok) {
-    throw new Error('決済の確認に失敗しました');
+    throw new Error(i18n.t('payment.errorConfirmFailed'));
   }
   const data = (await response.json()) as {
     paid?: boolean;
@@ -373,9 +374,7 @@ export async function openHostedCheckout(
 ): Promise<{ paid: boolean; sessionId: string }> {
   const url = String(checkoutUrl || '').trim();
   if (!/^https:\/\//i.test(url)) {
-    throw new Error(
-      '決済ページの URL を取得できませんでした。時間をおいて再度お試しください。',
-    );
+    throw new Error(i18n.t('payment.errorCheckoutUrlFailed'));
   }
   // Android Custom Tabs のリダイレクト検出は app scheme が安定している方がよい
   const returnUrl =
@@ -452,7 +451,7 @@ export async function openHostedCheckout(
       }
       const opened = await Linking.canOpenURL(url);
       if (!opened) {
-        throw new Error('決済ページを開けませんでした。');
+        throw new Error(i18n.t('payment.errorOpenFailed'));
       }
       await Linking.openURL(url);
     }
@@ -470,9 +469,7 @@ export async function openHostedCheckout(
   }
 
   if (result.type === 'locked') {
-    throw new Error(
-      '別のブラウザ画面が開いているため決済ページを表示できません。閉じてから再度お試しください。',
-    );
+    throw new Error(i18n.t('payment.errorBrowserLocked'));
   }
   // Android openBrowser polyfill は type: 'opened' を返すことがある
   if (result.type === 'opened') {
@@ -515,7 +512,7 @@ export async function requestStripeRefund(
     }),
   });
   if (!response.ok) {
-    throw new Error('Stripe の返金処理に失敗しました');
+    throw new Error(i18n.t('payment.errorRefundFailed'));
   }
   const data = (await response.json()) as { refundId?: string };
   return {

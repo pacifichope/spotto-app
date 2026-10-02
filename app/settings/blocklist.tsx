@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,12 +10,13 @@ import { confirmUnblockUser } from '@/lib/blocks';
 import { useBlocks } from '@/lib/blocksContext';
 
 export default function BlocklistScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { blockedUsers, unblockUser } = useBlocks();
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="ブロックリスト" />
+      <SettingsHeader title={t('settings.blocklist')} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -28,10 +30,10 @@ export default function BlocklistScreen() {
               <BlockEmptyIcon size={28} />
             </EmptyStateIcon>
             <Text style={styles.emptyTitle}>
-              現在、ブロックしているユーザーはいません
+              {t('settings.blocklistEmptyTitle')}
             </Text>
             <Text style={styles.emptyBody}>
-              プロフィールやチャットからブロックすると、その人のイベントやメッセージが非表示になります。
+              {t('settings.blocklistEmptyBody')}
             </Text>
           </View>
         ) : (
@@ -51,7 +53,7 @@ export default function BlocklistScreen() {
                     {user.name}
                   </Text>
                   <Text style={styles.meta} numberOfLines={1}>
-                    {user.bio?.trim() || 'ブロック中'}
+                    {user.bio?.trim() || t('settings.blockedLabel')}
                   </Text>
                 </View>
                 <Pressable
@@ -62,9 +64,9 @@ export default function BlocklistScreen() {
                     })
                   }
                   accessibilityRole="button"
-                  accessibilityLabel={`${user.name}のブロックを解除`}
+                  accessibilityLabel={t('settings.unblockA11y', { name: user.name })}
                 >
-                  <Text style={styles.unblockText}>解除</Text>
+                  <Text style={styles.unblockText}>{t('settings.unblock')}</Text>
                 </Pressable>
               </View>
             ))}

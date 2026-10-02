@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +21,7 @@ import {
   CONTACT_CATEGORIES,
   MAX_CONTACT_IMAGES,
   bindContactIdentity,
+  contactCategoryLabel,
   isValidContactEmail,
   submitContact,
   supportEmail,
@@ -46,6 +48,7 @@ function revokeIfBlob(uri: string) {
 }
 
 export default function ContactSettingsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { user, isLoggedIn } = useAuth();
   const { displayName } = useUserProfile();
@@ -78,14 +81,17 @@ export default function ContactSettingsScreen() {
     const email = replyEmail.trim();
     if (!email) {
       setEmailError(true);
-      notify('入力内容を確認してください', '返信用メールアドレスを入力してください。');
+      notify(
+        t('contact.checkInputTitle'),
+        t('contact.errors.emailRequired'),
+      );
       return false;
     }
     if (!isValidContactEmail(email)) {
       setEmailError(true);
       notify(
-        '入力内容を確認してください',
-        'メールアドレスの形式が正しくありません。',
+        t('contact.checkInputTitle'),
+        t('contact.errors.emailInvalid'),
       );
       return false;
     }
@@ -142,9 +148,8 @@ export default function ContactSettingsScreen() {
     if (attachmentCount > 0 && cloudMissed === attachmentCount) {
       setSending(false);
       notify(
-        '画像を保存できませんでした',
-        uploadErrors[0] ||
-          '画像のクラウド保存に失敗しました。通信環境を確認するか、画像なしで送信してください。',
+        t('contact.imageSaveFailedTitle'),
+        uploadErrors[0] || t('contact.imageSaveFailedBody'),
       );
       return;
     }
@@ -160,52 +165,54 @@ export default function ContactSettingsScreen() {
     });
     setSending(false);
     if (!result.ok) {
-      notify('送信できませんでした', result.error);
+      notify(t('contact.sendFailedTitle'), result.error);
       return;
     }
     attachments.forEach((item) => revokeIfBlob(item.uri));
     setMessage('');
     setAttachments([]);
-    const title = '送信しました';
+    const title = t('contact.sentTitle');
     const extra =
       attachmentCount > 0 && cloudMissed > 0
-        ? `\n\n一部の画像（${cloudMissed}件）はクラウドに保存できず、運営側で開けないことがあります。${
-            uploadErrors[0] ? `\n（${uploadErrors[0]}）` : ''
+        ? `\n\n${t('contact.imagesPartialFailed', { count: cloudMissed })}${
+            uploadErrors[0] ? `\n(${uploadErrors[0]})` : ''
           }`
         : '';
     const body =
       result.channel === 'mailto'
-        ? `メールアプリ（または共有シート）が開きます。送信を完了してください。${extra}`
-        : `運営に届きました。内容を確認のうえ、入力いただいたメールアドレスへご連絡します。${extra}`;
+        ? `${t('contact.sentViaMail')}${extra}`
+        : `${t('contact.sentViaApi')}${extra}`;
     notify(title, body.trim());
   };
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="お問い合わせ" />
+      <SettingsHeader title={t('settings.contact')} />
       <KeyboardFormScrollView
         contentContainerStyle={styles.content}
         bottomGap={Math.max(insets.bottom, 24)}
       >
         <Text style={styles.lead}>
-          不具合やご質問は、こちらのフォームから運営へ送れます。返信用メールアドレスは必須です。
+          {t('contact.lead')}
         </Text>
-        <Text style={styles.mailHint}>宛先: {supportEmail()}</Text>
+        <Text style={styles.mailHint}>
+          {t('contact.to', { email: supportEmail() })}
+        </Text>
 
         <View style={styles.card}>
-          <Text style={styles.label}>お名前</Text>
+          <Text style={styles.label}>{t('contact.name')}</Text>
           <TextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="表示名"
+            placeholder={t('contact.namePlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             autoCapitalize="words"
-            accessibilityLabel="お名前"
+            accessibilityLabel={t('contact.name')}
           />
           <View style={styles.labelRow}>
-            <Text style={styles.labelInline}>メールアドレス</Text>
-            <Text style={styles.requiredBadge}>必須</Text>
+            <Text style={styles.labelInline}>{t('contact.email')}</Text>
+            <Text style={styles.requiredBadge}>{t('contact.required')}</Text>
           </View>
           <TextInput
             style={[
@@ -219,22 +226,22 @@ export default function ContactSettingsScreen() {
               setEmailError(false);
               setReplyEmail(value);
             }}
-            placeholder="例: you@example.com（必須）"
+            placeholder={t('contact.emailPlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="email"
-            accessibilityLabel="返信用メールアドレス（必須）"
+            accessibilityLabel={t('contact.emailA11y')}
           />
           <Text style={[styles.fieldHint, emailError && styles.fieldHintError]}>
             {emailError
-              ? '返信用メールアドレスを入力してください。'
+              ? t('contact.errors.emailRequired')
               : isLoggedIn && accountEmail
-                ? 'アカウント登録メールを初期表示しています。別のアドレスへの返信を希望する場合は書き換えてください。'
-                : '運営からの返信はこのアドレス宛に届きます。受信できるメールを必ず入力してください。'}
+                ? t('contact.emailHintAccount')
+                : t('contact.emailHintGuest')}
           </Text>
-          <Text style={styles.label}>種別</Text>
+          <Text style={styles.label}>{t('contact.category')}</Text>
           <View style={styles.chips}>
             {CONTACT_CATEGORIES.map((item) => {
               const on = item === category;
@@ -245,28 +252,28 @@ export default function ContactSettingsScreen() {
                   style={[styles.chip, on && styles.chipOn]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
-                  accessibilityLabel={item}
+                  accessibilityLabel={contactCategoryLabel(item)}
                 >
                   <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                    {item}
+                    {contactCategoryLabel(item)}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
-          <Text style={styles.label}>内容</Text>
+          <Text style={styles.label}>{t('contact.message')}</Text>
           <TextInput
             style={[styles.input, styles.textarea]}
             value={message}
             onChangeText={setMessage}
-            placeholder="できるだけ具体的にご記入ください"
+            placeholder={t('contact.messagePlaceholder')}
             placeholderTextColor={theme.colors.textMuted}
             multiline
             textAlignVertical="top"
-            accessibilityLabel="お問い合わせ内容"
+            accessibilityLabel={t('contact.messageA11y')}
           />
 
-          <Text style={styles.label}>画像（任意）</Text>
+          <Text style={styles.label}>{t('contact.images')}</Text>
           {attachments.length > 0 ? (
             <View style={styles.thumbs}>
               {attachments.map((item) => (
@@ -275,14 +282,14 @@ export default function ContactSettingsScreen() {
                     source={{ uri: item.uri }}
                     style={styles.thumb}
                     resizeMode="cover"
-                    accessibilityLabel="添付画像のプレビュー"
+                    accessibilityLabel={t('contact.imagePreviewA11y')}
                   />
                   <Pressable
                     onPress={() => removeAttachment(item.id)}
                     style={styles.thumbRemove}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="この画像を削除"
+                    accessibilityLabel={t('contact.removeImageA11y')}
                   >
                     <Text style={styles.thumbRemoveText}>×</Text>
                   </Pressable>
@@ -298,25 +305,25 @@ export default function ContactSettingsScreen() {
             onPress={() => void attachImages()}
             disabled={picking || remaining <= 0 || sending}
             accessibilityRole="button"
-            accessibilityLabel="画像を添付する"
+            accessibilityLabel={t('contact.attachImage')}
           >
             {picking ? (
               <ActivityIndicator color={theme.colors.primaryDark} />
             ) : (
               <Text style={styles.attachBtnText}>
                 {remaining <= 0
-                  ? `画像は${MAX_CONTACT_IMAGES}枚まで`
-                  : '画像を添付する'}
+                  ? t('contact.imageLimit', { max: MAX_CONTACT_IMAGES })
+                  : t('contact.attachImage')}
               </Text>
             )}
           </Pressable>
           <Text style={styles.attachHint}>
-            スクリーンショットや写真を最大{MAX_CONTACT_IMAGES}
-            枚まで添付できます。送信時にストレージへ保存し、運営へのお問い合わせに含めます
             {attachments.length > 0
-              ? `（選択中 ${attachments.length}/${MAX_CONTACT_IMAGES}）`
-              : ''}
-            。
+              ? t('contact.attachHintSelected', {
+                  count: attachments.length,
+                  max: MAX_CONTACT_IMAGES,
+                })
+              : t('contact.attachHint', { max: MAX_CONTACT_IMAGES })}
           </Text>
 
           <Pressable
@@ -324,12 +331,12 @@ export default function ContactSettingsScreen() {
             onPress={() => void submit()}
             disabled={sending}
             accessibilityRole="button"
-            accessibilityLabel="送信する"
+            accessibilityLabel={t('contact.submit')}
           >
             {sending ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.submitText}>送信する</Text>
+              <Text style={styles.submitText}>{t('contact.submit')}</Text>
             )}
           </Pressable>
         </View>

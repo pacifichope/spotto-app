@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Pressable,
@@ -30,6 +31,7 @@ import {
   type SkillLevel,
 } from '@/lib/events';
 import { SportIcon } from '@/components/icons';
+import { levelDisplayLabel, sportDisplayLabel } from '@/lib/createEventLabels';
 import { theme } from '@/constants/theme';
 import type {
   CreateEventPayload,
@@ -41,6 +43,7 @@ export type { CreateEventPayload, CreateEventSheetRef } from '@/components/creat
 
 const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
   function CreateEventSheet({ onSubmit }, ref) {
+    const { t } = useTranslation();
     const snapPoints = useMemo(() => ['72%', '92%'], []);
     const sheetRef = useRef<BottomSheetModal>(null);
 
@@ -83,7 +86,10 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
 
     const handleSubmit = () => {
       if (!title.trim() || !location.trim()) {
-        Alert.alert('入力不足', 'タイトルと場所を入力してください。');
+        Alert.alert(
+          t('create.alerts.missingTitle'),
+          t('create.sheet.missingBody'),
+        );
         return;
       }
 
@@ -96,7 +102,7 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
         date,
         time,
         location: location.trim(),
-        description: `${title.trim()}\n\n主催者が作成した新しいイベントです。`,
+        description: `${title.trim()}\n\n${t('create.sheet.defaultDescription')}`,
         imageUri:
           SPORT_IMAGE_PRESETS[sport.label] ?? SPORT_IMAGE_PRESETS.default,
         imageUris: [
@@ -113,8 +119,8 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
 
       onSubmit?.(payload);
       Alert.alert(
-        'イベントを作成しました',
-        `${payload.emoji} ${payload.title}\n${payload.location}\n${payload.date} ${payload.time} · ${payload.level}`,
+        t('create.sheet.createdTitle'),
+        `${payload.emoji} ${payload.title}\n${payload.location}\n${payload.date} ${payload.time} · ${levelDisplayLabel(payload.level)}`,
       );
 
       sheetRef.current?.dismiss();
@@ -139,21 +145,21 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
         >
-          <Text style={styles.heading}>イベントを作成する</Text>
+          <Text style={styles.heading}>{t('create.sheet.heading')}</Text>
           <Text style={styles.subheading}>
-            競技・日時・レベルを選んで近くのプレイヤーを集めましょう
+            {t('create.sheet.subheading')}
           </Text>
 
-          <Text style={styles.label}>タイトル</Text>
+          <Text style={styles.label}>{t('create.sheet.titleLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="例: 週末ピックアップサッカー"
+            placeholder={t('create.sheet.titlePlaceholder')}
             placeholderTextColor="#9AA59E"
             value={title}
             onChangeText={setTitle}
           />
 
-          <Text style={styles.label}>競技タイプ</Text>
+          <Text style={styles.label}>{t('create.sheet.sportLabel')}</Text>
           <View style={styles.chipRow}>
             {SPORT_OPTIONS.map((option, index) => {
               const active = index === sportIndex;
@@ -171,20 +177,20 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
                     }
                   />
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {option.label}
+                    {sportDisplayLabel(option.label)}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.label}>レベル</Text>
+          <Text style={styles.label}>{t('create.sheet.levelLabel')}</Text>
           <View style={styles.chipRow}>
             {LEVEL_OPTIONS.map((option) => {
               const active = option === level;
               return (
                 <Pressable
-                  key={option}
+                  key={levelDisplayLabel(option)}
                   onPress={() => setLevel(option)}
                   style={[styles.chip, active && styles.chipActive]}
                 >
@@ -196,17 +202,17 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
             })}
           </View>
 
-          <Text style={styles.label}>日付</Text>
+          <Text style={styles.label}>{t('create.sheet.dateLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="YYYY-MM-DD"
+            placeholder={t('create.sheet.datePlaceholder')}
             placeholderTextColor="#9AA59E"
             value={date}
             onChangeText={setDate}
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>時間</Text>
+          <Text style={styles.label}>{t('create.sheet.timeLabel')}</Text>
           <View style={styles.chipRow}>
             {TIME_OPTIONS.map((option) => {
               const active = option === time;
@@ -224,10 +230,10 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
             })}
           </View>
 
-          <Text style={styles.label}>場所</Text>
+          <Text style={styles.label}>{t('create.sheet.locationLabel')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="例: 代々木公園グラウンド"
+            placeholder={t('create.sheet.locationPlaceholder')}
             placeholderTextColor="#9AA59E"
             value={location}
             onChangeText={setLocation}
@@ -237,7 +243,7 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
             style={({ pressed }) => [styles.submit, pressed && styles.submitPressed]}
             onPress={handleSubmit}
           >
-            <Text style={styles.submitText}>この内容で作成する</Text>
+            <Text style={styles.submitText}>{t('create.sheet.submit')}</Text>
           </Pressable>
         </BottomSheetScrollView>
       </BottomSheetModal>

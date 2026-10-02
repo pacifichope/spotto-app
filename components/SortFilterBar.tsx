@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import BrandGradient, { brandGradientFill } from '@/components/BrandGradient';
@@ -25,13 +26,14 @@ export default function SortFilterBar({
   areaMode = null,
   prefectureLabel = null,
 }: SortFilterBarProps) {
+  const { t } = useTranslation();
   const filterActive = filterCount > 0;
   const caption =
     areaMode === 'prefecture' && prefectureLabel
-      ? `${prefectureLabel}の${count}件が盛り上がっています`
+      ? t('home.captionPrefecture', { area: prefectureLabel, count })
       : areaMode === 'nearby'
-        ? `近くの${count}件が盛り上がっています`
-        : `${count}件が盛り上がっています`;
+        ? t('home.captionNearby', { count })
+        : t('home.caption', { count });
 
   return (
     <View style={styles.row}>
@@ -46,7 +48,7 @@ export default function SortFilterBar({
           style={[styles.iconBtn, filterActive && styles.iconBtnActive]}
           onPress={onPressFilter}
           hitSlop={8}
-          accessibilityLabel="絞り込み"
+          accessibilityLabel={t('home.filter.title')}
         >
           {filterActive ? (
             <BrandGradient style={[brandGradientFill, styles.iconBtnFill]} />

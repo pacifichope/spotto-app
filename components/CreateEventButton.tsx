@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import BrandGradient from '@/components/BrandGradient';
@@ -9,10 +10,11 @@ type CreateEventButtonProps = {
 
 /** ブランドグラデーション FAB（白の +） */
 export default function CreateEventButton({ onPress }: CreateEventButtonProps) {
+  const { t } = useTranslation();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="主催する"
+      accessibilityLabel={t('create.fabA11y')}
       style={({ pressed }) => [styles.wrap, pressed && styles.pressed]}
       onPress={onPress}
     >

@@ -20,6 +20,7 @@ import {
   ensureNativeFirebaseAppSync,
   isNativeFirebaseLinked,
 } from '@/lib/firebaseNativeInit';
+import i18n from '@/lib/i18n';
 import {
   extractPhoneAuthErrorRaw,
   formatPhoneAuthError,
@@ -234,9 +235,7 @@ async function applyPhoneCredential(
   const credential = authMod.PhoneAuthProvider.credential(verificationId, code);
   const user = authMod.getAuth().currentUser;
   if (!user) {
-    throw new Error(
-      'ログインセッションがありません。先にソーシャルログインしてください。',
-    );
+    throw new Error(i18n.t('errors.phone.sessionMissing'));
   }
 
   try {
@@ -296,7 +295,7 @@ export async function sendFirebasePhoneOtp(
     return {
       ok: false,
       error:
-        'Firebase の初期化に失敗しました。google-services.json を配置し、Dev Client を再ビルドしてください。',
+        i18n.t('errors.phone.initFailed'),
     };
   }
 
@@ -305,14 +304,14 @@ export async function sendFirebasePhoneOtp(
     return {
       ok: false,
       error:
-        'Firebase ネイティブモジュールがありません。google-services.json / GoogleService-Info.plist を配置し、Dev Client を再ビルドしてください。',
+        i18n.t('errors.phone.nativeMissing'),
     };
   }
 
   if (!authMod.getAuth().currentUser) {
     return {
       ok: false,
-      error: '電話番号認証にはログインが必要です。先にログインしてください。',
+      error: i18n.t('errors.phone.loginRequired'),
     };
   }
 
@@ -326,7 +325,7 @@ export async function sendFirebasePhoneOtp(
       return {
         ok: false,
         error:
-          '認証コードの送信に失敗しました。番号と Firebase 設定を確認してください。',
+          i18n.t('errors.phone.sendFailedDetail'),
       };
     }
 
@@ -341,7 +340,7 @@ export async function sendFirebasePhoneOtp(
         confirm: async (code: string) => {
           const useCode = (code || autoCode).trim();
           if (!pending?.verificationId) {
-            throw new Error('先に認証コードを送信してください。');
+            throw new Error(i18n.t('errors.phone.sendCodeFirst'));
           }
           await applyPhoneCredential(authMod, pending.verificationId, useCode);
           pending = null;
@@ -358,7 +357,7 @@ export async function sendFirebasePhoneOtp(
       ok: false,
       error: formatPhoneAuthError(
         raw,
-        'SMS の送信に失敗しました。番号と Firebase 設定を確認してください。',
+        i18n.t('errors.phone.smsSendFailed'),
       ),
     };
   }
@@ -370,7 +369,7 @@ export async function confirmFirebasePhoneOtp(
   if (!pending?.verificationId) {
     return {
       ok: false,
-      error: '先に認証コードを送信してください。',
+      error: i18n.t('errors.phone.sendCodeFirst'),
     };
   }
   await ensureNativeFirebaseApp();
@@ -378,7 +377,7 @@ export async function confirmFirebasePhoneOtp(
   if (!authMod) {
     return {
       ok: false,
-      error: 'Firebase ネイティブモジュールがありません。',
+      error: i18n.t('errors.phone.nativeMissingShort'),
     };
   }
   try {
@@ -393,7 +392,7 @@ export async function confirmFirebasePhoneOtp(
     }
     return {
       ok: false,
-      error: formatPhoneAuthError(raw, '認証コードが正しくありません。'),
+      error: formatPhoneAuthError(raw, i18n.t('errors.phone.codeInvalid')),
     };
   }
 }

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Image,
   Platform,
@@ -77,6 +78,7 @@ function toJoinedClubIdList(raw: unknown): string[] {
 }
 
 export default function JoinedClubsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const eventsCtx = useEvents();
@@ -257,7 +259,7 @@ export default function JoinedClubsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="参加したクラブ" />
+      <SettingsHeader title={t('club.listTitle')} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
@@ -267,9 +269,9 @@ export default function JoinedClubsScreen() {
       >
         {joinedClubs.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>参加しているクラブはありません</Text>
+            <Text style={styles.emptyTitle}>{t('club.listEmptyTitle')}</Text>
             <Text style={styles.emptyBody}>
-              イベント詳細からクラブを開き、「Join in」するとここに表示されます。
+              {t('club.listEmptyBody')}
             </Text>
           </View>
         ) : (
@@ -292,7 +294,7 @@ export default function JoinedClubsScreen() {
                   style={styles.card}
                   onPress={() => openClub(club.id)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${club.name}のクラブプロフィール`}
+                  accessibilityLabel={t('club.profileLabel', { name: club.name })}
                 >
                   {coverUri && Platform.OS !== 'web' ? (
                     <View style={styles.coverWrap} pointerEvents="none">
@@ -323,7 +325,7 @@ export default function JoinedClubsScreen() {
                   <View style={styles.caption} pointerEvents="none">
                     <View style={styles.captionTop}>
                       <HostAvatar
-                        name={club.name || 'クラブ'}
+                        name={club.name || t('club.fallbackName')}
                         imageUri={coverUri}
                         size={40}
                         borderWidth={2}
@@ -338,7 +340,7 @@ export default function JoinedClubsScreen() {
                       {club.name}
                     </Text>
                     <Text style={styles.clubMeta} numberOfLines={1}>
-                      {memberCount}メンバー
+                      {t('club.memberCount', { count: memberCount })}
                     </Text>
                   </View>
                 </Pressable>

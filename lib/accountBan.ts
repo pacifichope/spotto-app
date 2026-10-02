@@ -1,12 +1,45 @@
 import { Alert, Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 
-/** ユーザー向け凍結メッセージ（ログイン画面・マイページ共通） */
-export const ACCOUNT_BANNED_MESSAGE = 'アカウントが凍結されています';
+const ACCOUNT_BAN_KEYS = ['message', 'detail', 'title'] as const;
+type AccountBanKey = (typeof ACCOUNT_BAN_KEYS)[number];
 
-export const ACCOUNT_BANNED_DETAIL =
-  'アカウントが凍結されています。ご不明な点はサポートまでお問い合わせください。';
+/**
+ * ユーザー向け凍結文言（参照時に現在の言語で解決）。
+ * socialLoginErrors と同じ getter パターン。
+ *
+ * - ACCOUNT_BANNED_MESSAGE → ACCOUNT_BAN_USER_MESSAGES.message
+ * - ACCOUNT_BANNED_DETAIL → ACCOUNT_BAN_USER_MESSAGES.detail
+ * - showAccountBannedAlert title → ACCOUNT_BAN_USER_MESSAGES.title
+ */
+export const ACCOUNT_BAN_USER_MESSAGES = Object.defineProperties(
+  {} as Readonly<Record<AccountBanKey, string>>,
+  Object.fromEntries(
+    ACCOUNT_BAN_KEYS.map((key) => [
+      key,
+      {
+        enumerable: true,
+        get: () => i18n.t(`errors.banned.${key}`),
+      },
+    ]),
+  ),
+);
+
+/** 短い凍結メッセージ（参照時に現在言語） */
+export const ACCOUNT_BANNED_MESSAGE = {
+  toString: () => ACCOUNT_BAN_USER_MESSAGES.message,
+  valueOf: () => ACCOUNT_BAN_USER_MESSAGES.message,
+  [Symbol.toPrimitive]: () => ACCOUNT_BAN_USER_MESSAGES.message,
+} as unknown as string;
+
+/** 詳細凍結メッセージ（参照時に現在言語） */
+export const ACCOUNT_BANNED_DETAIL = {
+  toString: () => ACCOUNT_BAN_USER_MESSAGES.detail,
+  valueOf: () => ACCOUNT_BAN_USER_MESSAGES.detail,
+  [Symbol.toPrimitive]: () => ACCOUNT_BAN_USER_MESSAGES.detail,
+} as unknown as string;
 
 export type BanStatus = {
   isBanned: boolean;
@@ -20,14 +53,19 @@ export type BanStatus = {
 let cachedBanByUserId = new Map<string, BanStatus>();
 
 export function isAccountBannedMessage(message: string | null | undefined) {
-  return Boolean(message && /凍結/.test(message));
+  if (!message) return false;
+  if (/凍結|banned|suspend/i.test(message)) return true;
+  return (
+    message === ACCOUNT_BAN_USER_MESSAGES.message ||
+    message === ACCOUNT_BAN_USER_MESSAGES.detail
+  );
 }
 
 export function showAccountBannedAlert(
-  message: string = ACCOUNT_BANNED_DETAIL,
+  message: string = ACCOUNT_BAN_USER_MESSAGES.detail,
 ) {
-  const title = 'アカウント凍結';
-  const body = message.trim() || ACCOUNT_BANNED_DETAIL;
+  const title = ACCOUNT_BAN_USER_MESSAGES.title;
+  const body = message.trim() || ACCOUNT_BAN_USER_MESSAGES.detail;
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.alert(`${title}\n${body}`);
     return;
@@ -112,7 +150,7 @@ export async function assertAccountNotBanned(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const status = await fetchUserBanStatus(userId);
   if (status.isBanned) {
-    return { ok: false, error: ACCOUNT_BANNED_DETAIL };
+    return { ok: false, error: ACCOUNT_BAN_USER_MESSAGES.detail };
   }
   return { ok: true };
 }

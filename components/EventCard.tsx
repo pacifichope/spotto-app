@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MapPinIcon, SportIcon } from '@/components/icons';
@@ -8,8 +9,11 @@ import {
   formatLocationLabel,
   isEventCancelled,
   isEventPast,
+  levelLabel,
+  sportLabel,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 
 type EventCardProps = {
   event: SportEvent;
@@ -28,23 +32,26 @@ export default function EventCard({
   onClose,
   onJoin,
 }: EventCardProps) {
+  const { t } = useTranslation();
   if (!event?.id) return null;
   const ended = isEventPast(event);
   const cancelled = isEventCancelled(event);
   const closed = ended || cancelled;
   const sportTint = categoryColor(event.sport);
-  const title = String(event.title || '').trim() || '無題のイベント';
+  const title =
+    localizedEventTitle(event).trim() || t('events.untitled');
   const sport = String(event.sport || '').trim() || 'その他';
-  const level = String(event.level || '').trim() || '誰でも歓迎';
+  const sportText = sportLabel(sport);
+  const levelText = levelLabel(event.level);
   let scheduleFull = '';
   let locationLabel = '';
   try {
     scheduleFull = formatEventSchedule(event).full;
     locationLabel =
-      formatLocationLabel(event.location, event.locationNote) || '場所未設定';
+      formatLocationLabel(event.location, event.locationNote) || t('events.locationUnset');
   } catch {
-    scheduleFull = String(event.time || '').trim() || '日程未定';
-    locationLabel = '場所未設定';
+    scheduleFull = String(event.time || '').trim() || t('events.scheduleUndecided');
+    locationLabel = t('events.locationUnset');
   }
   const spotsLeft = eventSpotsLeft({
     capacity: Math.max(1, Math.floor(Number(event.capacity) || 1)),
@@ -69,11 +76,11 @@ export default function EventCard({
           <View style={styles.listTopRow}>
             <View style={[styles.sportChip, { backgroundColor: `${sportTint}14` }]}>
               <Text style={[styles.sportChipText, { color: sportTint }]}>
-                {sport}
+                {sportText}
               </Text>
             </View>
             <View style={styles.levelChip}>
-              <Text style={styles.levelChipText}>{level}</Text>
+              <Text style={styles.levelChipText}>{levelText}</Text>
             </View>
           </View>
           <Text style={styles.title} numberOfLines={1}>
@@ -91,10 +98,10 @@ export default function EventCard({
           <View style={styles.listFooter}>
             <Text style={[styles.spots, closed && styles.spotsMuted]}>
               {cancelled
-                ? '中止'
+                ? t('events.lifecycle.cancelled')
                 : ended
-                  ? '開催終了'
-                  : `残り ${spotsLeft} 席`}
+                  ? t('events.lifecycle.ended')
+                  : t('events.spotsLeft', { count: spotsLeft })}
             </Text>
             {onJoin && (
               <Pressable
@@ -110,7 +117,11 @@ export default function EventCard({
                 accessibilityState={{ disabled: closed }}
               >
                 <Text style={[styles.joinText, closed && styles.joinTextEnded]}>
-                  {cancelled ? '中止' : ended ? '開催終了' : '参加する'}
+                  {cancelled
+                    ? t('events.lifecycle.cancelled')
+                    : ended
+                      ? t('events.lifecycle.ended')
+                      : t('events.joinAction')}
                 </Text>
               </Pressable>
             )}
@@ -131,12 +142,14 @@ export default function EventCard({
           {title}
         </Text>
         <Text style={styles.metaSchedule} numberOfLines={1}>
-          {sport} · {level}
+          {sportText} · {levelText}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
           {scheduleFull} · {locationLabel}
         </Text>
-        <Text style={styles.spots}>残り {spotsLeft} 席</Text>
+        <Text style={styles.spots}>
+          {t('events.spotsLeft', { count: spotsLeft })}
+        </Text>
       </View>
 
       <View style={styles.sheetActions}>
@@ -159,7 +172,11 @@ export default function EventCard({
             accessibilityState={{ disabled: closed }}
           >
             <Text style={[styles.joinText, closed && styles.joinTextEnded]}>
-              {cancelled ? '中止' : ended ? '開催終了' : '参加する'}
+              {cancelled
+                    ? t('events.lifecycle.cancelled')
+                    : ended
+                      ? t('events.lifecycle.ended')
+                      : t('events.joinAction')}
             </Text>
           </Pressable>
         )}

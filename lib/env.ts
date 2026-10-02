@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { NativeModules, Platform } from 'react-native';
+import i18n from '@/lib/i18n';
 
 const PLACEHOLDER_PREFIX = 'YOUR_';
 const DEFAULT_API_PORT = 8787;
@@ -403,10 +404,10 @@ export function apiConnectionErrorMessage(url: string, error: unknown) {
     error instanceof Error && error.message ? error.message : String(error);
   if (__DEV__) {
     return (
-      `決済サーバーに接続できませんでした。` +
-      `URL=${url} / error=${detail}。` +
-      `実機／EAS では EXPO_PUBLIC_API_BASE_URL_REMOTE（本番 HTTPS）を設定してください。`
+      `${i18n.t('payment.errorServerUnreachable')} ` +
+      `URL=${url} / error=${detail}. ` +
+      `Set EXPO_PUBLIC_API_BASE_URL_REMOTE (production HTTPS) for device/EAS builds.`
     );
   }
-  return '決済サーバーに接続できませんでした。時間をおいて再度お試しください。';
+  return i18n.t('payment.errorServerUnreachable');
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Keyboard,
@@ -62,6 +63,7 @@ export default function PhoneVerificationModal({
   requestOtp,
   confirmOtp,
 }: PhoneVerificationModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const phoneInputRef = useRef<TextInput>(null);
   const codeInputRef = useRef<TextInput>(null);
@@ -144,7 +146,7 @@ export default function PhoneVerificationModal({
         ? phoneE164 || phoneValidation.e164 || phoneDigits
         : phoneValidation.e164 || phoneDigits;
       if (!fromResend && (!phoneValidation.isComplete || !phoneValidation.e164)) {
-        setError('電話番号を正しく入力してください。');
+        setError(t('auth.phone.errorInvalidInput'));
         return;
       }
 
@@ -156,7 +158,7 @@ export default function PhoneVerificationModal({
           setError(
             formatPhoneAuthError(
               extractPhoneAuthErrorRaw(err),
-              '本人確認の準備に失敗しました。',
+              t('auth.phone.errorPrepareFailed'),
             ),
           );
           return;
@@ -167,7 +169,7 @@ export default function PhoneVerificationModal({
       if (!result.ok || !result.phoneE164) {
         setError(
           result.ok
-            ? '送信に失敗しました。'
+            ? t('auth.phone.errorSendFailed')
             : formatPhoneAuthError(result.error),
         );
         return;
@@ -183,7 +185,7 @@ export default function PhoneVerificationModal({
       setError(
         formatPhoneAuthError(
           extractPhoneAuthErrorRaw(err),
-          '認証コードの送信中にエラーが発生しました。',
+          t('auth.phone.errorSendUnexpected'),
         ),
       );
     } finally {
@@ -201,7 +203,7 @@ export default function PhoneVerificationModal({
         setError(
           formatPhoneAuthError(
             result.error,
-            '認証コードが正しくありません。',
+            t('auth.phone.errorCodeInvalid'),
           ),
         );
         autoVerifyRef.current = '';
@@ -213,7 +215,7 @@ export default function PhoneVerificationModal({
         setError(
           formatPhoneAuthError(
             extractPhoneAuthErrorRaw(err),
-            '認証結果の保存に失敗しました。再度お試しください。',
+            t('auth.phone.errorSaveFailed'),
           ),
         );
         autoVerifyRef.current = '';
@@ -223,7 +225,7 @@ export default function PhoneVerificationModal({
       setError(
         formatPhoneAuthError(
           extractPhoneAuthErrorRaw(err),
-          '認証の確認中にエラーが発生しました。',
+          t('auth.phone.errorVerifyUnexpected'),
         ),
       );
     } finally {
@@ -288,14 +290,18 @@ export default function PhoneVerificationModal({
             ]}
           >
             <View style={styles.handle} />
-            <Text style={styles.kicker}>本人確認</Text>
+            <Text style={styles.kicker}>{t('auth.phone.kicker')}</Text>
             <Text style={styles.title}>
-              {step === 'phone' ? '電話番号を入力' : '認証コードを入力'}
+              {step === 'phone'
+                ? t('auth.phone.titlePhone')
+                : t('auth.phone.titleCode')}
             </Text>
             <Text style={styles.body}>
               {step === 'phone'
-                ? 'SMSで届く6桁のコードで本人確認します。国番号は初期設定で日本（+81）です。'
-                : `${formatPhoneDisplay(phoneE164)} に送信した6桁のコードを入力してください。`}
+                ? t('auth.phone.bodyPhone')
+                : t('auth.phone.bodyCode', {
+                    phone: formatPhoneDisplay(phoneE164),
+                  })}
             </Text>
 
             {step === 'phone' ? (
@@ -322,7 +328,7 @@ export default function PhoneVerificationModal({
                   style={styles.otpWrap}
                   onPress={() => codeInputRef.current?.focus()}
                   accessibilityRole="button"
-                  accessibilityLabel="認証コード入力欄"
+                  accessibilityLabel={t('auth.phone.otpFieldLabel')}
                 >
                   {Array.from({ length: OTP_LEN }).map((_, i) => {
                     const char = code[i] ?? '';
@@ -363,11 +369,11 @@ export default function PhoneVerificationModal({
                     maxLength={OTP_LEN}
                     caretHidden
                     editable={!submitting}
-                    accessibilityLabel="認証コード6桁"
+                    accessibilityLabel={t('auth.phone.otpInputLabel')}
                   />
                 </Pressable>
                 <Text style={styles.otpAssist}>
-                  6桁そろうと自動で認証します
+                  {t('auth.phone.otpAssist')}
                 </Text>
               </>
             )}
@@ -383,12 +389,12 @@ export default function PhoneVerificationModal({
                 onPress={() => void sendCode(false)}
                 disabled={!canSend || submitting}
                 accessibilityRole="button"
-                accessibilityLabel="認証コードを送る"
+                accessibilityLabel={t('auth.phone.sendCode')}
               >
                 {submitting ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitText}>認証コードを送る</Text>
+                  <Text style={styles.submitText}>{t('auth.phone.sendCode')}</Text>
                 )}
               </Pressable>
             ) : (
@@ -401,12 +407,12 @@ export default function PhoneVerificationModal({
                   onPress={() => void verifyCode(code)}
                   disabled={!canVerify || submitting}
                   accessibilityRole="button"
-                  accessibilityLabel="認証する"
+                  accessibilityLabel={t('auth.phone.verify')}
                 >
                   {submitting ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.submitText}>認証して続ける</Text>
+                    <Text style={styles.submitText}>{t('auth.phone.verifyContinue')}</Text>
                   )}
                 </Pressable>
 
@@ -422,9 +428,9 @@ export default function PhoneVerificationModal({
                     }}
                     disabled={submitting}
                     accessibilityRole="button"
-                    accessibilityLabel="電話番号をやり直す"
+                    accessibilityLabel={t('auth.phone.changeNumberLabel')}
                   >
-                    <Text style={styles.secondaryText}>番号を変更</Text>
+                    <Text style={styles.secondaryText}>{t('auth.phone.changeNumber')}</Text>
                   </Pressable>
 
                   <Pressable
@@ -435,7 +441,7 @@ export default function PhoneVerificationModal({
                     }}
                     disabled={submitting || resendSec > 0}
                     accessibilityRole="button"
-                    accessibilityLabel="認証コードを再送信"
+                    accessibilityLabel={t('auth.phone.resendLabel')}
                   >
                     <Text
                       style={[
@@ -444,8 +450,8 @@ export default function PhoneVerificationModal({
                       ]}
                     >
                       {resendSec > 0
-                        ? `再送信（${resendSec}秒）`
-                        : 'コードを再送信'}
+                        ? t('auth.phone.resendWait', { sec: resendSec })
+                        : t('auth.phone.resend')}
                     </Text>
                   </Pressable>
                 </View>
@@ -460,9 +466,9 @@ export default function PhoneVerificationModal({
                 }}
                 disabled={submitting}
                 accessibilityRole="button"
-                accessibilityLabel="あとで"
+                accessibilityLabel={t('auth.phone.later')}
               >
-                <Text style={styles.guestText}>あとで</Text>
+                <Text style={styles.guestText}>{t('auth.phone.later')}</Text>
               </Pressable>
             )}
 

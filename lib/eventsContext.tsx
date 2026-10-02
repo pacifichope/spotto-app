@@ -29,6 +29,7 @@ import {
     findNgWordInCreatePayload,
     NG_WORD_ERROR_MESSAGE,
 } from '@/lib/ngWords';
+import i18n, { getCurrentAppLanguage } from '@/lib/i18n';
 
 import type { EventAttendee } from '@/lib/attendees';
 import { isRemoteEventId } from '@/lib/chatsRemote';
@@ -64,6 +65,7 @@ import {
     resolveAuthUserId,
     updateRemoteHostProfileFields,
 } from '@/lib/eventsRemote';
+import { requestEventTranslation } from '@/lib/eventTranslateRemote';
 import {
     loadFavoriteEventIds,
     saveFavoriteEventIds,
@@ -851,7 +853,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
                 error: remote.error,
               });
             }
-            showNetworkErrorAlert(remote.error, 'お気に入りの更新に失敗しました');
+            showNetworkErrorAlert(
+              remote.error,
+              i18n.t('events.favoriteFailedTitle'),
+            );
             return currently;
           }
         } catch (error) {
@@ -862,7 +867,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
               error,
             });
           }
-          showNetworkErrorAlert(error, 'お気に入りの更新に失敗しました');
+          showNetworkErrorAlert(error, i18n.t('events.favoriteFailedTitle'));
           return currently;
         }
       }
@@ -894,13 +899,13 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             persistWatchlist(previous);
             showNetworkErrorAlert(
               remote.error,
-              '空き通知の更新に失敗しました',
+              i18n.t('events.watchFailedTitle'),
             );
             return currently;
           }
         } catch (error) {
           persistWatchlist(previous);
-          showNetworkErrorAlert(error, '空き通知の更新に失敗しました');
+          showNetworkErrorAlert(error, i18n.t('events.watchFailedTitle'));
           return currently;
         }
       }
@@ -962,7 +967,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
                 eventId: id,
                 error: remote.error,
               });
-              showNetworkErrorAlert(remote.error, '参加の更新に失敗しました');
+              showNetworkErrorAlert(
+                remote.error,
+                i18n.t('errors.joinUpdateFailed'),
+              );
               return 'unchanged';
             }
           } else if (next.result === 'joined') {
@@ -974,7 +982,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
                 eventId: id,
                 error: remote.error,
               });
-              showNetworkErrorAlert(remote.error, '参加の登録に失敗しました');
+              showNetworkErrorAlert(
+                remote.error,
+                i18n.t('errors.joinRegisterFailed'),
+              );
               return 'unchanged';
             }
           }
@@ -986,7 +997,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
                 ? { message: error.message, stack: error.stack }
                 : error,
           });
-          showNetworkErrorAlert(error, '参加の更新に失敗しました');
+          showNetworkErrorAlert(error, i18n.t('errors.joinUpdateFailed'));
           return 'unchanged';
         } finally {
           setEventsSaving(false);
@@ -1098,7 +1109,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         if (isSupabaseConfigured()) {
           const remote = await cancelRemoteEvent(eventId, reason);
           if (!remote.ok) {
-            showNetworkErrorAlert(remote.error, 'イベントの中止に失敗しました');
+            showNetworkErrorAlert(
+              remote.error,
+              i18n.t('errors.eventCancelFailed'),
+            );
             return null;
           }
           const nextEvent = remote.data;
@@ -1142,7 +1156,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         });
         return nextEvent;
       } catch (error) {
-        showNetworkErrorAlert(error, 'イベントの中止に失敗しました');
+        showNetworkErrorAlert(error, i18n.t('errors.eventCancelFailed'));
         return null;
       } finally {
         setEventsSaving(false);
@@ -1314,7 +1328,41 @@ export function EventsProvider({ children }: { children: ReactNode }) {
               },
             ];
           }
-    return next;
+          return next;
+        });
+
+        // 翻訳は作成成功後にバックグラウンド実行（失敗しても公開は維持）
+        const createdIds = created.map((item) => item.id);
+        void requestEventTranslation({
+          eventIds: createdIds,
+          title: payload.title,
+          description: payload.description,
+          sourceLang: getCurrentAppLanguage(),
+        }).then((translated) => {
+          if (!translated.ok) {
+            if (__DEV__) {
+              console.warn('[events] translate skipped/failed', translated.error);
+            }
+            return;
+          }
+          const idSet = new Set(translated.updatedIds);
+          setEvents((prev) => {
+            const nextEvents = prev.map((item) => {
+              if (!idSet.has(item.id)) return item;
+              return {
+                ...item,
+                sourceLang: translated.sourceLang,
+                titleJa: translated.titleJa || item.titleJa,
+                titleEn: translated.titleEn || item.titleEn,
+                descriptionJa: translated.descriptionJa || item.descriptionJa,
+                descriptionEn: translated.descriptionEn || item.descriptionEn,
+                translatedAt: new Date().toISOString(),
+              };
+            });
+            eventsRef.current = nextEvents;
+            persistHostedEvents(nextEvents, hostedIdsRef.current);
+            return nextEvents;
+          });
         });
 
         return { ok: true, event: primary, events: created };

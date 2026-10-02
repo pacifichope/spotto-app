@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { theme } from '@/constants/theme';
-import { LEGAL_DOC_META } from '@/lib/legalDocuments';
+import { legalDocTitle } from '@/lib/legalDocuments';
 import {
   openLegalDocument,
   type LegalDocumentId,
@@ -13,23 +14,22 @@ export default function LegalDocumentView({
 }: {
   document: LegalDocumentId;
 }) {
-  const title = LEGAL_DOC_META[document]?.title ?? '法的文書';
+  const { t } = useTranslation();
+  const title = legalDocTitle(document);
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.body}>
-        外部ブラウザで最新の内容をご確認ください。
-      </Text>
+      <Text style={styles.body}>{t('legal.externalHint')}</Text>
       <Pressable
         style={styles.button}
         onPress={() => {
           void openLegalDocument(document);
         }}
         accessibilityRole="link"
-        accessibilityLabel={`${title}を開く`}
+        accessibilityLabel={t('legal.openA11y', { title })}
       >
-        <Text style={styles.buttonText}>ブラウザで開く</Text>
+        <Text style={styles.buttonText}>{t('legal.openInBrowser')}</Text>
       </Pressable>
     </View>
   );

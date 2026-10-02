@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 import HostAvatar, { type AvatarGender } from '@/components/HostAvatar';
@@ -28,6 +29,7 @@ export default function AttendeeAvatarWithBadges({
   showHostBadge = false,
   quantityBadgeMin = 2,
 }: AttendeeAvatarWithBadgesProps) {
+  const { t } = useTranslation();
   const qty = attendeeTicketQuantity(attendee);
   const showQty = qty >= quantityBadgeMin;
   const qtyLabel = qty > 99 ? '99+' : String(qty);
@@ -44,12 +46,12 @@ export default function AttendeeAvatarWithBadges({
       />
       {showHostBadge && !showQty ? (
         <View style={styles.hostBadge} pointerEvents="none">
-          <Text style={styles.hostBadgeText}>主催</Text>
+          <Text style={styles.hostBadgeText}>{t('events.hostBadge')}</Text>
         </View>
       ) : null}
       {showHostBadge && showQty ? (
         <View style={styles.hostBadgeTop} pointerEvents="none">
-          <Text style={styles.hostBadgeText}>主催</Text>
+          <Text style={styles.hostBadgeText}>{t('events.hostBadge')}</Text>
         </View>
       ) : null}
       {showQty ? (

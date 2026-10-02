@@ -1,5 +1,7 @@
 import { Linking, Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
+
 export type SnsKind = 'instagram' | 'x' | 'line' | 'web';
 
 export type SnsLink = {
@@ -10,13 +12,19 @@ export type SnsLink = {
 
 export const SNS_KIND_OPTIONS: {
   kind: SnsKind;
-  label: string;
+  readonly label: string;
   color: string;
 }[] = [
   { kind: 'instagram', label: 'Instagram', color: '#E1306C' },
   { kind: 'x', label: 'X', color: '#000000' },
   { kind: 'line', label: 'LINE', color: '#06C755' },
-  { kind: 'web', label: 'Webサイト', color: '#0EA5E9' },
+  {
+    kind: 'web',
+    get label() {
+      return i18n.t('organizer.snsWeb');
+    },
+    color: '#0EA5E9',
+  },
 ];
 
 const LEGACY_SNS_KINDS = new Set(['youtube', 'facebook']);

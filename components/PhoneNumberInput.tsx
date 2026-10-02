@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FlatList,
   Modal,
@@ -16,7 +17,7 @@ import { theme } from '@/constants/theme';
 import {
   DEFAULT_PHONE_COUNTRY,
   filterPhoneCountries,
-  formatPhoneCountryLabel,
+  PHONE_COUNTRIES,
   type PhoneCountry,
 } from '@/lib/phoneCountries';
 import {
@@ -49,6 +50,26 @@ type PhoneNumberInputProps = {
 /**
  * 国番号セレクター + 国内番号入力（Firebase Auth 風のシンプル UI）
  */
+/** 端末の Intl.DisplayNames が使えるときだけ現在言語の国名を返す（失敗時は英語名） */
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+function localizedCountryName(country: PhoneCountry, language: string) {
+  if (language.startsWith('en')) return country.nameEn;
+  try {
+    let names = displayNamesCache.get(language);
+    if (names === undefined) {
+      names =
+        typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+          ? new Intl.DisplayNames([language], { type: 'region' })
+          : null;
+      displayNamesCache.set(language, names);
+    }
+    return names?.of(country.iso2) || country.nameEn;
+  } catch {
+    return country.nameEn;
+  }
+}
+
 export default function PhoneNumberInput({
   value,
   country,
@@ -59,6 +80,8 @@ export default function PhoneNumberInput({
   inputRef,
   onSubmitEditing,
 }: PhoneNumberInputProps) {
+  const { t, i18n } = useTranslation();
+  const language = i18n.language;
   const insets = useSafeAreaInsets();
   const localRef = useRef<TextInput>(null);
   const searchRef = useRef<TextInput>(null);
@@ -68,16 +91,27 @@ export default function PhoneNumberInput({
 
   const validation = useMemo(
     () => validatePhoneInput(value, country),
-    [value, country],
+    // language: ヒント文言の再計算用
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [value, country, language],
   );
   const display = useMemo(
     () => formatNationalTyping(value, country),
     [value, country],
   );
-  const filteredCountries = useMemo(
-    () => filterPhoneCountries(search),
-    [search],
-  );
+  const filteredCountries = useMemo(() => {
+    const base = filterPhoneCountries(search);
+    const q = search.trim().toLowerCase();
+    if (!q || language.startsWith('en')) return base;
+    // 現在言語の国名でも検索できるようにする
+    const seen = new Set(base.map((c) => `${c.iso2}-${c.dialCode}`));
+    const extra = PHONE_COUNTRIES.filter(
+      (c) =>
+        !seen.has(`${c.iso2}-${c.dialCode}`) &&
+        localizedCountryName(c, language).toLowerCase().includes(q),
+    );
+    return extra.length > 0 ? [...base, ...extra] : base;
+  }, [search, language]);
 
   const maxFormattedLen =
     country.maxDigits + Math.max(0, country.groups.length - 1);
@@ -121,7 +155,9 @@ export default function PhoneNumberInput({
           }}
           disabled={!editable}
           accessibilityRole="button"
-          accessibilityLabel={`Country code +${country.dialCode}. Tap to change`}
+          accessibilityLabel={t('auth.phoneInput.countryCodeLabel', {
+            dial: country.dialCode,
+          })}
         >
           <Text style={styles.countryDial}>+{country.dialCode}</Text>
           <Text style={styles.countryCaret}>▾</Text>
@@ -136,7 +172,7 @@ export default function PhoneNumberInput({
           onChangeText={(text) => {
             onChangeDigits(sanitizeNationalDigits(text, country));
           }}
-          placeholder="Phone number"
+          placeholder={t('auth.phoneInput.placeholder')}
           placeholderTextColor={theme.colors.textMuted}
           keyboardType="number-pad"
           inputMode="numeric"
@@ -148,7 +184,7 @@ export default function PhoneNumberInput({
           onSubmitEditing={onSubmitEditing}
           editable={editable}
           autoFocus={autoFocus}
-          accessibilityLabel="Phone number"
+          accessibilityLabel={t('auth.phoneInput.placeholder')}
         />
       </View>
 
@@ -176,14 +212,18 @@ export default function PhoneNumberInput({
           >
             <View style={styles.pickerHandle} />
             <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>Select country</Text>
+              <Text style={styles.pickerTitle}>
+                {t('auth.phoneInput.selectCountry')}
+              </Text>
               <Pressable
                 onPress={closePicker}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('auth.phoneInput.close')}
               >
-                <Text style={styles.pickerClose}>Done</Text>
+                <Text style={styles.pickerClose}>
+                  {t('auth.phoneInput.done')}
+                </Text>
               </Pressable>
             </View>
 
@@ -193,12 +233,12 @@ export default function PhoneNumberInput({
                 style={styles.searchInput}
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search country or code"
+                placeholder={t('auth.phoneInput.searchPlaceholder')}
                 placeholderTextColor={theme.colors.textMuted}
                 autoCorrect={false}
                 autoCapitalize="none"
                 clearButtonMode="while-editing"
-                accessibilityLabel="Search countries"
+                accessibilityLabel={t('auth.phoneInput.searchLabel')}
               />
             </View>
 
@@ -210,7 +250,9 @@ export default function PhoneNumberInput({
               initialNumToRender={24}
               windowSize={10}
               ListEmptyComponent={
-                <Text style={styles.emptySearch}>No countries found</Text>
+                <Text style={styles.emptySearch}>
+                  {t('auth.phoneInput.noResults')}
+                </Text>
               }
               renderItem={({ item }) => {
                 const selected = item.iso2 === country.iso2;
@@ -228,7 +270,7 @@ export default function PhoneNumberInput({
                     }}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={formatPhoneCountryLabel(item)}
+                    accessibilityLabel={`${localizedCountryName(item, language)} (+${item.dialCode})`}
                   >
                     <Text
                       style={[
@@ -237,7 +279,7 @@ export default function PhoneNumberInput({
                       ]}
                       numberOfLines={1}
                     >
-                      {item.nameEn}
+                      {localizedCountryName(item, language)}
                     </Text>
                     <Text
                       style={[

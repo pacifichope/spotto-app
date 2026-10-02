@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
@@ -15,6 +16,7 @@ export default function SettingsHeader({
   title,
   transparent = false,
 }: SettingsHeaderProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -39,7 +41,7 @@ export default function SettingsHeader({
         hitSlop={12}
         style={styles.side}
         accessibilityRole="button"
-        accessibilityLabel="戻る"
+        accessibilityLabel={t('common.back')}
       >
         <SymbolView
           name={{

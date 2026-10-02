@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useTranslation } from 'react-i18next';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { ChatIcon } from '@/components/icons';
@@ -11,6 +12,7 @@ import { useChats } from '@/lib/chatsContext';
 import { useHomeBrowse } from '@/lib/homeBrowseContext';
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   const { isReady, isLoggedIn } = useAuth();
   const { unreadCount } = useChats();
   const { resetToCurrentLocation } = useHomeBrowse();
@@ -44,7 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'ホーム',
+          title: t('tabs.home'),
           headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView
@@ -70,7 +72,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: 'メッセージ',
+          title: t('tabs.messages'),
           headerShown: false,
           tabBarBadge: messagesBadge,
           tabBarBadgeStyle: {
@@ -99,7 +101,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="mypage"
         options={{
-          title: 'マイページ',
+          title: t('tabs.mypage'),
           headerShown: false,
           tabBarIcon: ({ color }) => (
             <SymbolView

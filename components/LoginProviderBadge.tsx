@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import {
   AppleLogoMark,
@@ -16,10 +17,14 @@ type LoginProviderBadgeProps = {
 export default function LoginProviderBadge({
   provider,
 }: LoginProviderBadgeProps) {
+  const { t } = useTranslation();
   const label = loginMethodLabel(provider);
 
   return (
-    <View style={styles.row} accessibilityLabel={`ログイン方法 ${label}`}>
+    <View
+      style={styles.row}
+      accessibilityLabel={t('auth.loginMethodA11y', { label })}
+    >
       <View style={styles.iconWrap}>
         {provider === 'line' ? (
           <View style={[styles.badge, styles.lineBadge]}>

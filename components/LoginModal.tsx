@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +21,7 @@ import {
   showAccountBannedAlert,
 } from '@/lib/accountBan';
 import {
-  AUTH_REASON_COPY,
+  getAuthReasonCopy,
   type AuthReason,
   type AuthResult,
   type SocialProvider,
@@ -48,6 +49,7 @@ export default function LoginModal({
   onClose,
   onSocialSignIn,
 }: LoginModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
 
@@ -56,7 +58,7 @@ export default function LoginModal({
     setSubmitting(false);
   }, [visible, reason]);
 
-  const copy = reason ? AUTH_REASON_COPY[reason] : null;
+  const copy = reason ? getAuthReasonCopy(reason) : null;
 
   const submitSocial = async (provider: SocialProvider) => {
     if (submitting) return;
@@ -72,7 +74,7 @@ export default function LoginModal({
         showAccountBannedAlert(message);
         return;
       }
-      Alert.alert('ログインエラー', message);
+      Alert.alert(t('auth.loginErrorTitle'), message);
     };
     const uiGuard = setTimeout(() => {
       clearBusy();
@@ -115,10 +117,9 @@ export default function LoginModal({
           contentContainerStyle={styles.content}
         >
           <Text style={styles.kicker}>spotto</Text>
-          <Text style={styles.title}>{copy?.title ?? 'ログイン'}</Text>
+          <Text style={styles.title}>{copy?.title ?? t('auth.loginTitleDefault')}</Text>
           <Text style={styles.body}>
-            {copy?.body ??
-              'LINE・Google・Apple のいずれかのアカウントでログインできます。参加・送信・主催のときだけログインが必要です。'}
+            {copy?.body ?? t('auth.loginBodyDefault')}
           </Text>
 
           <SocialLoginButtons
@@ -129,7 +130,7 @@ export default function LoginModal({
           {submitting ? (
             <View style={styles.busyRow}>
               <ActivityIndicator color={theme.colors.primaryDark} />
-              <Text style={styles.busyText}>認証中…</Text>
+              <Text style={styles.busyText}>{t('auth.authenticating')}</Text>
             </View>
           ) : null}
 
@@ -139,9 +140,9 @@ export default function LoginModal({
             onPress={onClose}
             style={styles.guestBtn}
             accessibilityRole="button"
-            accessibilityLabel="今は閲覧だけ続ける"
+            accessibilityLabel={t('auth.keepBrowsing')}
           >
-            <Text style={styles.guestText}>今は閲覧だけ続ける</Text>
+            <Text style={styles.guestText}>{t('auth.keepBrowsing')}</Text>
           </Pressable>
         </ScrollView>
       </View>

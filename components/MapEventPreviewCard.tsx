@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Image,
   Platform,
@@ -23,9 +24,12 @@ import {
   eventPreviewUris,
   formatEventSchedule,
   formatLocationLabel,
+  levelLabel,
   sportFallbackUri,
+  sportLabel,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { eventPriceYen, formatYenAmount, isPaidEvent } from '@/lib/payments';
 
 type MapEventPreviewCardProps = {
@@ -41,6 +45,7 @@ export default function MapEventPreviewCard({
   onClose,
   onOpenDetail,
 }: MapEventPreviewCardProps) {
+  const { t } = useTranslation();
   const translateY = useSharedValue(120);
   const opacity = useSharedValue(0);
 
@@ -83,22 +88,23 @@ export default function MapEventPreviewCard({
 
   const thumb =
     eventPreviewUris(event, 1)[0] ?? sportFallbackUri(event.sport) ?? null;
-  let when = '日程未定';
-  let where = '場所未設定';
+  let when = t('events.scheduleUndecided');
+  let where = t('events.locationUnset');
   try {
     when = formatEventSchedule(event).full || when;
     where =
       formatLocationLabel(event.location, event.locationNote) || where;
   } catch {
     when = String(event.time || '').trim() || when;
-    where = '場所未設定';
+    where = t('events.locationUnset');
   }
   const priceLabel = isPaidEvent(event)
     ? formatYenAmount(eventPriceYen(event))
-    : '無料';
-  const title = String(event.title || '').trim() || '無題のイベント';
-  const sport = String(event.sport || '').trim() || 'その他';
-  const level = String(event.level || '').trim() || '誰でも歓迎';
+    : t('events.free');
+  const title =
+    localizedEventTitle(event).trim() || t('events.untitled');
+  const sportText = sportLabel(event.sport);
+  const levelText = levelLabel(event.level);
 
   return (
     <View
@@ -114,7 +120,7 @@ export default function MapEventPreviewCard({
             onPress={dismiss}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('common.close')}
           >
             <Text style={styles.closeText}>✕</Text>
           </Pressable>
@@ -123,7 +129,7 @@ export default function MapEventPreviewCard({
             style={styles.body}
             onPress={() => onOpenDetail(event)}
             accessibilityRole="button"
-            accessibilityLabel={`${title}の詳細を見る`}
+            accessibilityLabel={t('events.viewDetailsFor', { title })}
           >
             <View style={styles.thumb}>
               {thumb ? (
@@ -143,7 +149,7 @@ export default function MapEventPreviewCard({
 
             <View style={styles.info}>
               <Text style={styles.sport} numberOfLines={1}>
-                {sport} · {level}
+                {sportText} · {levelText}
               </Text>
               <Text style={styles.title} numberOfLines={2}>
                 {title}
@@ -168,10 +174,10 @@ export default function MapEventPreviewCard({
             <Pressable
               onPress={() => onOpenDetail(event)}
               accessibilityRole="button"
-              accessibilityLabel="詳細を見る"
+              accessibilityLabel={t('events.viewDetails')}
             >
               <BrandGradient style={styles.detailBtn}>
-                <Text style={styles.detailBtnText}>詳細を見る</Text>
+                <Text style={styles.detailBtnText}>{t('events.viewDetails')}</Text>
               </BrandGradient>
             </Pressable>
           </View>

@@ -1,3 +1,4 @@
+import i18n from '@/lib/i18n';
 import { MY_ORGANIZER_ID } from '@/lib/organizerProfile';
 
 export type EventAttendee = {
@@ -277,7 +278,7 @@ export function attendeeFromViewer(
       : undefined;
   return {
     id: user.id,
-    name: profile.name.trim() || user.name?.trim() || 'アカウント',
+    name: profile.name.trim() || user.name?.trim() || i18n.t('events.accountFallback'),
     imageUri: profile.imageUri ?? user.imageUri,
     gender,
     clubIds,
@@ -292,12 +293,13 @@ export function seedAttendees(
   const count = Math.max(0, Math.floor(Number(event.joinedCount) || 0));
   if (count === 0) return [];
 
-  const hostName = String(event.host || '').trim() || '主催者';
+  const hostName =
+    String(event.host || '').trim() || i18n.t('events.host');
   const host: EventAttendee = {
     id: eventHostAttendeeId({ ...event, host: hostName }),
     name: hostName,
     imageUri: event.hostImageUri,
-    bio: `${hostName} として、この回の雰囲気づくりをしています。`,
+    bio: i18n.t('events.hostBioSeed', { name: hostName }),
     clubIds: hostClubId ? [hostClubId] : undefined,
   };
 
@@ -325,8 +327,8 @@ export function seedAttendees(
     const n = others.length + 2;
     others.push({
       id: `${event.id}-plus-${n}`,
-      name: `参加者${n}`,
-      bio: 'スポーツを楽しむために参加しています。',
+      name: i18n.t('events.attendeeSeedName', { n }),
+      bio: i18n.t('events.attendeeSeedBio'),
       clubIds: hostClubId ? [hostClubId] : undefined,
     });
   }
@@ -368,7 +370,11 @@ export function attendeePreviewLabel(attendees: EventAttendee[], maxNames = 3) {
   if (attendees.length === 0) return '';
   const names = attendees
     .slice(0, maxNames)
-    .map((person) => (person.self ? '自分' : person.name));
-  if (attendees.length <= maxNames) return names.join('、');
-  return `${names.join('、')} ほか${attendees.length - maxNames}人`;
+    .map((person) => (person.self ? i18n.t('events.attendeeSelf') : person.name));
+  const separator = i18n.t('events.attendeeSeparator');
+  if (attendees.length <= maxNames) return names.join(separator);
+  return i18n.t('events.attendeePreviewMore', {
+    names: names.join(separator),
+    count: attendees.length - maxNames,
+  });
 }

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { APP_DISPLAY_NAME, getAppVersion } from '@/lib/settings';
 import { getSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
@@ -23,8 +24,10 @@ export type SubmitReportResult =
 
 export type ReportChannel = 'supabase' | 'api' | 'slack' | 'console';
 
-export const REPORT_SUCCESS_MESSAGE =
-  'ご報告ありがとうございます。運営チームで確認いたします。';
+/** 通報完了メッセージ（呼び出し時に現在の言語で解決） */
+export function getReportSuccessMessage() {
+  return i18n.t('safety.reportSuccess');
+}
 
 const PLACEHOLDER_PREFIX = 'YOUR_';
 
@@ -159,7 +162,7 @@ async function insertReportToSupabase(
 ): Promise<{ ok: true; reportId: string } | { ok: false; error: string }> {
   const client = getSupabaseClient();
   if (!client) {
-    return { ok: false, error: 'データベースに接続できません。' };
+    return { ok: false, error: i18n.t('errors.reportDbUnavailable') };
   }
 
   let reporterId = payload.reporterUserId;
@@ -167,7 +170,7 @@ async function insertReportToSupabase(
     reporterId = (await resolveAuthUserId()) || '';
   }
   if (!reporterId) {
-    return { ok: false, error: '通報するにはログインが必要です。' };
+    return { ok: false, error: i18n.t('errors.reportLoginRequired') };
   }
 
   const row = {
@@ -197,13 +200,12 @@ async function insertReportToSupabase(
     ) {
       return {
         ok: false,
-        error:
-          '通報テーブルが未作成です。apply_reports.sql を適用してください。',
+        error: i18n.t('errors.reportTableMissing'),
       };
     }
     return {
       ok: false,
-      error: '通報の保存に失敗しました。時間をおいて再度お試しください。',
+      error: i18n.t('errors.reportSaveFailed'),
     };
   }
 
@@ -254,14 +256,14 @@ export async function submitUserReport(
   });
 
   if (!payload.targetUserId || !payload.reason) {
-    return { ok: false, error: '通報内容が不足しています。' };
+    return { ok: false, error: i18n.t('errors.reportMissingFields') };
   }
   if (
     payload.targetType === 'user' &&
     authUserId &&
     payload.targetUserId === authUserId
   ) {
-    return { ok: false, error: '自分自身は通報できません。' };
+    return { ok: false, error: i18n.t('errors.reportSelf') };
   }
 
   const channel = getReportChannel();
@@ -304,8 +306,7 @@ export async function submitUserReport(
     }
     return {
       ok: false,
-      error:
-        '送信できませんでした。通信環境を確認して、もう一度お試しください。',
+      error: i18n.t('errors.reportSendFailed'),
     };
   }
 }

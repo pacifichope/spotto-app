@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +38,7 @@ import type { ChatMessage, EventChatMode } from '@/lib/chats';
 import { formatChatBubbleTime, isSeededMessage } from '@/lib/chats';
 import { useChats } from '@/lib/chatsContext';
 import { eventPreviewUris, type SportEvent } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { useEvents } from '@/lib/eventsContext';
 import { clubIdFromEvent } from '@/lib/clubs';
 import { clubHref } from '@/lib/clubNavigation';
@@ -68,6 +70,7 @@ export default function ChatRoomScreen({
   onBack,
   onOpenEvent,
 }: ChatRoomScreenProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -116,8 +119,8 @@ export default function ChatRoomScreen({
     hiddenIds,
     hostId,
   );
-  const title = event.title;
-  const subtitle = mode === 'host' ? event.host : 'グループチャット';
+  const title = localizedEventTitle(event);
+  const subtitle = mode === 'host' ? event.host : t('chat.groupChat');
   const coverUri = eventPreviewUris(event, 1)[0];
   const messagingLocked = mode === 'host' && hostBlocked && !ownEvent;
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -228,10 +231,7 @@ export default function ChatRoomScreen({
     const next = text.trim();
     if (!next || messagingLocked || sending) return;
     if (mode === 'host' && !dmUserId) {
-      Alert.alert(
-        '送信できません',
-        'メッセージの相手が特定できません。メッセージ一覧から会話を開き直してください。',
-      );
+      Alert.alert(t('chat.cannotSendTitle'), t('chat.cannotSendBody'));
       return;
     }
     const deliver = () => {
@@ -247,7 +247,7 @@ export default function ChatRoomScreen({
             hostUserId: event.hostId,
           });
           if (!result.ok) {
-            Alert.alert('送信に失敗しました', result.error);
+            Alert.alert(t('chat.sendFailedTitle'), result.error);
             setDraft(next);
             return;
           }
@@ -257,10 +257,7 @@ export default function ChatRoomScreen({
         } catch (error) {
           console.error('[chat] send threw', error);
           setDraft(next);
-          Alert.alert(
-            '送信に失敗しました',
-            '接続を確認して再度お試しください。',
-          );
+          Alert.alert(t('chat.sendFailedTitle'), t('chat.checkConnection'));
         } finally {
           setSending(false);
         }
@@ -287,8 +284,8 @@ export default function ChatRoomScreen({
     const senderId = resolveSenderId(item);
     const fallbackName =
       item.role === 'me'
-        ? displayName || item.name || userProfile.name || '自分'
-        : item.name.trim() || 'ユーザー';
+        ? displayName || item.name || userProfile.name || t('chat.me')
+        : item.name.trim() || t('chat.user');
     const fallbackImage =
       item.role === 'me'
         ? userProfile.imageUri || item.imageUri
@@ -310,8 +307,8 @@ export default function ChatRoomScreen({
         return;
       }
       Alert.alert(
-        'プロフィールを開けません',
-        '送信者を特定できませんでした。',
+        t('chat.profileOpenFailedTitle'),
+        t('chat.profileOpenFailedBody'),
       );
       return;
     }
@@ -334,7 +331,7 @@ export default function ChatRoomScreen({
       try {
         const result = await fetchPublicProfileByUserId(senderId);
         if (!result.ok) {
-          Alert.alert('プロフィールを取得できませんでした', result.error);
+          Alert.alert(t('chat.profileFetchFailedTitle'), result.error);
           return;
         }
         const remote = result.data;
@@ -351,8 +348,8 @@ export default function ChatRoomScreen({
       } catch (error) {
         console.warn('[chat] openSenderProfile failed', error);
         Alert.alert(
-          'プロフィールを取得できませんでした',
-          '時間をおいて再度お試しください。',
+          t('chat.profileFetchFailedTitle'),
+          t('chat.tryAgainLater'),
         );
       } finally {
         setProfileLoading(false);
@@ -370,10 +367,10 @@ export default function ChatRoomScreen({
 
   const confirmDeleteMessage = (item: ChatMessage) => {
     if (!canDeleteMessage(item) || deletingId) return;
-    Alert.alert('メッセージを削除', 'このメッセージを削除しますか？', [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(t('chat.deleteTitle'), t('chat.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: '削除',
+        text: t('chat.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -383,13 +380,13 @@ export default function ChatRoomScreen({
                 dmUserId,
               });
               if (!result.ok) {
-                Alert.alert('削除に失敗しました', result.error);
+                Alert.alert(t('chat.deleteFailedTitle'), result.error);
               }
             } catch (error) {
               console.error('[chat] delete threw', error);
               Alert.alert(
-                '削除に失敗しました',
-                '接続を確認して再度お試しください。',
+                t('chat.deleteFailedTitle'),
+                t('chat.checkConnection'),
               );
             } finally {
               setDeletingId(null);
@@ -417,8 +414,8 @@ export default function ChatRoomScreen({
     Alert.alert(
       title,
       mode === 'host'
-        ? '主催者との個別チャットです。'
-        : '参加者限定のグループチャットです。送信者の名前やアイコンをタップするとプロフィールが開きます。',
+        ? t('chat.menuHostInfo')
+        : t('chat.menuGroupInfo'),
     );
   };
 
@@ -437,7 +434,7 @@ export default function ChatRoomScreen({
           hitSlop={12}
           style={styles.headerBtn}
           accessibilityRole="button"
-          accessibilityLabel="戻る"
+          accessibilityLabel={t('chat.back')}
         >
           <SymbolView
             name={{
@@ -457,7 +454,7 @@ export default function ChatRoomScreen({
             pressed && styles.headerTitleHitPressed,
           ]}
           accessibilityRole="link"
-          accessibilityLabel={`${event.title}の詳細を開く`}
+          accessibilityLabel={t('chat.openEventLabel', { title })}
         >
           <View
             style={[
@@ -505,7 +502,7 @@ export default function ChatRoomScreen({
           hitSlop={12}
           style={styles.headerBtn}
           accessibilityRole="button"
-          accessibilityLabel="メニュー"
+          accessibilityLabel={t('chat.menu')}
         >
           <SymbolView
             name={{
@@ -523,7 +520,7 @@ export default function ChatRoomScreen({
       {messagingLocked ? (
         <View style={styles.blockBanner}>
           <Text style={styles.blockBannerText}>
-            この主催者をブロックしています。メッセージは非表示です。
+            {t('chat.blockedBanner')}
           </Text>
           <Pressable
             onPress={() =>
@@ -533,9 +530,9 @@ export default function ChatRoomScreen({
             }
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="ブロックを解除"
+            accessibilityLabel={t('chat.unblockLabel')}
           >
-            <Text style={styles.blockBannerAction}>解除</Text>
+            <Text style={styles.blockBannerAction}>{t('chat.unblock')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -558,7 +555,7 @@ export default function ChatRoomScreen({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         ListEmptyComponent={
-          <Text style={styles.emptyHint}>メッセージはまだありません</Text>
+          <Text style={styles.emptyHint}>{t('chat.empty')}</Text>
         }
         renderItem={({ item }) => {
           const mine = item.role === 'me';
@@ -575,7 +572,9 @@ export default function ChatRoomScreen({
                 <Pressable
                   onPress={() => openSenderProfile(item)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${item.name}のプロフィールを開く`}
+                  accessibilityLabel={t('chat.openProfileLabel', {
+                    name: item.name,
+                  })}
                 >
                   <Text style={styles.author}>{item.name}</Text>
                 </Pressable>
@@ -583,7 +582,7 @@ export default function ChatRoomScreen({
                 <Pressable
                   onPress={() => openSenderProfile(item)}
                   accessibilityRole="button"
-                  accessibilityLabel="自分のプロフィールを開く"
+                  accessibilityLabel={t('chat.openOwnProfileLabel')}
                 >
                   <Text style={styles.authorMine}>{item.name}</Text>
                 </Pressable>
@@ -597,7 +596,9 @@ export default function ChatRoomScreen({
                 <Pressable
                   onPress={() => openSenderProfile(item)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${mine ? '自分' : item.name}のプロフィールを開く`}
+                  accessibilityLabel={t('chat.openProfileLabel', {
+                    name: mine ? t('chat.me') : item.name,
+                  })}
                   hitSlop={6}
                 >
                   <HostAvatar
@@ -626,7 +627,7 @@ export default function ChatRoomScreen({
                   {mine && timeLabel ? (
                     <Text
                       style={styles.bubbleTime}
-                      accessibilityLabel={`送信時刻 ${timeLabel}`}
+                      accessibilityLabel={t('chat.sentAtLabel', { time: timeLabel })}
                     >
                       {timeLabel}
                     </Text>
@@ -649,7 +650,7 @@ export default function ChatRoomScreen({
                   {!mine && timeLabel ? (
                     <Text
                       style={styles.bubbleTime}
-                      accessibilityLabel={`送信時刻 ${timeLabel}`}
+                      accessibilityLabel={t('chat.sentAtLabel', { time: timeLabel })}
                     >
                       {timeLabel}
                     </Text>
@@ -680,12 +681,12 @@ export default function ChatRoomScreen({
                     ]}
                     disabled={deletingId === item.id}
                     accessibilityRole="button"
-                    accessibilityLabel="メッセージを削除"
+                    accessibilityLabel={t('chat.deleteMessageLabel')}
                   >
                     {deletingId === item.id ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.deleteActionText}>削除</Text>
+                      <Text style={styles.deleteActionText}>{t('chat.delete')}</Text>
                     )}
                   </Pressable>
                 </View>
@@ -719,7 +720,7 @@ export default function ChatRoomScreen({
           ]}
         >
           <Text style={styles.lockedText}>
-            ブロック中のため、メッセージは送れません
+            {t('chat.lockedBar')}
           </Text>
         </View>
       ) : (
@@ -737,9 +738,9 @@ export default function ChatRoomScreen({
         <Pressable
           style={styles.circleBtn}
           onPress={() =>
-            Alert.alert('音声メッセージ', '音声入力はこのあと追加予定です。')
+            Alert.alert(t('chat.voiceTitle'), t('chat.voiceSoon'))
           }
-          accessibilityLabel="音声メッセージ"
+          accessibilityLabel={t('chat.voiceTitle')}
         >
           <SymbolView
             name={{ ios: 'mic', android: 'mic', web: 'mic' }}
@@ -752,7 +753,7 @@ export default function ChatRoomScreen({
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="メッセージ"
+          placeholder={t('chat.placeholder')}
           placeholderTextColor={theme.colors.textMuted}
           returnKeyType="send"
           onSubmitEditing={() => send()}
@@ -762,7 +763,7 @@ export default function ChatRoomScreen({
         <Pressable
           style={styles.iconBtn}
           onPress={() => setEmojiOpen((open) => !open)}
-          accessibilityLabel="絵文字"
+          accessibilityLabel={t('chat.emoji')}
         >
           <SymbolView
             name={{
@@ -780,21 +781,21 @@ export default function ChatRoomScreen({
             style={[styles.sendBtn, sending && styles.sendBtnDisabled]}
             onPress={() => send()}
             disabled={sending}
-            accessibilityLabel="送信"
+            accessibilityLabel={t('chat.send')}
           >
             {sending ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={styles.sendText}>送信</Text>
+              <Text style={styles.sendText}>{t('chat.send')}</Text>
             )}
           </Pressable>
         ) : (
           <Pressable
             style={styles.circleBtn}
             onPress={() =>
-              Alert.alert('添付', '写真やファイルの添付はこのあと追加予定です。')
+              Alert.alert(t('chat.attachTitle'), t('chat.attachSoon'))
             }
-            accessibilityLabel="添付"
+            accessibilityLabel={t('chat.attachTitle')}
           >
             <SymbolView
               name={{

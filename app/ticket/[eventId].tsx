@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Pressable,
@@ -24,8 +25,11 @@ import {
   getEventLifecycleStatus,
   isEventCancelled,
   isEventPast,
+  levelLabel,
+  sportLabel,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { useEvents } from '@/lib/eventsContext';
 import { eventPriceYen, formatYenAmount, isPaidEvent } from '@/lib/payments';
 import { userDisplayName } from '@/lib/userProfile';
@@ -45,6 +49,7 @@ function formatBookedAt(iso: string | null | undefined) {
 }
 
 export default function TicketScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { eventId: eventIdParam } = useLocalSearchParams<{
@@ -70,7 +75,7 @@ export default function TicketScreen() {
   const [event, setEvent] = useState<SportEvent | null>(fromList);
   const [ticket, setTicket] = useState<MyParticipantTicket | null>(null);
   const [loading, setLoading] = useState(!fromList);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     setEvent(fromList);
@@ -82,7 +87,7 @@ export default function TicketScreen() {
 
     void (async () => {
       setLoading(true);
-      setLoadError(null);
+      setLoadFailed(false);
 
       let nextEvent = fromList;
       if (!nextEvent) {
@@ -101,7 +106,7 @@ export default function TicketScreen() {
 
       setLoading(false);
       if (!nextEvent) {
-        setLoadError('イベント情報を取得できませんでした。');
+        setLoadFailed(true);
       }
     })();
 
@@ -118,7 +123,7 @@ export default function TicketScreen() {
   const reserverName =
     userDisplayName(userProfile) ||
     user?.name?.trim() ||
-    '参加者';
+    t('ticket.participantFallback');
   const ticketQty = Math.max(
     1,
     ticket?.ticketQuantity || payment?.ticketQuantity || 1,
@@ -128,12 +133,12 @@ export default function TicketScreen() {
   const lifecycle = event ? getEventLifecycleStatus(event) : 'upcoming';
   const statusLabel =
     lifecycle === 'cancelled'
-      ? '中止'
+      ? t('events.lifecycle.cancelled')
       : lifecycle === 'ended'
-        ? '開催終了'
+        ? t('events.lifecycle.ended')
         : joined
-          ? '参加確定'
-          : '未参加';
+          ? t('ticket.statusJoined')
+          : t('ticket.statusNotJoined');
   const bookedAt = formatBookedAt(ticket?.createdAt);
 
   const close = () => {
@@ -148,7 +153,7 @@ export default function TicketScreen() {
     return (
       <View style={[styles.root, styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator color={theme.colors.primary} />
-        <Text style={styles.hint}>チケットを読み込んでいます…</Text>
+        <Text style={styles.hint}>{t('ticket.loading')}</Text>
       </View>
     );
   }
@@ -156,13 +161,14 @@ export default function TicketScreen() {
   if (!event) {
     return (
       <View style={[styles.root, styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.missingTitle}>チケットが見つかりません</Text>
+        <Text style={styles.missingTitle}>{t('ticket.notFoundTitle')}</Text>
         <Text style={styles.hint}>
-          {loadError ||
-            'イベントが削除されたか、この端末ではまだ表示できません。'}
+          {loadFailed
+            ? t('ticket.loadFailed')
+            : t('ticket.notFoundBody')}
         </Text>
         <Pressable style={styles.secondaryBtn} onPress={close}>
-          <Text style={styles.secondaryBtnText}>戻る</Text>
+          <Text style={styles.secondaryBtnText}>{t('common.back')}</Text>
         </Pressable>
       </View>
     );
@@ -171,18 +177,18 @@ export default function TicketScreen() {
   if (!joined) {
     return (
       <View style={[styles.root, styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.missingTitle}>参加予約がありません</Text>
+        <Text style={styles.missingTitle}>{t('ticket.noReservationTitle')}</Text>
         <Text style={styles.hint}>
-          このイベントへの参加が確認できませんでした。
+          {t('ticket.noReservationBody')}
         </Text>
         <Pressable
           style={styles.secondaryBtn}
           onPress={() => router.replace(`/event/${event.id}`)}
         >
-          <Text style={styles.secondaryBtnText}>イベント詳細へ</Text>
+          <Text style={styles.secondaryBtnText}>{t('ticket.toEventDetail')}</Text>
         </Pressable>
         <Pressable style={styles.textLink} onPress={close}>
-          <Text style={styles.textLinkLabel}>戻る</Text>
+          <Text style={styles.textLinkLabel}>{t('common.back')}</Text>
         </Pressable>
       </View>
     );
@@ -195,11 +201,11 @@ export default function TicketScreen() {
           onPress={close}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel="閉じる"
+          accessibilityLabel={t('common.close')}
         >
-          <Text style={styles.headerClose}>閉じる</Text>
+          <Text style={styles.headerClose}>{t('common.close')}</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>参加チケット</Text>
+        <Text style={styles.headerTitle}>{t('ticket.title')}</Text>
         <View style={styles.headerSide} />
       </View>
 
@@ -211,7 +217,7 @@ export default function TicketScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.lead}>
-          当日はこの画面を主催者に提示してください
+          {t('ticket.lead')}
         </Text>
 
         <View style={styles.ticket}>
@@ -223,22 +229,22 @@ export default function TicketScreen() {
           </BrandGradient>
 
           <View style={styles.ticketBody}>
-            <Text style={styles.eventTitle}>{event.title}</Text>
+            <Text style={styles.eventTitle}>{localizedEventTitle(event)}</Text>
             <Text style={styles.sportLine}>
-              {event.emoji} {event.sport}
-              {event.level ? ` · ${event.level}` : ''}
+              {event.emoji} {sportLabel(event.sport)}
+              {event.level ? ` · ${levelLabel(event.level)}` : ''}
             </Text>
 
             <View style={styles.divider} />
 
-            <Text style={styles.fieldLabel}>日時</Text>
+            <Text style={styles.fieldLabel}>{t('ticket.fieldDateTime')}</Text>
             <Text style={styles.fieldValue}>
               {schedule?.full || `${event.date} ${event.time}`}
             </Text>
 
             {location ? (
               <>
-                <Text style={styles.fieldLabel}>場所</Text>
+                <Text style={styles.fieldLabel}>{t('ticket.fieldLocation')}</Text>
                 <View style={styles.locationRow}>
                   <MapPinIcon size={16} color={theme.colors.primaryDark} />
                   <Text style={styles.fieldValueFlex}>{location}</Text>
@@ -246,30 +252,32 @@ export default function TicketScreen() {
               </>
             ) : null}
 
-            <Text style={styles.fieldLabel}>予約者</Text>
+            <Text style={styles.fieldLabel}>{t('ticket.fieldReserver')}</Text>
             <Text style={styles.fieldValue}>{reserverName}</Text>
 
-            <Text style={styles.fieldLabel}>枚数</Text>
-            <Text style={styles.fieldValue}>{ticketQty} 枚</Text>
+            <Text style={styles.fieldLabel}>{t('ticket.fieldQuantity')}</Text>
+            <Text style={styles.fieldValue}>
+              {t('ticket.quantityValue', { count: ticketQty })}
+            </Text>
 
             {isPaidEvent(event) ? (
               <>
-                <Text style={styles.fieldLabel}>参加費</Text>
+                <Text style={styles.fieldLabel}>{t('ticket.fieldFee')}</Text>
                 <Text style={styles.fieldValue}>
                   {formatYenAmount(eventPriceYen(event) * ticketQty)}
-                  {payment?.status === 'refunded' ? '（返金済）' : ''}
+                  {payment?.status === 'refunded' ? t('ticket.refundedSuffix') : ''}
                 </Text>
               </>
             ) : (
               <>
-                <Text style={styles.fieldLabel}>参加費</Text>
-                <Text style={styles.fieldValue}>無料</Text>
+                <Text style={styles.fieldLabel}>{t('ticket.fieldFee')}</Text>
+                <Text style={styles.fieldValue}>{t('events.free')}</Text>
               </>
             )}
 
             {bookedAt ? (
               <>
-                <Text style={styles.fieldLabel}>予約日時</Text>
+                <Text style={styles.fieldLabel}>{t('ticket.fieldBookedAt')}</Text>
                 <Text style={styles.fieldValue}>{bookedAt}</Text>
               </>
             ) : null}
@@ -277,8 +285,8 @@ export default function TicketScreen() {
             {(isEventPast(event) || isEventCancelled(event)) && (
               <Text style={styles.pastNote}>
                 {isEventCancelled(event)
-                  ? 'このイベントは中止されました。'
-                  : 'このイベントは終了しています。'}
+                  ? t('ticket.noteCancelled')
+                  : t('ticket.noteEnded')}
               </Text>
             )}
           </View>
@@ -288,9 +296,9 @@ export default function TicketScreen() {
           style={styles.secondaryBtn}
           onPress={() => router.push(`/event/${event.id}`)}
           accessibilityRole="button"
-          accessibilityLabel="イベント詳細を開く"
+          accessibilityLabel={t('ticket.openEventA11y')}
         >
-          <Text style={styles.secondaryBtnText}>イベント詳細を見る</Text>
+          <Text style={styles.secondaryBtnText}>{t('ticket.viewEventDetail')}</Text>
         </Pressable>
       </ScrollView>
     </View>

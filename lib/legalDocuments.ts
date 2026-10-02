@@ -1,3 +1,5 @@
+import i18n from '@/lib/i18n';
+
 export type LegalDocSection = {
   id: string;
   title: string;
@@ -9,24 +11,55 @@ export type LegalDocumentId = 'terms' | 'privacy' | 'tokushoho';
 
 export const LEGAL_UPDATED_AT = '2026-09-21';
 
+const LEGAL_TITLE_KEYS: Record<LegalDocumentId, string> = {
+  terms: 'settings.terms',
+  privacy: 'settings.privacy',
+  tokushoho: 'settings.tokushoho',
+};
+
+/** UI 表示用タイトル（呼び出し時に現在言語で解決） */
+export function legalDocTitle(document: LegalDocumentId): string {
+  return i18n.t(LEGAL_TITLE_KEYS[document], {
+    defaultValue: i18n.t('legal.fallbackTitle'),
+  });
+}
+
+/** UI 表示用イントロ */
+export function legalDocIntro(document: LegalDocumentId): string {
+  return i18n.t(`legal.intro.${document}`);
+}
+
+/**
+ * 互換: タイトル／イントロは実行時に言語解決されるゲッター付き。
+ * セクション本文は法的文書の原文（日本語）を維持。
+ */
 export const LEGAL_DOC_META: Record<
   LegalDocumentId,
   { title: string; intro: string }
 > = {
   terms: {
-    title: '利用規約',
-    intro:
-      '本利用規約（以下「本規約」）は、spotto（以下「本サービス」）の利用条件を定めるものです。本サービスをご利用いただく際は、本規約に同意したものとみなします。',
+    get title() {
+      return legalDocTitle('terms');
+    },
+    get intro() {
+      return legalDocIntro('terms');
+    },
   },
   privacy: {
-    title: 'プライバシーポリシー',
-    intro:
-      'spotto（以下「当社」）は、本サービスの提供にあたり取得する個人情報の取扱いについて、以下のとおりプライバシーポリシーを定めます。',
+    get title() {
+      return legalDocTitle('privacy');
+    },
+    get intro() {
+      return legalDocIntro('privacy');
+    },
   },
   tokushoho: {
-    title: '特定商取引法に基づく表記',
-    intro:
-      '特定商取引法に基づき、以下の事項を明示します。販売条件・キャンセル・返金についてはイベントごとの表示および本ページの内容をご確認ください。',
+    get title() {
+      return legalDocTitle('tokushoho');
+    },
+    get intro() {
+      return legalDocIntro('tokushoho');
+    },
   },
 };
 

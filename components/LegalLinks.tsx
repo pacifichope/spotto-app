@@ -1,4 +1,5 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { theme } from '@/constants/theme';
 import { LEGAL_EXTERNAL_URLS } from '@/lib/settings';
@@ -21,8 +22,11 @@ function openTokushoho() {
 }
 
 export function LegalConsentNote({ variant }: LegalConsentNoteProps) {
+  const { t } = useTranslation();
   const prefix =
-    variant === 'signup' ? '登録することで、' : '続行することで、';
+    variant === 'signup'
+      ? t('auth.legal.signupPrefix')
+      : t('auth.legal.continuePrefix');
 
   return (
     <Text style={styles.note}>
@@ -31,52 +35,53 @@ export function LegalConsentNote({ variant }: LegalConsentNoteProps) {
         style={styles.link}
         onPress={openTerms}
         accessibilityRole="link"
-        accessibilityLabel="利用規約"
+        accessibilityLabel={t('auth.legal.terms')}
       >
-        利用規約
+        {t('auth.legal.terms')}
       </Text>
-      および
+      {t('auth.legal.and')}
       <Text
         style={styles.link}
         onPress={openPrivacy}
         accessibilityRole="link"
-        accessibilityLabel="プライバシーポリシー"
+        accessibilityLabel={t('auth.legal.privacy')}
       >
-        プライバシーポリシー
+        {t('auth.legal.privacy')}
       </Text>
-      に同意したものとみなします
+      {t('auth.legal.suffix')}
     </Text>
   );
 }
 
 export function LegalLinksRow() {
+  const { t } = useTranslation();
   return (
     <View style={styles.row} accessibilityRole="text">
       <Pressable
         onPress={openTerms}
         hitSlop={8}
         accessibilityRole="link"
-        accessibilityLabel="利用規約"
+        accessibilityLabel={t('auth.legal.terms')}
       >
-        <Text style={styles.rowLink}>利用規約</Text>
+        <Text style={styles.rowLink}>{t('auth.legal.terms')}</Text>
       </Pressable>
       <Text style={styles.dot}>·</Text>
       <Pressable
         onPress={openPrivacy}
         hitSlop={8}
         accessibilityRole="link"
-        accessibilityLabel="プライバシーポリシー"
+        accessibilityLabel={t('auth.legal.privacy')}
       >
-        <Text style={styles.rowLink}>プライバシー</Text>
+        <Text style={styles.rowLink}>{t('auth.legal.privacyShort')}</Text>
       </Pressable>
       <Text style={styles.dot}>·</Text>
       <Pressable
         onPress={openTokushoho}
         hitSlop={8}
         accessibilityRole="link"
-        accessibilityLabel="特定商取引法に基づく表記"
+        accessibilityLabel={t('auth.legal.tokushoho')}
       >
-        <Text style={styles.rowLink}>特商法表記</Text>
+        <Text style={styles.rowLink}>{t('auth.legal.tokushohoShort')}</Text>
       </Pressable>
     </View>
   );

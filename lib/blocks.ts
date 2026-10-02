@@ -1,5 +1,6 @@
 import { Alert, Platform } from 'react-native';
 
+import i18n from '@/lib/i18n';
 import { hostUserIdFromName, type EventAttendee } from '@/lib/attendees';
 import type { ChatMessage } from '@/lib/chats';
 import { MY_ORGANIZER_ID } from '@/lib/organizerProfile';
@@ -270,7 +271,7 @@ export async function insertBlockInSupabase(
   const client = getSupabaseClient();
   const myId = await currentAuthUserId();
   if (!client || !myId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   const blockedId = input.id.trim();
@@ -302,7 +303,7 @@ export async function deleteBlockInSupabase(
   const client = getSupabaseClient();
   const myId = await currentAuthUserId();
   if (!client || !myId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
 
   const { error } = await client
@@ -319,9 +320,8 @@ export async function deleteBlockInSupabase(
 }
 
 export function confirmBlockUser(name: string, onConfirm: () => void) {
-  const title = `${name}さんをブロックしますか？`;
-  const message =
-    'ブロックすると、今後お互いのイベントやメッセージ、参加者一覧に表示されなくなります。設定画面からいつでも解除できます。';
+  const title = i18n.t('safety.blockTitle', { name });
+  const message = i18n.t('safety.blockMessage');
   if (Platform.OS === 'web') {
     if (
       typeof window !== 'undefined' &&
@@ -332,14 +332,18 @@ export function confirmBlockUser(name: string, onConfirm: () => void) {
     return;
   }
   Alert.alert(title, message, [
-    { text: 'キャンセル', style: 'cancel' },
-    { text: 'ブロックする', style: 'destructive', onPress: onConfirm },
+    { text: i18n.t('safety.cancel'), style: 'cancel' },
+    {
+      text: i18n.t('safety.blockConfirm'),
+      style: 'destructive',
+      onPress: onConfirm,
+    },
   ]);
 }
 
 export function confirmUnblockUser(name: string, onConfirm: () => void) {
-  const title = `${name} のブロックを解除しますか？`;
-  const message = '解除すると、この人のイベントやメッセージが再び表示されます。';
+  const title = i18n.t('safety.unblockTitle', { name });
+  const message = i18n.t('safety.unblockMessage');
   if (Platform.OS === 'web') {
     if (
       typeof window !== 'undefined' &&
@@ -350,7 +354,7 @@ export function confirmUnblockUser(name: string, onConfirm: () => void) {
     return;
   }
   Alert.alert(title, message, [
-    { text: 'キャンセル', style: 'cancel' },
-    { text: '解除する', onPress: onConfirm },
+    { text: i18n.t('safety.cancel'), style: 'cancel' },
+    { text: i18n.t('safety.unblockConfirm'), onPress: onConfirm },
   ]);
 }

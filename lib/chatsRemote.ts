@@ -1,4 +1,5 @@
 import type { ChatMessage, EventChatMode } from '@/lib/chats';
+import i18n from '@/lib/i18n';
 import { formatChatClock, parseChatMode } from '@/lib/chats';
 import { resolveAuthUserId } from '@/lib/eventsRemote';
 import { ensureFirebaseAuthenticatedClaim } from '@/lib/firebaseEnsureClaims';
@@ -53,7 +54,7 @@ export function rowToChatMessage(
   return {
     id: row.id,
     role: isMe ? 'me' : 'member',
-    name: row.sender_name || (isMe ? '自分' : '参加者'),
+    name: row.sender_name || (isMe ? i18n.t('chat.me') : i18n.t('chat.participant')),
     text: row.body,
     time: formatChatClock(Number.isFinite(at) ? at : Date.now()),
     at: Number.isFinite(at) ? at : Date.now(),
@@ -142,19 +143,11 @@ export function annotateHostRoles(
 
 function formatChatRemoteError(message: string | undefined, fallback: string) {
   const raw = String(message || '').trim() || fallback;
-  if (/row level security|rls|42501/i.test(raw)) {
-    return (
-      `${raw}\n\n` +
-      'sender_id が JWT sub と一致しているか、' +
-      'RLS が requesting_user_id() を使っているか確認してください。' +
-      ' SQL: supabase/apply_chat_messages_firebase_rls.sql'
-    );
-  }
-  if (/permission denied|jwt|authenticated/i.test(raw)) {
-    return (
-      `${raw}\n\n` +
-      'JWT に role: "authenticated" が必要です。ensure-claims を確認してください。'
-    );
+  if (/row level security|rls|42501|permission denied|jwt|authenticated/i.test(raw)) {
+    if (__DEV__) {
+      console.warn('[chatsRemote] permission/rls', raw);
+    }
+    return i18n.t('chat.permissionDenied');
   }
   return raw;
 }
@@ -196,18 +189,18 @@ export async function fetchChatMessages(input: {
     return { ok: false, error: 'remote unavailable' };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('chat.supabaseNotConfigured') };
 
   try {
     const auth = await resolveChatSenderId();
     if (!auth.tokenPresent || !auth.senderId) {
-      const error = 'ログインセッションを確認できません。再ログインしてください。';
+      const error = i18n.t('chat.sessionLost');
       logChatError('fetch', { error, eventId: input.eventId, mode: input.mode });
       return { ok: false, error };
     }
     if (!auth.hasAuthenticatedRole) {
       const error =
-        '認証トークンに role: "authenticated" がありません。API（ensure-claims）を確認してください。';
+        i18n.t('errors.authRoleMissing');
       logChatError('fetch', {
         error,
         eventId: input.eventId,
@@ -250,7 +243,7 @@ export async function fetchChatMessages(input: {
         ok: false,
         error: formatChatRemoteError(
           error.message,
-          'メッセージの取得に失敗しました',
+          i18n.t('chat.fetchFailed'),
         ),
       };
     }
@@ -284,7 +277,7 @@ export async function fetchChatMessages(input: {
       error:
         error instanceof Error
           ? error.message
-          : 'メッセージの取得に失敗しました',
+          : i18n.t('chat.fetchFailed'),
     };
   }
 }
@@ -343,18 +336,18 @@ export async function insertChatMessage(input: {
     return { ok: false, error: 'remote unavailable' };
   }
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('chat.supabaseNotConfigured') };
 
   const auth = await resolveChatSenderId();
   const senderId = auth.senderId || (await resolveAuthUserId());
   if (!senderId) {
-    const error = 'ログインが必要です';
+    const error = i18n.t('errors.loginRequired');
     logChatError('insert', { error, eventId: input.eventId });
     return { ok: false, error };
   }
   if (!auth.hasAuthenticatedRole) {
     const error =
-      '認証トークンに role: "authenticated" がありません。API（ensure-claims）を確認してください。';
+      i18n.t('errors.authRoleMissing');
     logChatError('insert', { error, eventId: input.eventId, senderId });
     return { ok: false, error };
   }
@@ -363,12 +356,12 @@ export async function insertChatMessage(input: {
   const dmUserId =
     mode === 'host' ? input.dmUserId?.trim() || null : null;
   if (mode === 'host' && !dmUserId) {
-    return { ok: false, error: 'DM の相手が特定できません' };
+    return { ok: false, error: i18n.t('chat.dmPeerUnknown') };
   }
 
   const body = input.body.trim();
   if (!body) {
-    return { ok: false, error: 'メッセージが空です' };
+    return { ok: false, error: i18n.t('chat.emptyMessage') };
   }
 
   const payload = {
@@ -376,7 +369,7 @@ export async function insertChatMessage(input: {
     mode,
     dm_user_id: dmUserId,
     sender_id: senderId,
-    sender_name: input.senderName.trim() || 'ユーザー',
+    sender_name: input.senderName.trim() || i18n.t('chat.user'),
     // ローカル file:// は保存しない（他端末で壊れる）
     sender_image_uri:
       resolvePublicImageUrl(input.senderImageUri) || null,
@@ -410,7 +403,7 @@ export async function insertChatMessage(input: {
         ok: false,
         error: formatChatRemoteError(
           error?.message,
-          'メッセージの送信に失敗しました',
+          i18n.t('chat.sendFailed'),
         ),
       };
     }
@@ -430,7 +423,7 @@ export async function insertChatMessage(input: {
       ok: false,
       error: formatChatRemoteError(
         error instanceof Error ? error.message : undefined,
-        'メッセージの送信に失敗しました',
+        i18n.t('chat.sendFailed'),
       ),
     };
   }
@@ -442,29 +435,29 @@ export async function deleteChatMessage(
 ): Promise<ChatsRemoteResult<void>> {
   const id = String(messageId || '').trim();
   if (!id) {
-    return { ok: false, error: 'メッセージ ID がありません' };
+    return { ok: false, error: i18n.t('chat.noMessageId') };
   }
   // ローカル仮 ID / シードはリモート削除不要
   if (!UUID_RE.test(id)) {
     return { ok: true, data: undefined };
   }
   if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase が未設定です' };
+    return { ok: false, error: i18n.t('chat.supabaseNotConfigured') };
   }
 
   const client = getSupabaseClient();
-  if (!client) return { ok: false, error: 'Supabase が未設定です' };
+  if (!client) return { ok: false, error: i18n.t('chat.supabaseNotConfigured') };
 
   const auth = await resolveChatSenderId();
   const senderId = auth.senderId || (await resolveAuthUserId());
   if (!senderId) {
-    return { ok: false, error: 'ログインが必要です' };
+    return { ok: false, error: i18n.t('errors.loginRequired') };
   }
   if (!auth.hasAuthenticatedRole) {
     return {
       ok: false,
       error:
-        '認証トークンに role: "authenticated" がありません。API（ensure-claims）を確認してください。',
+        i18n.t('errors.authRoleMissing'),
     };
   }
 
@@ -490,7 +483,7 @@ export async function deleteChatMessage(
         ok: false,
         error: formatChatRemoteError(
           error.message,
-          'メッセージの削除に失敗しました',
+          i18n.t('chat.deleteFailed'),
         ),
       };
     }
@@ -502,7 +495,7 @@ export async function deleteChatMessage(
       });
       return {
         ok: false,
-        error: '削除できるメッセージが見つかりません（自分の投稿のみ削除できます）',
+        error: i18n.t('chat.deleteNotFound'),
       };
     }
     return { ok: true, data: undefined };
@@ -516,7 +509,7 @@ export async function deleteChatMessage(
       error:
         error instanceof Error
           ? error.message
-          : 'メッセージの削除に失敗しました',
+          : i18n.t('chat.deleteFailed'),
     };
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Modal,
   Pressable,
@@ -21,7 +22,7 @@ import {
 } from '@/lib/events';
 
 const WEEKDAY_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
+const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const;
 const MONTH_EN = [
   'Jan',
   'Feb',
@@ -70,10 +71,6 @@ function parseStamp(stamp: string) {
 function formatTimeRange(time: string, endTime?: string) {
   if (!endTime) return time;
   return `${time} - ${endTime}`;
-}
-
-function monthTitle(year: number, monthIndex: number) {
-  return `${year}年${monthIndex + 1}月`;
 }
 
 function buildMonthCells(year: number, monthIndex: number) {
@@ -181,6 +178,7 @@ export default function EventScheduleSection({
   selectedEventId,
   onSelect,
 }: EventScheduleSectionProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const days = useMemo(() => {
     if (occurrenceEvents && occurrenceEvents.length > 0) {
@@ -303,7 +301,7 @@ export default function EventScheduleSection({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.sectionLabel}>活動時間</Text>
+      <Text style={styles.sectionLabel}>{t('events.schedule.sectionLabel')}</Text>
 
       <View style={styles.dateRow}>
         <ScrollView
@@ -360,7 +358,7 @@ export default function EventScheduleSection({
           onPress={() => setCalendarOpen(true)}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel="カレンダーで開催日を選ぶ"
+          accessibilityLabel={t('events.schedule.pickDateA11y')}
         >
           <Feather
             name="calendar"
@@ -406,14 +404,14 @@ export default function EventScheduleSection({
       >
         <View style={[styles.calModal, { paddingTop: insets.top || 12 }]}>
           <View style={styles.calHeader}>
-            <Text style={styles.calTitle}>開催日程</Text>
+            <Text style={styles.calTitle}>{t('events.schedule.calendarTitle')}</Text>
             <Pressable
               onPress={() => setCalendarOpen(false)}
               hitSlop={12}
               accessibilityRole="button"
-              accessibilityLabel="閉じる"
+              accessibilityLabel={t('common.close')}
             >
-              <Text style={styles.calClose}>閉じる</Text>
+              <Text style={styles.calClose}>{t('common.close')}</Text>
             </Pressable>
           </View>
 
@@ -430,35 +428,39 @@ export default function EventScheduleSection({
                 hitSlop={12}
                 style={styles.monthArrow}
                 accessibilityRole="button"
-                accessibilityLabel="前の月"
+                accessibilityLabel={t('events.schedule.prevMonth')}
               >
                 <Text style={styles.monthArrowText}>‹</Text>
               </Pressable>
               <Text style={styles.monthTitle}>
-                {monthTitle(year, monthIndex)}
+                {t('events.schedule.monthTitle', {
+                  year,
+                  month: monthIndex + 1,
+                  monthName: MONTH_EN[monthIndex] ?? '',
+                })}
               </Text>
               <Pressable
                 onPress={goNextMonth}
                 hitSlop={12}
                 style={styles.monthArrow}
                 accessibilityRole="button"
-                accessibilityLabel="次の月"
+                accessibilityLabel={t('events.schedule.nextMonth')}
               >
                 <Text style={styles.monthArrowText}>›</Text>
               </Pressable>
             </View>
 
             <View style={styles.weekRow}>
-              {WEEKDAY_JA.map((day, index) => (
+              {WEEKDAY_INDEXES.map((index) => (
                 <Text
-                  key={day}
+                  key={index}
                   style={[
                     styles.weekLabel,
                     index === 0 && styles.sunday,
                     index === 6 && styles.saturday,
                   ]}
                 >
-                  {day}
+                  {t(`events.weekdayShort.${index}`)}
                 </Text>
               ))}
             </View>
@@ -483,9 +485,16 @@ export default function EventScheduleSection({
                     disabled={!hasEvent}
                     accessibilityRole="button"
                     accessibilityState={{ selected, disabled: !hasEvent }}
-                    accessibilityLabel={`${monthIndex + 1}月${day}日${
-                      hasEvent ? '（開催あり）' : ''
-                    }`}
+                    accessibilityLabel={t(
+                      hasEvent
+                        ? 'events.schedule.dayA11yWithEvent'
+                        : 'events.schedule.dayA11y',
+                      {
+                        month: monthIndex + 1,
+                        monthName: MONTH_EN[monthIndex] ?? '',
+                        day,
+                      },
+                    )}
                   >
                     <View
                       style={[
@@ -523,7 +532,7 @@ export default function EventScheduleSection({
             </View>
 
             <Text style={styles.calHint}>
-              ● の日付がこのイベントの開催日です。タップして選択できます。
+              {t('events.schedule.calendarHint')}
             </Text>
           </ScrollView>
         </View>

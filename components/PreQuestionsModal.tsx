@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Modal,
@@ -43,6 +44,7 @@ export default function PreQuestionsModal({
   onClose,
   onSave,
 }: PreQuestionsModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<PreQuestion[]>([]);
   const questionsRef = useRef(questions);
@@ -78,8 +80,8 @@ export default function PreQuestionsModal({
   const addQuestion = () => {
     if (draft.length >= MAX_PRE_QUESTIONS) {
       Alert.alert(
-        '質問は最大15問まで',
-        'これ以上追加できません。不要な質問を削除してください。',
+        t('create.preQuestions.maxTitle', { count: MAX_PRE_QUESTIONS }),
+        t('create.preQuestions.maxBody'),
       );
       return;
     }
@@ -139,11 +141,11 @@ export default function PreQuestionsModal({
       <View style={[styles.root, { paddingTop: insets.top || 8 }]}>
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
-            <Text style={styles.cancel}>閉じる</Text>
+            <Text style={styles.cancel}>{t('common.close')}</Text>
           </Pressable>
-          <Text style={styles.title}>事前質問</Text>
+          <Text style={styles.title}>{t('create.preQuestions.title')}</Text>
           <Pressable onPress={handleDone} hitSlop={12} style={styles.headerSideRight}>
-            <Text style={styles.done}>完了</Text>
+            <Text style={styles.done}>{t('common.done')}</Text>
           </Pressable>
         </View>
 
@@ -153,17 +155,16 @@ export default function PreQuestionsModal({
           contentContainerStyle={styles.content}
           bottomGap={Math.max(insets.bottom, 24)}
         >
-          <Text style={styles.kicker}>追加の質問</Text>
-          <Text style={styles.lead}>
-            氏名・電話番号などの基本情報はアカウントから自動取得されます。ここではイベント固有の質問（例:
-            初心者ですか？ / 希望ポジション）だけを自由記述や選択式で追加してください。
-          </Text>
+          <Text style={styles.kicker}>{t('create.preQuestions.kicker')}</Text>
+          <Text style={styles.lead}>{t('create.preQuestions.lead')}</Text>
 
           {draft.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>質問はまだありません</Text>
+              <Text style={styles.emptyTitle}>
+                {t('create.preQuestions.emptyTitle')}
+              </Text>
               <Text style={styles.emptyBody}>
-                「質問を追加」から、このイベントだけの確認事項を作成できます。
+                {t('create.preQuestions.emptyBody')}
               </Text>
             </View>
           ) : null}
@@ -171,7 +172,9 @@ export default function PreQuestionsModal({
           {draft.map((question, index) => (
             <View key={question.id} style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>質問 {index + 1}</Text>
+                <Text style={styles.cardTitle}>
+                  {t('create.preQuestions.cardTitle', { index: index + 1 })}
+                </Text>
                 <View style={styles.cardHeaderRight}>
                   <Switch
                     value={question.enabled}
@@ -189,14 +192,14 @@ export default function PreQuestionsModal({
                     onPress={() => removeQuestion(question.id)}
                     hitSlop={8}
                   >
-                    <Text style={styles.delete}>削除</Text>
+                    <Text style={styles.delete}>{t('common.delete')}</Text>
                   </Pressable>
                 </View>
               </View>
 
               <TextInput
                 style={styles.titleInput}
-                placeholder="質問を入力（例: 希望ポジションは？）"
+                placeholder={t('create.preQuestions.titlePlaceholder')}
                 placeholderTextColor={MUTED}
                 value={question.title}
                 onChangeText={(title) => updateQuestion(question.id, { title })}
@@ -217,7 +220,9 @@ export default function PreQuestionsModal({
                           active && styles.typeChipTextActive,
                         ]}
                       >
-                        {item.label}
+                        {t(`create.preQuestions.types.${item.value}`, {
+                          defaultValue: item.label,
+                        })}
                       </Text>
                     </Pressable>
                   );
@@ -236,7 +241,9 @@ export default function PreQuestionsModal({
                       </Text>
                       <TextInput
                         style={styles.optionInput}
-                        placeholder={`選択肢 ${optionIndex + 1}`}
+                        placeholder={t('create.preQuestions.optionPlaceholder', {
+                          index: optionIndex + 1,
+                        })}
                         placeholderTextColor={MUTED}
                         value={option}
                         onChangeText={(value) =>
@@ -260,14 +267,16 @@ export default function PreQuestionsModal({
                       style={styles.addOption}
                       onPress={() => addOption(question.id)}
                     >
-                      <Text style={styles.addOptionText}>＋ 選択肢を追加</Text>
+                      <Text style={styles.addOptionText}>
+                        {t('create.preQuestions.addOption')}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>
               ) : (
                 <View style={styles.textPreview}>
                   <Text style={styles.textPreviewLabel}>
-                    参加者が自由に入力します
+                    {t('create.preQuestions.textPreview')}
                   </Text>
                 </View>
               )}
@@ -281,7 +290,9 @@ export default function PreQuestionsModal({
             ]}
             onPress={addQuestion}
           >
-            <Text style={styles.addQuestionText}>＋ 質問を追加</Text>
+            <Text style={styles.addQuestionText}>
+              {t('create.preQuestions.addQuestion')}
+            </Text>
           </Pressable>
         </KeyboardFormScrollView>
       </View>

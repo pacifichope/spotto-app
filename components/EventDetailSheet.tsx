@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Alert,
@@ -65,13 +66,17 @@ import { isRemoteEventId } from '@/lib/chatsRemote';
 import { clubHref } from '@/lib/clubNavigation';
 import { clubIdFromEvent, resolveClub } from '@/lib/clubs';
 import { useClubs } from '@/lib/clubsContext';
-import { CANCEL_CONFIRM_TITLE, cancelPolicyCardText, cancelPolicyTagLabel, eventContentBody, eventDisplayPhotoUris, eventEarliestStartAt, eventEndAt, eventForSelectedOccurrence, eventSpotsLeft, formatDeadlineLabel, formatEventSchedule, formatLocationLabel, isEventCancelled, isEventFull, isEventPast, isRefundWindowClosed, refundEligibleNotice, refundForfeitNotice, relatedScheduleEvents, sanitizeEventItems, sanitizeTargetAgeGroups, sessionFromEvent, shouldAutoRefundOnCancel, sportFallbackUri, type EventSession, type JoinActionResult, type SportEvent } from '@/lib/events';
+import { ageGroupLabel, cancelConfirmTitle, cancelPolicyCardText, cancelPolicyTagLabel, eventContentBody, eventDisplayPhotoUris, eventEarliestStartAt, eventEndAt, eventForSelectedOccurrence, eventSpotsLeft, formatDeadlineLabel, formatEventSchedule, formatLocationLabel, isEventCancelled, isEventFull, isEventPast, isRefundWindowClosed, levelLabel, parseCancelPolicyRule, refundEligibleNotice, refundForfeitNotice, relatedScheduleEvents, sanitizeEventItems, sanitizeTargetAgeGroups, sessionFromEvent, shouldAutoRefundOnCancel, sportFallbackUri, sportLabel, type EventSession, type JoinActionResult, type SportEvent } from '@/lib/events';
+import {
+  localizedEventDescription,
+  localizedEventTitle,
+} from '@/lib/eventLocalizedText';
 import { useEvents } from '@/lib/eventsContext';
 import {
     preferredPlaceName,
     resolveMeetingPlaceLabel,
 } from '@/lib/googlePlaces';
-import { confirmHostCancelEvent, HOST_CANCEL_CHAT_MESSAGE } from '@/lib/hostCancel';
+import { confirmHostCancelEvent, getHostCancelChatMessage } from '@/lib/hostCancel';
 import { notifyBookingEvent } from '@/lib/notify';
 import { ALLOW_JOIN_PAST_EVENTS } from '@/lib/devTestFlags';
 import { openEventInMaps } from '@/lib/openMaps';
@@ -114,6 +119,8 @@ export default function EventDetailSheet({
   onToggleJoin: _onToggleJoin,
   onOpenClub,
 }: EventDetailSheetProps) {
+  const { t, i18n } = useTranslation();
+  const CANCEL_CONFIRM_TITLE = cancelConfirmTitle();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { events, organizerProfile, now, recordEventPayment, eventPayment, markEventRefunded, cancelHostedEvent, favoriteIds, toggleFavorite, watchlistIds, toggleWatchlist, toggleCheckIn, checkedInIds, hostedIds, currentUserId, loadEventParticipants, participantsForEvent, eventsSaving, toggleJoin, joinedIds, isParticipating } = useEvents();
@@ -360,11 +367,22 @@ export default function EventDetailSheet({
   const priceYen = eventPriceYen(event);
   const paid = isPaidEvent(event);
   const contentBody = useMemo(
-    () => (event ? eventContentBody(event) : ''),
-    [event],
+    () =>
+      event
+        ? eventContentBody({
+            description: localizedEventDescription(event),
+          })
+        : '',
+    [event, i18n.language],
+  );
+  const displayTitle = useMemo(
+    () => (event ? localizedEventTitle(event) : ''),
+    [event, i18n.language],
   );
   const cancelTag = event ? cancelPolicyTagLabel(event) : '';
-  const cancelTagNoRefund = cancelTag === '返金不可';
+  const cancelTagNoRefund = Boolean(
+    event && paid && parseCancelPolicyRule(event.cancelPolicy).kind === 'none',
+  );
   const notifyBooking = (
     kind:
       | 'booking_confirmed'
@@ -410,8 +428,8 @@ export default function EventDetailSheet({
       'unchanged') as JoinActionResult;
     if (result === 'full') {
       Alert.alert(
-        '満員（受付終了）',
-        '定員に達しているため、これ以上お申し込みいただけません。',
+        t('events.fullClosed'),
+        t('join.fullBody'),
       );
     } else if (result === 'unchanged' && event) {
       // remote 失敗時など — 参加操作の失敗は呼び出し側で補足
@@ -475,15 +493,15 @@ export default function EventDetailSheet({
               if (left === 'left') {
                 notifyBooking('booking_cancelled', { refundYen });
                 Alert.alert(
-                  'キャンセルしました',
+                  t('join.cancelledTitle'),
                   result.demo
-                    ? '参加費の返金手続きを開始しました。'
-                    : '参加費を Stripe で返金しました。',
+                    ? t('join.refundStarted')
+                    : t('join.refundedStripe'),
                 );
               } else if (left === 'unchanged') {
                 Alert.alert(
-                  'キャンセルに失敗しました',
-                  '参加の取り消しを完了できませんでした。時間をおいて再度お試しください。',
+                  t('join.cancelFailedTitle'),
+                  t('join.cancelFailedBody'),
                 );
               }
             })();
@@ -491,10 +509,10 @@ export default function EventDetailSheet({
         } catch (err) {
           setLeaveBusy(false);
           Alert.alert(
-            '返金に失敗しました',
+            t('join.refundFailedTitle'),
             err instanceof Error
               ? err.message
-              : '返金を完了できませんでした。時間をおいて再度お試しください。',
+              : t('join.refundFailedBody'),
           );
         }
         return;
@@ -509,8 +527,8 @@ export default function EventDetailSheet({
             });
           } else if (left === 'unchanged') {
             Alert.alert(
-              'キャンセルに失敗しました',
-              '参加の取り消しを完了できませんでした。時間をおいて再度お試しください。',
+              t('join.cancelFailedTitle'),
+              t('join.cancelFailedBody'),
             );
           }
         })();
@@ -536,16 +554,16 @@ export default function EventDetailSheet({
     }
     if (isFull) {
       Alert.alert(
-        '満員（受付終了）',
-        '定員に達しているため、これ以上お申し込みいただけません。',
+        t('events.fullClosed'),
+        t('join.fullBody'),
       );
       return 'full';
     }
     // 有料・無料どちらも参加確認（チェックアウト）画面へ
     if (!checkoutEvent) {
       Alert.alert(
-        '参加手続きを開始できません',
-        'イベント情報の読み込みに失敗しました。画面を閉じて再度お試しください。',
+        t('join.cannotStartTitle'),
+        t('join.cannotStartBody'),
       );
       return 'unchanged';
     }
@@ -631,26 +649,26 @@ export default function EventDetailSheet({
           }
           const next = await cancelHostedEvent(event.id);
           if (!next) {
-            throw new Error('中止できませんでした。');
+            throw new Error(t('join.hostCancelFailedBody'));
           }
           ensureThread(event, 'group');
-          sendMessage(event.id, 'group', HOST_CANCEL_CHAT_MESSAGE);
+          sendMessage(event.id, 'group', getHostCancelChatMessage());
           notifyBooking('event_cancelled_by_host', {
             refundYen: paid ? paidYen : 0,
             hostCancelled: true,
           });
           Alert.alert(
-            'イベントを中止しました',
+            t('join.hostCancelledTitle'),
             paid
-              ? '参加者への通知と、参加費の返金手続きを開始しました。'
-              : '参加者へ中止をお知らせします。',
+              ? t('join.hostCancelledPaidBody')
+              : t('join.hostCancelledFreeBody'),
           );
         } catch (err) {
           Alert.alert(
-            '中止できませんでした',
+            t('join.hostCancelFailedTitle'),
             err instanceof Error
               ? err.message
-              : '時間をおいて再度お試しください。',
+              : t('common.tryAgainLater'),
           );
         } finally {
           setCancelBusy(false);
@@ -806,20 +824,20 @@ export default function EventDetailSheet({
     }
     if (joinBlockedByPast || cancelled) {
       Alert.alert(
-        cancelled ? 'イベント中止' : '開催終了',
+        cancelled ? t('join.closedCancelledTitle') : t('events.lifecycle.ended'),
         cancelled
-          ? 'このイベントは主催者により中止されたため、新たに参加することはできません。'
-          : 'このイベントは終了したため、新たに参加することはできません。',
+          ? t('join.closedCancelledBody')
+          : t('join.closedEndedBody'),
       );
       return;
     }
     Alert.alert(
-      '参加者限定のグループチャット',
-      'グループチャットを利用するには参加登録が必要です。参加すると、主催者と参加者だけのグループに入れます。',
+      t('join.groupOnlyTitle'),
+      t('join.groupOnlyBody'),
       [
-        { text: '閉じる', style: 'cancel' },
+        { text: t('common.close'), style: 'cancel' },
         {
-          text: paid ? paidJoinButtonLabel(priceYen) : '参加する',
+          text: paid ? paidJoinButtonLabel(priceYen) : t('events.joinAction'),
           onPress: () => {
             pendingGroupChatRef.current = true;
             applyJoin();
@@ -872,7 +890,7 @@ export default function EventDetailSheet({
                       onPress={closeDetail}
                       hitSlop={10}
                       accessibilityRole="button"
-                      accessibilityLabel="戻る"
+                      accessibilityLabel={t('common.back')}
                     >
                       <SymbolView
                         name={{
@@ -893,12 +911,12 @@ export default function EventDetailSheet({
                       accessibilityRole={club ? 'button' : undefined}
                       accessibilityLabel={
                         club
-                          ? `${club.name}のクラブプロフィール`
-                          : event.host || '主催者'
+                          ? t('events.overlay.clubProfileA11y', { name: club.name })
+                          : event.host || t('events.hostFallback')
                       }
                     >
                       <HostAvatar
-                        name={club?.name || event.host || '主催'}
+                        name={club?.name || event.host || t('events.hostBadge')}
                         imageUri={
                           club?.imageUri ??
                           club?.coverUri ??
@@ -907,7 +925,7 @@ export default function EventDetailSheet({
                         size={28}
                       />
                       <Text style={styles.headerHostName} numberOfLines={1}>
-                        {club?.name || event.host || '主催者'}
+                        {club?.name || event.host || t('events.hostFallback')}
                       </Text>
                       {club ? (
                         <Pressable
@@ -915,7 +933,7 @@ export default function EventDetailSheet({
                           onPress={openClubProfile}
                           hitSlop={6}
                           accessibilityRole="button"
-                          accessibilityLabel="クラブを開く"
+                          accessibilityLabel={t('join.openClub')}
                         >
                           <Text style={styles.headerClubBtnText}>Club ›</Text>
                         </Pressable>
@@ -928,7 +946,7 @@ export default function EventDetailSheet({
                         onPress={() => void shareEvent(event)}
                         hitSlop={10}
                         accessibilityRole="button"
-                        accessibilityLabel="シェア"
+                        accessibilityLabel={t('join.share')}
                       >
                         <SymbolView
                           name={{
@@ -951,10 +969,10 @@ export default function EventDetailSheet({
                                 await toggleFavorite(event.id);
                               } catch (error) {
                                 Alert.alert(
-                                  'お気に入りの更新に失敗しました',
+                                  t('join.favoriteFailedTitle'),
                                   error instanceof Error
                                     ? error.message
-                                    : '時間をおいて再度お試しください。',
+                                    : t('common.tryAgainLater'),
                                 );
                               }
                             })();
@@ -965,7 +983,7 @@ export default function EventDetailSheet({
                         hitSlop={10}
                         accessibilityRole="button"
                         accessibilityLabel={
-                          favorited ? 'お気に入りから外す' : 'お気に入りに追加'
+                          favorited ? t('join.favoriteRemove') : t('join.favoriteAdd')
                         }
                       >
                         <SymbolView
@@ -989,20 +1007,20 @@ export default function EventDetailSheet({
 
                 <View style={styles.body}>
                   <View style={styles.heroMeta}>
-                                        <Text style={styles.title}>{event.title}</Text>
+                                        <Text style={styles.title}>{displayTitle}</Text>
 
                     <View style={styles.tagsRow}>
                       {cancelled ? (
                         <View style={[styles.tag, styles.tagCancelled]}>
-                          <Text style={styles.tagCancelledText}>中止</Text>
+                          <Text style={styles.tagCancelledText}>{t('events.lifecycle.cancelled')}</Text>
                         </View>
                       ) : ended ? (
                         <View style={[styles.tag, styles.tagEnded]}>
-                          <Text style={styles.tagEndedText}>開催終了</Text>
+                          <Text style={styles.tagEndedText}>{t('events.lifecycle.ended')}</Text>
                         </View>
                       ) : null}
                       <View style={[styles.tag, styles.tagBlue]}>
-                        <Text style={styles.tagBlueText}>安心参加</Text>
+                        <Text style={styles.tagBlueText}>{t('join.safeJoinTag')}</Text>
                       </View>
                       <View
                         style={[
@@ -1030,8 +1048,8 @@ export default function EventDetailSheet({
                           style={paid ? styles.tagPaidText : styles.tagFreeText}
                         >
                           {paid
-                            ? `参加費 ${formatYenAmount(priceYen)}`
-                            : '参加費 無料'}
+                            ? t('join.feeTag', { amount: formatYenAmount(priceYen) })
+                            : t('join.feeFreeTag')}
                         </Text>
                       </View>
                       <View style={[styles.tag, styles.tagGray]}>
@@ -1046,7 +1064,7 @@ export default function EventDetailSheet({
                             { color: categoryColor(event.sport) },
                           ]}
                         >
-                          {event.sport} · {event.level}
+                          {sportLabel(event.sport)} · {levelLabel(event.level)}
                         </Text>
                       </View>
                       {targetAgeGroups.map((group) => (
@@ -1055,7 +1073,7 @@ export default function EventDetailSheet({
                             size={11}
                             color={theme.colors.iconActive}
                           />
-                          <Text style={styles.tagAgeText}>{group}</Text>
+                          <Text style={styles.tagAgeText}>{ageGroupLabel(group)}</Text>
                         </View>
                       ))}
                     </View>
@@ -1096,7 +1114,7 @@ export default function EventDetailSheet({
                             />
                           </View>
                           <View style={styles.infoRowBody}>
-                            <Text style={styles.infoLabel}>申込締切</Text>
+                            <Text style={styles.infoLabel}>{t('join.registrationDeadline')}</Text>
                             <Text style={styles.infoValue}>
                               {formatDeadlineLabel(
                                 event.registrationDeadlineOffset,
@@ -1115,7 +1133,7 @@ export default function EventDetailSheet({
                         />
                       </View>
                       <View style={styles.infoRowBody}>
-                        <Text style={styles.infoLabel}>キャンセル</Text>
+                        <Text style={styles.infoLabel}>{t('join.cancelLabel')}</Text>
                         <Text style={styles.infoValue}>
                           {cancelPolicyCardText(event)}
                         </Text>
@@ -1129,7 +1147,7 @@ export default function EventDetailSheet({
                       style={styles.infoRow}
                       onPress={() => void openEventInMaps(event)}
                       accessibilityRole="link"
-                      accessibilityLabel="地図アプリで集合場所を開く"
+                      accessibilityLabel={t('join.openMeetingPlaceA11y')}
                     >
                       <View style={styles.infoIconWrap}>
                         <MapPinIcon
@@ -1138,17 +1156,17 @@ export default function EventDetailSheet({
                         />
                       </View>
                       <View style={styles.infoRowBody}>
-                        <Text style={styles.infoLabel}>集合場所</Text>
+                        <Text style={styles.infoLabel}>{t('join.meetingPlace')}</Text>
                         <Text style={styles.infoValue}>
                           {meetingPlaceLabel ||
                             formatLocationLabel(
                               event.location,
                               event.locationNote,
                             ) ||
-                            '場所未設定'}
+                            t('events.locationUnset')}
                         </Text>
                         <Text style={styles.mapHint}>
-                          タップしてマップで開く
+                          {t('join.tapToOpenMap')}
                         </Text>
                       </View>
                     </Pressable>
@@ -1156,7 +1174,7 @@ export default function EventDetailSheet({
                       style={styles.mapWrap}
                       onPress={() => void openEventInMaps(event)}
                       accessibilityRole="link"
-                      accessibilityLabel="地図アプリで位置を開く"
+                      accessibilityLabel={t('join.openMapA11y')}
                     >
                       <MiniMap
                         event={event}
@@ -1176,7 +1194,7 @@ export default function EventDetailSheet({
                       {itemsToBring.length > 0 ? (
                         <View style={styles.kitCard}>
                           <Text style={styles.kitKicker}>BRING</Text>
-                          <Text style={styles.kitTitle}>必要な持ち物</Text>
+                          <Text style={styles.kitTitle}>{t('join.itemsToBring')}</Text>
                           {itemsToBring.map((item) => (
                             <View key={item} style={styles.kitRow}>
                               <View style={styles.kitDot} />
@@ -1188,7 +1206,7 @@ export default function EventDetailSheet({
                       {includedItems.length > 0 ? (
                         <View style={[styles.kitCard, styles.kitCardIncluded]}>
                           <Text style={styles.kitKickerIncluded}>INCLUDED</Text>
-                          <Text style={styles.kitTitle}>含まれているもの</Text>
+                          <Text style={styles.kitTitle}>{t('join.itemsIncluded')}</Text>
                           {includedItems.map((item) => (
                             <View key={item} style={styles.kitRow}>
                               <Text style={styles.kitCheck}>✓</Text>
@@ -1211,13 +1229,13 @@ export default function EventDetailSheet({
                       </View>
                       <View style={styles.ageBannerBody}>
                         <Text style={styles.ageBannerLabel}>
-                          参加しやすい年齢層
+                          {t('join.ageGroupLabel')}
                         </Text>
                         <View style={styles.ageBannerTags}>
                           {targetAgeGroups.map((group) => (
                             <View key={group} style={styles.ageBannerTag}>
                               <Text style={styles.ageBannerTagText}>
-                                {group}
+                                {ageGroupLabel(group)}
                               </Text>
                             </View>
                           ))}
@@ -1228,28 +1246,28 @@ export default function EventDetailSheet({
                   <EventContentSection text={contentBody} />
 
                   <View style={styles.statsCard}>
-                    <Text style={styles.statsSectionTitle}>参加者</Text>
+                    <Text style={styles.statsSectionTitle}>{t('join.attendees')}</Text>
                     <View style={styles.statsRow}>
                       <Pressable
                         style={styles.stat}
                         onPress={openAttendeeList}
                         accessibilityRole="button"
-                        accessibilityLabel={`${event.joinedCount}人参加中。一覧を開く`}
+                        accessibilityLabel={t('join.joinedListA11y', { count: event.joinedCount })}
                       >
                         <Text style={styles.statValue}>
                           {event.joinedCount}
                         </Text>
-                        <Text style={styles.statLabel}>参加中</Text>
+                        <Text style={styles.statLabel}>{t('join.statJoined')}</Text>
                       </Pressable>
                       <View style={styles.statDivider} />
                       <View style={styles.stat}>
                         <Text style={styles.statValue}>{spotsLeft}</Text>
-                        <Text style={styles.statLabel}>残り席</Text>
+                        <Text style={styles.statLabel}>{t('join.statSpotsLeft')}</Text>
                       </View>
                       <View style={styles.statDivider} />
                       <View style={styles.stat}>
                         <Text style={styles.statValue}>{event.capacity}</Text>
-                        <Text style={styles.statLabel}>定員</Text>
+                        <Text style={styles.statLabel}>{t('join.statCapacity')}</Text>
                       </View>
                     </View>
                     <EventAttendeesRow
@@ -1267,19 +1285,24 @@ export default function EventDetailSheet({
                       onPress={openAttendeeList}
                       style={styles.checkInBanner}
                       accessibilityRole="button"
-                      accessibilityLabel={`参加者一覧と受付。受付完了 ${checkedInCount}人、全${attendees.length}人`}
+                      accessibilityLabel={t('join.checkInBannerA11y', {
+                        checked: checkedInCount,
+                        total: attendees.length,
+                      })}
                     >
                       <View style={styles.checkInBannerCopy}>
-                        <Text style={styles.checkInBannerKicker}>主催者ツール</Text>
+                        <Text style={styles.checkInBannerKicker}>{t('join.hostTools')}</Text>
                         <Text style={styles.checkInBannerTitle}>
-                          参加者一覧・受付
+                          {t('join.attendeeListCheckIn')}
                         </Text>
                         <Text style={styles.checkInBannerSub}>
-                          受付完了 {checkedInCount}/{attendees.length}人 ·
-                          チェックでチェックイン
+                          {t('join.checkInBannerSub', {
+                            checked: checkedInCount,
+                            total: attendees.length,
+                          })}
                         </Text>
                       </View>
-                      <Text style={styles.checkInBannerCta}>開く</Text>
+                      <Text style={styles.checkInBannerCta}>{t('join.open')}</Text>
                     </Pressable>
                     {!cancelled && !ended ? (
                       <Pressable
@@ -1287,23 +1310,23 @@ export default function EventDetailSheet({
                         disabled={cancelBusy}
                         style={styles.cancelEventBanner}
                         accessibilityRole="button"
-                        accessibilityLabel="このイベントを中止する"
+                        accessibilityLabel={t('join.cancelEventA11y')}
                       >
                         <View style={styles.checkInBannerCopy}>
                           <Text style={styles.cancelEventKicker}>
-                            主催者ツール
+                            {t('join.hostTools')}
                           </Text>
                           <Text style={styles.cancelEventTitle}>
-                            イベントを中止する
+                            {t('join.cancelEvent')}
                           </Text>
                           <Text style={styles.cancelEventSub}>
                             {paid
-                              ? '参加者へ通知し、参加費を全額返金します'
-                              : '参加者へ中止を通知します'}
+                              ? t('join.cancelEventSubPaid')
+                              : t('join.cancelEventSubFree')}
                           </Text>
                         </View>
                         <Text style={styles.cancelEventCta}>
-                          {cancelBusy ? '処理中' : '中止'}
+                          {cancelBusy ? t('join.processing') : t('events.lifecycle.cancelled')}
                         </Text>
                       </Pressable>
                     ) : null}
@@ -1331,7 +1354,7 @@ export default function EventDetailSheet({
                       ]}
                       onPress={() => router.push(ticketHref(event.id))}
                       accessibilityRole="button"
-                      accessibilityLabel="参加チケットを開く"
+                      accessibilityLabel={t('join.openTicketA11y')}
                     >
                       <View style={styles.sideIconWrap}>
                         <SymbolView
@@ -1359,9 +1382,9 @@ export default function EventDetailSheet({
                     accessibilityLabel={
                       canUseGroupChat
                         ? groupUnread > 0
-                          ? `参加者限定のグループチャットを開く、未読${groupUnread}件`
-                          : '参加者限定のグループチャットを開く'
-                        : 'グループチャットは参加後に利用できます'
+                          ? t('join.groupChatUnreadA11y', { count: groupUnread })
+                          : t('join.groupChatA11y')
+                        : t('join.groupChatLockedA11y')
                     }
                   >
                     <View style={styles.sideIconWrap}>
@@ -1394,8 +1417,8 @@ export default function EventDetailSheet({
                     accessibilityRole="button"
                     accessibilityLabel={
                       hostUnread > 0
-                        ? `主催者にメッセージを送る、未読${hostUnread}件`
-                        : '主催者にメッセージを送る'
+                        ? t('join.messageHostUnreadA11y', { count: hostUnread })
+                        : t('join.messageHostA11y')
                     }
                   >
                     <View style={styles.sideIconWrap}>
@@ -1428,7 +1451,7 @@ export default function EventDetailSheet({
                     ]}
                     onPress={() => void shareEvent(event)}
                     accessibilityRole="button"
-                    accessibilityLabel="このイベントをシェア"
+                    accessibilityLabel={t('join.shareEventA11y')}
                   >
                     <SymbolView
                       name={{
@@ -1474,17 +1497,17 @@ export default function EventDetailSheet({
                             const nowWatching = await toggleWatchlist(event.id);
                             if (nowWatching) {
                               setToast(
-                                '空き通知を設定しました（空きが出たらお知らせします）',
+                                t('join.watchEnabledToast'),
                               );
                             } else {
-                              setToast('空き通知を解除しました');
+                              setToast(t('join.watchDisabledToast'));
                             }
                           } catch (error) {
                             Alert.alert(
-                              '空き通知の更新に失敗しました',
+                              t('join.watchFailedTitle'),
                               error instanceof Error
                                 ? error.message
-                                : '時間をおいて再度お試しください。',
+                                : t('common.tryAgainLater'),
                             );
                           }
                         })();
@@ -1512,25 +1535,25 @@ export default function EventDetailSheet({
                   accessibilityLabel={
                     isHost
                       ? cancelled
-                        ? 'このイベントは中止されました'
+                        ? t('join.eventCancelledNotice')
                         : ended
-                          ? '開催終了'
-                          : 'このイベントを中止する'
+                          ? t('events.lifecycle.ended')
+                          : t('join.cancelEventA11y')
                       : cancelled
-                        ? 'このイベントは中止されました'
+                        ? t('join.eventCancelledNotice')
                         : showEndedCta &&
                             !(ALLOW_JOIN_PAST_EVENTS && !activeJoined)
-                          ? '開催終了'
+                          ? t('events.lifecycle.ended')
                           : canWatchVacancies
                             ? watchingVacancies
-                              ? '空き通知を解除'
-                              : '空き通知を受け取る'
+                              ? t('join.watchOff')
+                              : t('join.watchOn')
                             : joinClosed
-                              ? '満員（受付終了）'
+                              ? t('events.fullClosed')
                               : activeJoined
-                                ? 'キャンセル'
+                                ? t('join.cancelButton')
                                 : isFull
-                                  ? '満員（受付終了）'
+                                  ? t('events.fullClosed')
                                   : paid
                                     ? paidJoinButtonLabel(priceYen)
                                     : freeJoinButtonLabel()
@@ -1582,26 +1605,26 @@ export default function EventDetailSheet({
                     ellipsizeMode="tail"
                   >
                     {cancelled
-                      ? 'このイベントは中止されました'
+                      ? t('join.eventCancelledNotice')
                       : isHost
                         ? ended
-                          ? '開催終了'
+                          ? t('events.lifecycle.ended')
                           : cancelBusy
-                            ? '中止処理中…'
-                            : 'イベントを中止する'
+                            ? t('join.cancelProcessing')
+                            : t('join.cancelEvent')
                         : showEndedCta &&
                             !(ALLOW_JOIN_PAST_EVENTS && !activeJoined)
-                          ? '開催終了'
+                          ? t('events.lifecycle.ended')
                           : canWatchVacancies
                             ? watchingVacancies
-                              ? '空き通知を解除'
-                              : '空き通知を受け取る'
+                              ? t('join.watchOff')
+                              : t('join.watchOn')
                             : joinClosed
-                              ? '満員（受付終了）'
+                              ? t('events.fullClosed')
                               : activeJoined
-                                ? `${displayName} · キャンセル`
+                                ? t('join.joinedCancelLabel', { name: displayName })
                                 : isFull
-                                  ? '満員（受付終了）'
+                                  ? t('events.fullClosed')
                                   : paid
                                     ? paidJoinButtonLabel(priceYen)
                                     : freeJoinButtonLabel()}
@@ -1691,17 +1714,17 @@ export default function EventDetailSheet({
               });
             } else if (result === 'full') {
               Alert.alert(
-                '満員（受付終了）',
+                t('events.fullClosed'),
                 receipt.mode === 'paid'
-                  ? '決済処理の直後に定員へ達しました。参加枠を確保できていないため、アプリ内の返金手続きまたは主催者・サポートへご連絡ください。'
-                  : '定員に達したため参加できません。',
+                  ? t('join.fullAfterPayment')
+                  : t('join.fullNoPayment'),
               );
             } else if (result === 'unchanged') {
               Alert.alert(
-                '参加登録に失敗しました',
+                t('join.registerFailedTitle'),
                 receipt.mode === 'paid'
-                  ? '決済は完了していますが、参加情報の保存に失敗しました。時間をおいて詳細画面から再度「参加する」を押してください。'
-                  : '参加情報の保存に失敗しました。時間をおいて再度お試しください。',
+                  ? t('join.registerFailedPaidBody')
+                  : t('join.registerFailedBody'),
               );
             }
           })();
@@ -1742,7 +1765,7 @@ export default function EventDetailSheet({
             style={styles.confirmBackdrop}
             onPress={dismissLeaveConfirm}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('common.close')}
           />
           <View
             style={styles.confirmCard}
@@ -1774,9 +1797,9 @@ export default function EventDetailSheet({
                 onPress={dismissLeaveConfirm}
                 disabled={leaveBusy}
                 accessibilityRole="button"
-                accessibilityLabel="閉じる"
+                accessibilityLabel={t('common.close')}
               >
-                <Text style={styles.confirmSecondaryText}>閉じる</Text>
+                <Text style={styles.confirmSecondaryText}>{t('common.close')}</Text>
               </Pressable>
               <Pressable
                 style={[
@@ -1786,12 +1809,12 @@ export default function EventDetailSheet({
                 onPress={confirmLeaveAndLeave}
                 disabled={leaveBusy}
                 accessibilityRole="button"
-                accessibilityLabel="キャンセルする"
+                accessibilityLabel={t('join.confirmCancel')}
               >
                 {leaveBusy ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.confirmPrimaryText}>キャンセルする</Text>
+                  <Text style={styles.confirmPrimaryText}>{t('join.confirmCancel')}</Text>
                 )}
               </Pressable>
             </View>

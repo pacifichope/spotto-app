@@ -1,6 +1,7 @@
 import { attendeeIdByName, hostUserIdFromName } from '@/lib/attendees';
 import { SPORT_IMAGE_PRESETS } from '@/lib/events';
 import type { SportEvent } from '@/lib/events';
+import i18n from '@/lib/i18n';
 import {
   MY_ORGANIZER_ID,
   organizerDisplayName,
@@ -356,8 +357,8 @@ export function clubFromOrganizer(
     coverUri,
     bio:
       organizer.bio.trim() ||
-      'あなたが主催するクラブ。イベント公開時のサークル情報です。',
-    tag: 'マイサークル',
+      i18n.t('club.defaultBioSelf'),
+    tag: i18n.t('club.myCircleTag'),
     hostName: name,
     members: [
       {
@@ -428,7 +429,7 @@ export function resolveClub(
     coverUri,
     bio:
       sample.hostBio?.trim() ||
-      `${sample.host} が主催するクラブスポーツの集まりです。`,
+      i18n.t('club.defaultBioHosted', { name: sample.host }),
     tag: sample.sport,
     hostName: sample.host,
     members: members(sample.host, [], hostPersonal).map((member, index) =>
@@ -451,7 +452,8 @@ export function clubFromPublicProfile(
     bio?: string | null;
   },
 ): Club {
-  const name = String(profile.name || '').trim() || 'クラブ';
+  const name =
+    String(profile.name || '').trim() || i18n.t('club.fallbackName');
   const coverUri =
     profile.coverUri?.trim() || SPORT_IMAGE_PRESETS.default;
   const clubImage = profile.imageUri?.trim() || coverUri;
@@ -462,8 +464,8 @@ export function clubFromPublicProfile(
     coverUri,
     bio:
       String(profile.bio || '').trim() ||
-      `${name} が主催するクラブスポーツの集まりです。`,
-    tag: 'クラブ',
+      i18n.t('club.defaultBioHosted', { name }),
+    tag: i18n.t('club.fallbackName'),
     hostName: name,
     members: [
       { id: userId, name, imageUri: clubImage, role: 'host' },

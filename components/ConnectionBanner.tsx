@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppState, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,6 +33,7 @@ async function probeOnline(): Promise<boolean> {
  * オフライン時だけ表示。復帰したら自動で消える。
  */
 export default function ConnectionBanner() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [offline, setOffline] = useState(false);
 
@@ -82,7 +84,7 @@ export default function ConnectionBanner() {
       style={[styles.wrap, { top: Math.max(insets.top, 8) + 48 }]}
     >
       <View style={styles.pill}>
-        <Text style={styles.text}>接続がありません</Text>
+        <Text style={styles.text}>{t('common.offline')}</Text>
       </View>
     </View>
   );

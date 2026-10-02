@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   Platform,
@@ -25,6 +26,7 @@ import {
 import { registerDevicePushToken } from '@/lib/pushNotifications';
 
 export default function NotificationSettingsScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<NotificationSettings>(
     DEFAULT_NOTIFICATION_SETTINGS,
@@ -69,12 +71,12 @@ export default function NotificationSettingsScreen() {
       void registerDevicePushToken().catch(() => undefined);
     } else if (result.reason === 'denied') {
       Alert.alert(
-        '通知が許可されていません',
-        '「設定を開く」を押すと、このアプリの個別設定が開きます。通知を許可してください。',
+        t('settings.notificationDeniedTitle'),
+        t('settings.notificationDeniedBody'),
         [
-          { text: '閉じる', style: 'cancel' },
+          { text: t('common.close'), style: 'cancel' },
           {
-            text: '設定を開く',
+            text: t('settings.openSettings'),
             onPress: () => {
               void openAppSettings();
             },
@@ -83,8 +85,8 @@ export default function NotificationSettingsScreen() {
       );
     } else {
       Alert.alert(
-        '通知を利用できません',
-        'この環境ではプッシュ通知の許可を取得できません。iOS / Android のアプリでお試しください。',
+        t('settings.notificationUnsupportedTitle'),
+        t('settings.notificationUnsupportedBody'),
       );
     }
     setPendingKey(null);
@@ -92,7 +94,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={styles.root}>
-      <SettingsHeader title="通知設定" />
+      <SettingsHeader title={t('settings.notifications')} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -125,8 +127,8 @@ export default function NotificationSettingsScreen() {
         </View>
         <Text style={styles.hint}>
           {Platform.OS === 'web'
-            ? '設定はこのブラウザに保存されます。プッシュ通知の許可ダイアログは iOS / Android アプリで表示されます。'
-            : '初めて通知をオンにすると、端末の通知許可が求められます。許可後も種類ごとに切り替えられます。'}
+            ? t('settings.notificationHintWeb')
+            : t('settings.notificationHintNative')}
         </Text>
       </ScrollView>
     </View>

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   FlatList,
   Image,
@@ -28,11 +29,15 @@ import {
   formatLocationLabel,
   getEventLifecycleStatus,
   hasEventPhotos,
+  levelLabel,
   sportFallbackUri,
+  sportLabel,
   type SportEvent,
 } from '@/lib/events';
+import { localizedEventTitle } from '@/lib/eventLocalizedText';
 import { eventPriceYen, formatYenAmount, isPaidEvent } from '@/lib/payments';
 import { useEvents } from '@/lib/eventsContext';
+import i18n from '@/lib/i18n';
 
 const PHOTO_MAX = 3;
 const PHOTO_GAP = 6;
@@ -68,7 +73,7 @@ function resolveCardAttendees(
     return [];
   }
   return attendeesForDisplay(
-    { ...event, host: String(event.host || '').trim() || '主催者' },
+    { ...event, host: String(event.host || '').trim() || i18n.t('events.hostFallback') },
     null,
     joined,
   );
@@ -89,13 +94,15 @@ function TimelineCard({
   attendees: EventAttendee[];
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const { filterAttendees } = useBlocks();
   if (!event?.id) return null;
 
-  const hostName = String(event.host || '').trim() || '主催者';
-  const title = String(event.title || '').trim() || '無題のイベント';
-  const sport = String(event.sport || '').trim() || 'その他';
-  const level = String(event.level || '').trim() || '誰でも歓迎';
+  const hostName = String(event.host || '').trim() || t('events.hostFallback');
+  const title =
+    localizedEventTitle(event).trim() || t('events.untitled');
+  const sport = sportLabel(event.sport);
+  const level = levelLabel(event.level);
   const joinedCount = Math.max(
     0,
     Math.floor(
@@ -136,17 +143,17 @@ function TimelineCard({
   const statusLabel = cancelled || ended
     ? eventLifecycleLabel(lifecycle)
     : joined
-      ? '参加中'
+      ? t('events.statusJoined')
       : spots > 0
-        ? '募集中'
-        : '受付終了';
-  const statusLive = statusLabel === '募集中' || statusLabel === '参加中';
+        ? t('events.statusOpen')
+        : t('events.statusClosed');
+  const statusLive = !cancelled && !ended && (joined || spots > 0);
   const ctaLabel = cancelled
-    ? '中止'
+    ? t('events.lifecycle.cancelled')
     : ended
-      ? '開催終了'
+      ? t('events.lifecycle.ended')
       : joined
-        ? '参加済み'
+        ? t('events.ctaJoined')
         : isPaidEvent(event)
           ? formatYenAmount(eventPriceYen(event))
           : 'Join';
@@ -156,17 +163,17 @@ function TimelineCard({
   try {
     whenLabel = formatEventWhenCompact(event, now);
     whereLabel =
-      formatLocationLabel(event.location, event.locationNote) || '場所未設定';
+      formatLocationLabel(event.location, event.locationNote) || t('events.locationUnset');
   } catch {
-    whenLabel = '日程未定';
-    whereLabel = '場所未設定';
+    whenLabel = t('events.scheduleUndecided');
+    whereLabel = t('events.locationUnset');
   }
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}の詳細`}
-      accessibilityHint="イベント詳細を開きます"
+      accessibilityLabel={t('events.cardA11yLabel', { title })}
+      accessibilityHint={t('events.cardA11yHint')}
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
@@ -253,7 +260,7 @@ function TimelineCard({
                     ]}
                   >
                     <HostAvatar
-                      name={person.name || '参加者'}
+                      name={person.name || t('events.participantFallback')}
                       imageUri={person.imageUri}
                       gender={person.gender}
                       size={24}
@@ -286,8 +293,8 @@ function TimelineCard({
               numberOfLines={1}
             >
               {joinedCount > 0
-                ? `${joinedCount}人が参加中`
-                : 'まだ参加者はいません'}
+                ? t('events.joinedCount', { count: joinedCount })
+                : t('events.noAttendeesShort')}
             </Text>
           </View>
 
@@ -375,6 +382,7 @@ export default function EventList({
   contentPaddingBottom = 120,
   requirePhotos = true,
 }: EventListProps) {
+  const { t } = useTranslation();
   const router = useRouter();
   const {
     now,
@@ -474,9 +482,9 @@ export default function EventList({
             <EmptyStateIcon size={64} style={{ marginBottom: 12 }}>
               <SearchIcon size={26} color={theme.colors.iconEmpty} />
             </EmptyStateIcon>
-            <Text style={styles.emptyTitle}>該当するイベントがありません</Text>
+            <Text style={styles.emptyTitle}>{t('events.listEmptyTitle')}</Text>
             <Text style={styles.emptyText}>
-              カテゴリや絞り込み条件を変えてみてください
+              {t('events.listEmptyHint')}
             </Text>
           </View>
         )

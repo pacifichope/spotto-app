@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Alert,
   FlatList,
@@ -41,6 +42,7 @@ export default function EventChatModal({
   event,
   onClose,
 }: EventChatModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const [draft, setDraft] = useState('');
@@ -128,10 +130,7 @@ export default function EventChatModal({
     const text = draft.trim();
     if (!text || !event) return;
     if (mode === 'host' && !dmUserId) {
-      Alert.alert(
-        '送信できません',
-        'メッセージの相手が特定できません。',
-      );
+      Alert.alert(t('chat.cannotSendTitle'), t('chat.cannotSendBodyShort'));
       return;
     }
     const deliver = () => {
@@ -143,7 +142,7 @@ export default function EventChatModal({
           hostUserId: event.hostId,
         });
         if (!result.ok) {
-          Alert.alert('送信に失敗しました', result.error);
+          Alert.alert(t('chat.sendFailedTitle'), result.error);
           setDraft(text);
           return;
         }
@@ -174,20 +173,18 @@ export default function EventChatModal({
               onPress={onClose}
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="チャットを閉じる"
+              accessibilityLabel={t('chat.closeChatLabel')}
             >
-              <Text style={styles.back}>‹ 戻る</Text>
+              <Text style={styles.back}>{t('chat.backWithChevron')}</Text>
             </Pressable>
             <View style={styles.headerCenter}>
               <Text style={styles.headerTitle} numberOfLines={1}>
-                {mode === 'host'
-                  ? `${event.host}`
-                  : `グループチャット`}
+                {mode === 'host' ? event.host : t('chat.groupChat')}
               </Text>
               <Text style={styles.headerSub} numberOfLines={1}>
                 {mode === 'host'
-                  ? '主催者への個別メッセージ'
-                  : `${event.title} · 参加者限定`}
+                  ? t('chat.hostChatSub')
+                  : t('chat.groupChatSub', { title: event.title })}
               </Text>
             </View>
             <View style={styles.headerSpacer} />
@@ -205,8 +202,8 @@ export default function EventChatModal({
               <View style={styles.notice}>
                 <Text style={styles.noticeText}>
                   {mode === 'host'
-                    ? '主催者との個別チャットです。他の参加者には表示されません。'
-                    : 'このチャットは、申し込んだ参加者と主催者だけが閲覧・投稿できます。'}
+                    ? t('chat.noticeHost')
+                    : t('chat.noticeGroup')}
                 </Text>
               </View>
             }
@@ -227,7 +224,7 @@ export default function EventChatModal({
                   {!mine ? (
                     <Text style={styles.author}>
                       {mode === 'host' || item.role === 'host'
-                        ? `${item.name}（主催）`
+                        ? t('chat.authorHost', { name: item.name })
                         : item.name}
                     </Text>
                   ) : null}
@@ -268,7 +265,7 @@ export default function EventChatModal({
               style={styles.input}
               value={draft}
               onChangeText={setDraft}
-              placeholder="メッセージを入力"
+              placeholder={t('chat.placeholderLong')}
               placeholderTextColor={theme.colors.textMuted}
               multiline
               returnKeyType="send"
@@ -281,9 +278,9 @@ export default function EventChatModal({
               onPress={send}
               disabled={!draft.trim()}
               accessibilityRole="button"
-              accessibilityLabel="送信"
+              accessibilityLabel={t('chat.send')}
             >
-              <Text style={styles.sendText}>送信</Text>
+              <Text style={styles.sendText}>{t('chat.send')}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingScreen>

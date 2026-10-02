@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +18,7 @@ export default function SortPickerModal({
   onClose,
   onSelect,
 }: SortPickerModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -35,8 +37,8 @@ export default function SortPickerModal({
           ]}
         >
           <View style={styles.handle} />
-          <Text style={styles.title}>並び替え</Text>
-          <Text style={styles.subtitle}>一覧の表示順を選べます</Text>
+          <Text style={styles.title}>{t('home.sort.title')}</Text>
+          <Text style={styles.subtitle}>{t('home.sort.subtitle')}</Text>
           {SORT_OPTIONS.map((option) => {
             const selected = option.key === sortKey;
             return (

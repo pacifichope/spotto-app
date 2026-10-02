@@ -1,5 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     Alert,
@@ -42,10 +43,8 @@ import {
 import {
     CANCEL_POLICY_OPTIONS,
     defaultEventSchedule,
-    formatDeadlineLabel,
     formatEventDate,
     formatLocationLabel,
-    formatSessionsSummary,
     LEVEL_OPTIONS,
     MAX_EVENT_ITEMS,
     MAX_EVENT_PHOTOS,
@@ -66,9 +65,20 @@ import {
 } from '@/lib/events';
 import { isImagePickerAvailable, requestPhotoLibraryAccess } from '@/lib/imagePicker';
 import {
+    ageGroupDisplayLabel,
+    cancelPolicyDisplayHint,
+    cancelPolicyDisplayLabel,
+    deadlineDisplayLabel,
+    deadlineDisplaySublabel,
+    formatMonthDay,
+    formatSessionsSummaryLocalized,
+    levelDisplayLabel,
+    numberLocale,
+    sportDisplayLabel,
+} from '@/lib/createEventLabels';
+import {
     findNgWordInCreatePayload,
     findNgWordInTexts,
-    NG_WORD_ERROR_MESSAGE,
 } from '@/lib/ngWords';
 import {
     sanitizePreQuestions,
@@ -111,6 +121,7 @@ export default function CreateEventModal({
   draft = null,
   onSaveDraft,
 }: CreateEventModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
   const [sportIndex, setSportIndex] = useState(0);
@@ -158,9 +169,15 @@ export default function CreateEventModal({
 
   const sport = SPORT_OPTIONS[sportIndex];
   const isOtherSport = sport.label === OTHER_SPORT_LABEL;
+  // payload.sport に保存する値（日本語 ID または自由入力）
   const sportLabel = isOtherSport
     ? customSport.trim() || OTHER_SPORT_LABEL
     : sport.label;
+  // 画面表示用（保存値は変えない）
+  const sportDisplay =
+    isOtherSport && customSport.trim()
+      ? customSport.trim()
+      : sportDisplayLabel(sportLabel);
   const remainingSlots = MAX_EVENT_PHOTOS - imageUris.length;
   const atPhotoLimit = remainingSlots <= 0;
 
@@ -292,40 +309,58 @@ export default function CreateEventModal({
   const buildPayload = (): CreateEventPayload | null => {
     if (uploadingImageUris.length > 0) {
       Alert.alert(
-        '写真をアップロード中です',
-        '完了してから公開してください。',
+        t('create.alerts.uploadingTitle'),
+        t('create.alerts.uploadingBody'),
       );
       return null;
     }
     if (imageUris.length === 0) {
       if (Platform.OS === 'web') {
-        window.alert('写真を1枚以上追加してください');
+        window.alert(t('create.alerts.photoRequired'));
       } else {
-        Alert.alert('入力不足', '写真を1枚以上追加してください');
+        Alert.alert(
+          t('create.alerts.missingTitle'),
+          t('create.alerts.photoRequired'),
+        );
       }
       return null;
     }
     if (!title.trim() || !location.trim()) {
-      Alert.alert('入力不足', 'タイトルと活動地点を入力してください。');
+      Alert.alert(
+        t('create.alerts.missingTitle'),
+        t('create.alerts.titleLocationRequired'),
+      );
       return null;
     }
     if (!description.trim()) {
-      Alert.alert('入力不足', 'イベント内容を入力してください');
+      Alert.alert(
+        t('create.alerts.missingTitle'),
+        t('create.alerts.descriptionRequired'),
+      );
       return null;
     }
     if (scheduleType === 'recurring' && sessions.length === 0) {
-      Alert.alert('入力不足', '開催日を1日以上選んでください。');
+      Alert.alert(
+        t('create.alerts.missingTitle'),
+        t('create.alerts.sessionsRequired'),
+      );
       return null;
     }
     const cap = Math.min(1000, Math.max(1, Number(capacity)));
     const price =
       feeType === 'paid' ? Math.max(0, Math.floor(Number(priceYen) || 0)) : 0;
     if (feeType === 'paid' && price < 1) {
-      Alert.alert('入力不足', '有料イベントの参加費を入力してください');
+      Alert.alert(
+        t('create.alerts.missingTitle'),
+        t('create.alerts.priceRequired'),
+      );
       return null;
     }
     if (feeType === 'paid' && !cancelPolicy.trim()) {
-      Alert.alert('入力不足', 'キャンセルポリシーを選択してください');
+      Alert.alert(
+        t('create.alerts.missingTitle'),
+        t('create.alerts.cancelPolicyRequired'),
+      );
       return null;
     }
     const orderedSessions =
@@ -380,9 +415,12 @@ export default function CreateEventModal({
     if (!payload) return;
     if (findNgWordInCreatePayload(payload)) {
       if (Platform.OS === 'web') {
-        window.alert(NG_WORD_ERROR_MESSAGE);
+        window.alert(t('create.alerts.ngWord'));
       } else {
-        Alert.alert('送信できません', NG_WORD_ERROR_MESSAGE);
+        Alert.alert(
+          t('create.alerts.cannotSubmitTitle'),
+          t('create.alerts.ngWord'),
+        );
       }
       return;
     }
@@ -431,9 +469,12 @@ export default function CreateEventModal({
     const snapshot = collectSnapshot();
     if (!draft && !eventDraftHasContent(snapshot)) {
       if (Platform.OS === 'web') {
-        window.alert('保存する内容がありません');
+        window.alert(t('create.alerts.nothingToSaveWeb'));
       } else {
-        Alert.alert('保存できません', '入力内容がありません。');
+        Alert.alert(
+          t('create.alerts.cannotSaveTitle'),
+          t('create.alerts.nothingToSaveBody'),
+        );
       }
       return;
     }
@@ -453,9 +494,12 @@ export default function CreateEventModal({
     ]);
     if (draftNgHit) {
       if (Platform.OS === 'web') {
-        window.alert(NG_WORD_ERROR_MESSAGE);
+        window.alert(t('create.alerts.ngWord'));
       } else {
-        Alert.alert('保存できません', NG_WORD_ERROR_MESSAGE);
+        Alert.alert(
+          t('create.alerts.cannotSaveTitle'),
+          t('create.alerts.ngWord'),
+        );
       }
       return;
     }
@@ -507,16 +551,16 @@ export default function CreateEventModal({
       return;
     }
     Alert.alert(
-      '変更を破棄しますか？',
-      '入力中の内容はまだ公開されていません。下書きとして保存するか、変更を破棄して閉じることができます。',
+      t('create.alerts.discardTitle'),
+      t('create.alerts.discardBody'),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '下書きとして保存',
+          text: t('create.alerts.saveAsDraft'),
           onPress: handleDraft,
         },
         {
-          text: '変更を破棄する',
+          text: t('create.alerts.discard'),
           style: 'destructive',
           onPress: onClose,
         },
@@ -528,8 +572,8 @@ export default function CreateEventModal({
     const remaining = MAX_EVENT_PHOTOS - imageUris.length;
     if (remaining <= 0) {
       Alert.alert(
-        '写真は最大5枚まで',
-        'これ以上追加できません。不要な写真を削除してください。',
+        t('create.alerts.photoMaxTitle', { count: MAX_EVENT_PHOTOS }),
+        t('create.alerts.photoMaxBody'),
       );
       return;
     }
@@ -589,9 +633,8 @@ export default function CreateEventModal({
     }
     if (cloudFailed) {
       Alert.alert(
-        '一部の写真をクラウドに保存できませんでした',
-        cloudError ||
-          'この端末内の写真として追加します。公開後、他の端末では表示されないことがあります。',
+        t('create.alerts.cloudFailTitle'),
+        cloudError || t('create.alerts.cloudFailBody'),
       );
     }
   };
@@ -620,8 +663,8 @@ export default function CreateEventModal({
   const openImagePicker = () => {
     if (MAX_EVENT_PHOTOS - imageUris.length <= 0) {
       Alert.alert(
-        '写真は最大5枚まで',
-        'これ以上追加できません。不要な写真を削除してください。',
+        t('create.alerts.photoMaxTitle', { count: MAX_EVENT_PHOTOS }),
+        t('create.alerts.photoMaxBody'),
       );
       return;
     }
@@ -637,19 +680,23 @@ export default function CreateEventModal({
       return;
     }
 
-    Alert.alert('写真を追加', 'イベントの雰囲気が伝わる写真を選びましょう（最大5枚）', [
+    Alert.alert(
+      t('create.alerts.addPhotoTitle'),
+      t('create.alerts.addPhotoBody', { count: MAX_EVENT_PHOTOS }),
+      [
       {
-        text: 'フォトライブラリから選ぶ',
+        text: t('create.alerts.fromLibrary'),
         onPress: () => {
           void pickFromLibrary();
         },
       },
       {
-        text: 'プリセット / URL',
+        text: t('create.alerts.presetOrUrl'),
         onPress: openPreset,
       },
-      { text: 'キャンセル', style: 'cancel' },
-    ]);
+      { text: t('common.cancel'), style: 'cancel' },
+    ],
+    );
   };
 
   const openLocationPicker = () => {
@@ -690,13 +737,13 @@ export default function CreateEventModal({
   const datetimeLabel = formatEventDate(date, time, endTime, endDate);
   const recurringLabel =
     sessions.length > 0
-      ? formatSessionsSummary(sessions, 4)
-      : '開催日を選択してください';
+      ? formatSessionsSummaryLocalized(sessions, 4)
+      : t('create.form.selectSessionDates');
   const activityLabel =
     scheduleType === 'recurring'
       ? recurringLabel
-      : `${datetimeLabel.monthDay} ${datetimeLabel.time}`;
-  const deadlineLabel = formatDeadlineLabel(deadlineOffset);
+      : `${formatMonthDay(date)} ${datetimeLabel.time}`;
+  const deadlineLabel = deadlineDisplayLabel(deadlineOffset);
 
   return (
     <Modal
@@ -712,7 +759,7 @@ export default function CreateEventModal({
             hitSlop={12}
             style={styles.headerSide}
             accessibilityRole="button"
-            accessibilityLabel="閉じる"
+            accessibilityLabel={t('common.close')}
           >
             <SymbolView
               name={{
@@ -726,7 +773,7 @@ export default function CreateEventModal({
             />
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            イベント作成
+            {t('create.title')}
           </Text>
           <View style={styles.headerSide} />
         </View>
@@ -749,7 +796,10 @@ export default function CreateEventModal({
           {/* 1. Hero card: photos + title + description */}
           <View style={styles.heroCard}>
             <Text style={styles.photoCountLabel}>
-              写真（必須） {imageUris.length}/{MAX_EVENT_PHOTOS}
+              {t('create.form.photosLabel', {
+                count: imageUris.length,
+                max: MAX_EVENT_PHOTOS,
+              })}
             </Text>
             <ScrollView
               horizontal
@@ -772,7 +822,7 @@ export default function CreateEventModal({
                     style={styles.thumbRemove}
                     onPress={() => removeImage(index)}
                     hitSlop={8}
-                    accessibilityLabel="写真を削除"
+                    accessibilityLabel={t('create.form.removePhotoA11y')}
                   >
                     <Text style={styles.thumbRemoveText}>×</Text>
                   </Pressable>
@@ -789,15 +839,15 @@ export default function CreateEventModal({
                   <Text style={styles.imagePlus}>＋</Text>
                   <Text style={styles.imageHint}>
                     {imageUris.length === 0
-                      ? `写真を1枚以上追加\n（必須）`
-                      : '写真を追加'}
+                      ? t('create.form.addPhotoRequired')
+                      : t('create.form.addPhoto')}
                   </Text>
                 </Pressable>
               ) : null}
             </ScrollView>
             {atPhotoLimit ? (
               <Text style={styles.photoLimitHint}>
-                写真は最大{MAX_EVENT_PHOTOS}枚までです
+                {t('create.form.photoLimit', { count: MAX_EVENT_PHOTOS })}
               </Text>
             ) : null}
 
@@ -806,7 +856,7 @@ export default function CreateEventModal({
                 <View style={styles.heroFieldHeader}>
                   <Text style={styles.heroFieldLabel}>
                     <Text style={styles.asterisk}>＊</Text>
-                    タイトル
+                    {t('create.form.titleLabel')}
                   </Text>
                   <Text style={styles.heroFieldMeta}>
                     {title.length}/20
@@ -814,12 +864,12 @@ export default function CreateEventModal({
                 </View>
                 <TextInput
                   style={styles.titleInput}
-                  placeholder="例：おもしろサッカー練習会"
+                  placeholder={t('create.form.titlePlaceholder')}
                   placeholderTextColor={MUTED}
                   value={title}
                   onChangeText={(t) => setTitle(t.slice(0, 20))}
                   maxLength={20}
-                  accessibilityLabel="タイトル"
+                  accessibilityLabel={t('create.form.titleLabel')}
                 />
               </View>
 
@@ -827,30 +877,30 @@ export default function CreateEventModal({
                 <View style={styles.heroFieldHeader}>
                   <Text style={styles.heroFieldLabel}>
                     <Text style={styles.asterisk}>＊</Text>
-                    イベント内容
+                    {t('create.form.descriptionLabel')}
                   </Text>
                 </View>
                 <TextInput
                   style={styles.descInput}
-                  placeholder={
-                    '例：初心者大歓迎！みんなで楽しくボールを蹴りましょう！\n当日の流れやおすすめの人なども書けます'
-                  }
+                  placeholder={t('create.form.descriptionPlaceholder')}
                   placeholderTextColor={MUTED}
                   value={description}
                   onChangeText={setDescription}
                   multiline
                   textAlignVertical="top"
-                  accessibilityLabel="イベント内容（必須）"
+                  accessibilityLabel={t('create.form.descriptionA11y')}
                 />
               </View>
             </View>
           </View>
 
-          <Text style={styles.sectionLabel}>当日の案内（任意）</Text>
+          <Text style={styles.sectionLabel}>
+            {t('create.form.guideSection')}
+          </Text>
           <View style={styles.listCard}>
             <ChipEditor
-              label="必要な持ち物"
-              hint="例: インドアシューズ"
+              label={t('create.form.itemsToBringLabel')}
+              hint={t('create.form.itemsToBringHint')}
               items={itemsToBring}
               onChangeItems={setItemsToBring}
               draft={itemsToBringDraft}
@@ -858,8 +908,8 @@ export default function CreateEventModal({
             />
             <View style={styles.rowDivider} />
             <ChipEditor
-              label="イベントに含まれているもの"
-              hint="例: コート代込み"
+              label={t('create.form.includedItemsLabel')}
+              hint={t('create.form.includedItemsHint')}
               items={includedItems}
               onChangeItems={setIncludedItems}
               draft={includedItemsDraft}
@@ -879,9 +929,11 @@ export default function CreateEventModal({
                   scheduleType === 'single' && styles.tabTitleActive,
                 ]}
               >
-                単発イベント
+                {t('create.form.scheduleSingle')}
               </Text>
-              <Text style={styles.tabSub}>1回限り・気軽な組局向け</Text>
+              <Text style={styles.tabSub}>
+                {t('create.form.scheduleSingleSub')}
+              </Text>
               {scheduleType === 'single' && <View style={styles.tabUnderline} />}
             </Pressable>
             <Pressable
@@ -901,10 +953,10 @@ export default function CreateEventModal({
                   scheduleType === 'recurring' && styles.tabTitleActive,
                 ]}
               >
-                定期・複数回
+                {t('create.form.scheduleRecurring')}
               </Text>
               <Text style={styles.tabSub}>
-                日程ごとに別イベントとして公開
+                {t('create.form.scheduleRecurringSub')}
               </Text>
               {scheduleType === 'recurring' && (
                 <View style={styles.tabUnderline} />
@@ -916,14 +968,18 @@ export default function CreateEventModal({
           <View style={styles.listCard}>
             <SettingsRow
               required
-              label="カテゴリ"
-              value={sportLabel}
+              label={t('create.form.category')}
+              value={sportDisplay}
               placeholder={false}
               onPress={() => setPicker('sport')}
             />
             <SettingsRow
               required
-              label={scheduleType === 'recurring' ? '活動日時' : '活動時間'}
+              label={
+                scheduleType === 'recurring'
+                  ? t('create.form.activityDateTime')
+                  : t('create.form.activityTime')
+              }
               value={activityLabel}
               placeholder={
                 scheduleType === 'recurring'
@@ -939,11 +995,11 @@ export default function CreateEventModal({
             />
             <SettingsRow
               required
-              label="活動地点"
+              label={t('create.form.location')}
               value={
                 location
                   ? formatLocationLabel(location, locationNote)
-                  : '集合場所を選択してください'
+                  : t('create.form.selectLocation')
               }
               placeholder={!location}
               onPress={openLocationPicker}
@@ -953,7 +1009,7 @@ export default function CreateEventModal({
                 style={styles.locationNoteInput}
                 value={locationNote}
                 onChangeText={setLocationNote}
-                placeholder="場所の補足（任意）"
+                placeholder={t('create.form.locationNotePlaceholder')}
                 placeholderTextColor={MUTED}
                 maxLength={40}
               />
@@ -963,18 +1019,18 @@ export default function CreateEventModal({
           {/* Level (extra useful for sports app) */}
           <View style={styles.listCard}>
             <SettingsRow
-              label="参加レベル"
-              value={level}
+              label={t('create.form.level')}
+              value={levelDisplayLabel(level)}
               onPress={() => setPicker('level')}
               last
             />
           </View>
 
-          <Text style={styles.sectionLabel}>年齢層（任意）</Text>
+          <Text style={styles.sectionLabel}>{t('create.form.ageSection')}</Text>
           <View style={styles.listCard}>
             <View style={styles.ageBlock}>
               <Text style={styles.ageHint}>
-                複数選べます。参加しやすい雰囲気の目安です。未設定でも公開できます。
+                {t('create.form.ageHint')}
               </Text>
               <View style={styles.agePresetRow}>
                 <Pressable
@@ -989,7 +1045,7 @@ export default function CreateEventModal({
                     setAgeCustomDraft('');
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="年齢層を指定しない"
+                  accessibilityLabel={t('create.form.ageNoneA11y')}
                 >
                   <Text
                     style={[
@@ -999,7 +1055,7 @@ export default function CreateEventModal({
                         styles.ageChipTextActive,
                     ]}
                   >
-                    指定しない
+                    {t('create.form.ageNone')}
                   </Text>
                 </Pressable>
                 {TARGET_AGE_PRESETS.map((preset) => {
@@ -1026,7 +1082,7 @@ export default function CreateEventModal({
                       }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
-                      accessibilityLabel={preset}
+                      accessibilityLabel={ageGroupDisplayLabel(preset)}
                     >
                       <Text
                         style={[
@@ -1034,7 +1090,7 @@ export default function CreateEventModal({
                           active && styles.ageChipTextActive,
                         ]}
                       >
-                        {preset}
+                        {ageGroupDisplayLabel(preset)}
                       </Text>
                     </Pressable>
                   );
@@ -1046,7 +1102,7 @@ export default function CreateEventModal({
                 onChangeText={(value) =>
                   setAgeCustomDraft(value.slice(0, MAX_TARGET_AGE_GROUP_LENGTH))
                 }
-                placeholder="自由記述を追加（例: 社会人中心）"
+                placeholder={t('create.form.agePlaceholder')}
                 placeholderTextColor={MUTED}
                 maxLength={MAX_TARGET_AGE_GROUP_LENGTH}
                 returnKeyType="done"
@@ -1064,14 +1120,15 @@ export default function CreateEventModal({
           </View>
 
           {/* 4. Group info card */}
-          <Text style={styles.sectionLabel}>グループ情報</Text>
+          <Text style={styles.sectionLabel}>{t('create.form.groupSection')}</Text>
           <View style={styles.listCard}>
             <Pressable
               style={styles.settingsRow}
               onPress={() => setCapacityPickerVisible(true)}
             >
               <Text style={styles.rowLabel}>
-                <Text style={styles.asterisk}>＊</Text>活動人数
+                <Text style={styles.asterisk}>＊</Text>
+                {t('create.form.capacity')}
               </Text>
               <View style={styles.rowRight}>
                 <Text
@@ -1082,8 +1139,12 @@ export default function CreateEventModal({
                   numberOfLines={1}
                 >
                   {Number(capacity) > 0
-                    ? `${Math.floor(Number(capacity)).toLocaleString('ja-JP')} 人`
-                    : '活動人数を入力してください'}
+                    ? t('create.form.capacityValue', {
+                        formatted: Math.floor(Number(capacity)).toLocaleString(
+                          numberLocale(),
+                        ),
+                      })
+                    : t('create.form.capacityPlaceholder')}
                 </Text>
                 <Text style={styles.chevron}>{'>'}</Text>
               </View>
@@ -1091,7 +1152,8 @@ export default function CreateEventModal({
             <View style={styles.rowDivider} />
             <View style={styles.settingsRow}>
               <Text style={styles.rowLabel}>
-                <Text style={styles.asterisk}>＊</Text>参加費
+                <Text style={styles.asterisk}>＊</Text>
+                {t('create.form.fee')}
               </Text>
               <View style={styles.feeTypePills}>
                 <Pressable
@@ -1111,7 +1173,7 @@ export default function CreateEventModal({
                       feeType === 'free' && styles.feeTypePillTextActive,
                     ]}
                   >
-                    無料
+                    {t('create.form.free')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -1130,7 +1192,7 @@ export default function CreateEventModal({
                       feeType === 'paid' && styles.feeTypePillTextActive,
                     ]}
                   >
-                    有料
+                    {t('create.form.paid')}
                   </Text>
                 </Pressable>
               </View>
@@ -1143,7 +1205,8 @@ export default function CreateEventModal({
                   onPress={() => setPricePickerVisible(true)}
                 >
                   <Text style={styles.rowLabel}>
-                    <Text style={styles.asterisk}>＊</Text>金額
+                    <Text style={styles.asterisk}>＊</Text>
+                    {t('create.form.amount')}
                   </Text>
                   <View style={styles.rowRight}>
                     <Text
@@ -1154,8 +1217,12 @@ export default function CreateEventModal({
                       numberOfLines={1}
                     >
                       {Number(priceYen) > 0
-                        ? `¥ ${Math.floor(Number(priceYen)).toLocaleString('ja-JP')} / 人`
-                        : '参加費を入力してください'}
+                        ? t('create.form.amountValue', {
+                            amount: Math.floor(Number(priceYen)).toLocaleString(
+                              numberLocale(),
+                            ),
+                          })
+                        : t('create.form.amountPlaceholder')}
                     </Text>
                     <Text style={styles.chevron}>{'>'}</Text>
                   </View>
@@ -1166,7 +1233,8 @@ export default function CreateEventModal({
                   onPress={() => setPicker('cancel')}
                 >
                   <Text style={styles.rowLabel}>
-                    <Text style={styles.asterisk}>＊</Text>キャンセルポリシー
+                    <Text style={styles.asterisk}>＊</Text>
+                    {t('create.form.cancelPolicy')}
                   </Text>
                   <View style={styles.rowRight}>
                     <Text
@@ -1176,7 +1244,9 @@ export default function CreateEventModal({
                       ]}
                       numberOfLines={2}
                     >
-                      {cancelPolicy || '返金ポリシーを選択'}
+                      {cancelPolicy
+                        ? cancelPolicyDisplayLabel(cancelPolicy)
+                        : t('create.form.cancelPolicyPlaceholder')}
                     </Text>
                     <Text style={styles.chevron}>{'>'}</Text>
                   </View>
@@ -1189,8 +1259,10 @@ export default function CreateEventModal({
               onPress={() => setPicker('deadline')}
             >
               <View style={styles.stackLabel}>
-                <Text style={styles.rowLabel}>申込締切</Text>
-                <Text style={styles.stackMeta}>Registration Deadline</Text>
+                <Text style={styles.rowLabel}>{t('create.form.deadline')}</Text>
+                <Text style={styles.stackMeta}>
+                  {t('create.form.deadlineCaption')}
+                </Text>
               </View>
               <View style={styles.rowRight}>
                 <Text
@@ -1205,18 +1277,23 @@ export default function CreateEventModal({
             <View style={styles.rowDivider} />
           </View>
 
-          <Text style={styles.moreLabel}>その他の設定</Text>
+          <Text style={styles.moreLabel}>{t('create.form.moreSection')}</Text>
           <View style={styles.listCard}>
             <View style={styles.toggleRow}>
               <Pressable
                 style={styles.preQuestionMain}
                 onPress={openPreQuestions}
               >
-                <Text style={styles.rowLabel}>事前質問</Text>
+                <Text style={styles.rowLabel}>{t('create.form.preQuestions')}</Text>
                 <Text style={styles.preQuestionMeta}>
                   {configuredQuestionCount > 0
-                    ? `${configuredQuestionCount}問の追加質問${enablePreQuestions ? '' : ' · オフ'}`
-                    : 'イベント固有の質問を追加'}
+                    ? t(
+                        enablePreQuestions
+                          ? 'create.form.preQuestionsCount'
+                          : 'create.form.preQuestionsCountOff',
+                        { count: configuredQuestionCount },
+                      )
+                    : t('create.form.preQuestionsEmpty')}
                 </Text>
               </Pressable>
               <Switch
@@ -1247,9 +1324,9 @@ export default function CreateEventModal({
             style={styles.draftBtn}
             onPress={handleDraft}
             accessibilityRole="button"
-            accessibilityLabel="下書き保存"
+            accessibilityLabel={t('create.form.saveDraft')}
           >
-            <Text style={styles.draftText}>下書き保存</Text>
+            <Text style={styles.draftText}>{t('create.form.saveDraft')}</Text>
           </Pressable>
           <Pressable
             style={[
@@ -1261,12 +1338,12 @@ export default function CreateEventModal({
             }}
             disabled={!canPublish || publishing}
             accessibilityRole="button"
-            accessibilityLabel="イベントを公開"
+            accessibilityLabel={t('create.form.publish')}
           >
             {publishing ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.publishText}>イベントを公開</Text>
+              <Text style={styles.publishText}>{t('create.form.publish')}</Text>
             )}
           </Pressable>
         </View>
@@ -1293,7 +1370,9 @@ export default function CreateEventModal({
 
               {picker === 'sport' && (
                 <>
-                  <Text style={styles.pickerTitle}>カテゴリを選択</Text>
+                  <Text style={styles.pickerTitle}>
+                    {t('create.pickers.sportTitle')}
+                  </Text>
                   <ScrollView style={{ maxHeight: 320 }}>
                     {SPORT_OPTIONS.map((option, index) => (
                       <Pressable
@@ -1318,7 +1397,7 @@ export default function CreateEventModal({
                             }
                           />
                           <Text style={styles.pickerItemText}>
-                            {option.label}
+                            {sportDisplayLabel(option.label)}
                           </Text>
                         </View>
                         {index === sportIndex && (
@@ -1330,20 +1409,20 @@ export default function CreateEventModal({
                   {isOtherSport ? (
                     <>
                       <Text style={styles.pickerHint}>
-                        任意のカテゴリ名を入力できます（空なら「その他」）
+                        {t('create.pickers.sportOtherHint')}
                       </Text>
                       <TextInput
                         style={styles.pickerInput}
                         value={customSport}
                         onChangeText={setCustomSport}
-                        placeholder="例: ボルダリング、ヨガ"
+                        placeholder={t('create.pickers.sportOtherPlaceholder')}
                         placeholderTextColor={MUTED}
                       />
                       <Pressable
                         style={styles.pickerDone}
                         onPress={() => setPicker(null)}
                       >
-                        <Text style={styles.pickerDoneText}>決定</Text>
+                        <Text style={styles.pickerDoneText}>{t('common.confirm')}</Text>
                       </Pressable>
                     </>
                   ) : null}
@@ -1352,9 +1431,11 @@ export default function CreateEventModal({
 
               {picker === 'deadline' && (
                 <>
-                  <Text style={styles.pickerTitle}>申込締切</Text>
+                  <Text style={styles.pickerTitle}>
+                    {t('create.pickers.deadlineTitle')}
+                  </Text>
                   <Text style={styles.pickerHint}>
-                    いつまで申し込みを受け付けるかを選びます
+                    {t('create.pickers.deadlineHint')}
                   </Text>
                   <ScrollView style={{ maxHeight: 360 }}>
                     {REGISTRATION_DEADLINE_OPTIONS.map((option, index) => {
@@ -1367,7 +1448,7 @@ export default function CreateEventModal({
                         <View key={String(option.value)}>
                           {showSection ? (
                             <Text style={styles.deadlineSection}>
-                              開始の〇時間前
+                              {t('create.pickers.deadlineBeforeSection')}
                             </Text>
                           ) : null}
                           <Pressable
@@ -1379,10 +1460,10 @@ export default function CreateEventModal({
                           >
                             <View style={styles.deadlineOptionCopy}>
                               <Text style={styles.pickerItemText}>
-                                {option.label}
+                                {deadlineDisplayLabel(option.value)}
                               </Text>
                               <Text style={styles.deadlineOptionSub}>
-                                {option.sublabel}
+                                {deadlineDisplaySublabel(option.value)}
                               </Text>
                             </View>
                             {active ? (
@@ -1398,9 +1479,11 @@ export default function CreateEventModal({
 
               {picker === 'cancel' && (
                 <>
-                  <Text style={styles.pickerTitle}>キャンセルポリシー</Text>
+                  <Text style={styles.pickerTitle}>
+                    {t('create.pickers.cancelTitle')}
+                  </Text>
                   <Text style={styles.ageHint}>
-                    期限内のキャンセルは自動返金されます。期限後は返金されません。
+                    {t('create.pickers.cancelHint')}
                   </Text>
                   {CANCEL_POLICY_OPTIONS.map((item) => (
                     <Pressable
@@ -1412,8 +1495,12 @@ export default function CreateEventModal({
                       }}
                     >
                       <View style={styles.deadlineOptionCopy}>
-                        <Text style={styles.pickerItemText}>{item.label}</Text>
-                        <Text style={styles.deadlineOptionSub}>{item.hint}</Text>
+                        <Text style={styles.pickerItemText}>
+                          {cancelPolicyDisplayLabel(item.label)}
+                        </Text>
+                        <Text style={styles.deadlineOptionSub}>
+                          {cancelPolicyDisplayHint(item.label, item.hint)}
+                        </Text>
                       </View>
                       {cancelPolicy === item.label && (
                         <Text style={styles.check}>✓</Text>
@@ -1425,7 +1512,9 @@ export default function CreateEventModal({
 
               {picker === 'level' && (
                 <>
-                  <Text style={styles.pickerTitle}>参加レベル</Text>
+                  <Text style={styles.pickerTitle}>
+                    {t('create.pickers.levelTitle')}
+                  </Text>
                   {LEVEL_OPTIONS.map((item) => (
                     <Pressable
                       key={item}
@@ -1435,7 +1524,9 @@ export default function CreateEventModal({
                         setPicker(null);
                       }}
                     >
-                      <Text style={styles.pickerItemText}>{item}</Text>
+                      <Text style={styles.pickerItemText}>
+                        {levelDisplayLabel(item)}
+                      </Text>
                       {level === item && <Text style={styles.check}>✓</Text>}
                     </Pressable>
                   ))}
@@ -1444,9 +1535,13 @@ export default function CreateEventModal({
 
               {picker === 'image' && (
                 <>
-                  <Text style={styles.pickerTitle}>写真を追加</Text>
+                  <Text style={styles.pickerTitle}>
+                    {t('create.pickers.imageTitle')}
+                  </Text>
                   <Text style={styles.pickerHint}>
-                    あと{remainingSlots}枚まで追加できます
+                    {t('create.pickers.imageRemaining', {
+                      count: remainingSlots,
+                    })}
                   </Text>
                   {isImagePickerAvailable() ? (
                     <Pressable
@@ -1457,15 +1552,15 @@ export default function CreateEventModal({
                       }}
                     >
                       <Text style={styles.libraryBtnText}>
-                        フォトライブラリから選ぶ
+                        {t('create.alerts.fromLibrary')}
                       </Text>
                     </Pressable>
                   ) : (
                     <Text style={styles.pickerHint}>
-                      ※ 端末ライブラリ連携は開発ビルド（npx expo run:ios）後に有効になります。今は URL / プリセットを使えます。
+                      {t('create.pickers.imageLibraryUnavailable')}
                     </Text>
                   )}
-                  <Text style={styles.pickerHint}>画像 URL</Text>
+                  <Text style={styles.pickerHint}>{t('create.pickers.imageUrl')}</Text>
                   <TextInput
                     style={styles.pickerInput}
                     value={imageDraft}
@@ -1475,7 +1570,9 @@ export default function CreateEventModal({
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <Text style={styles.pickerHint}>プリセット</Text>
+                  <Text style={styles.pickerHint}>
+                    {t('create.pickers.imagePresets')}
+                  </Text>
                   <View style={styles.presetGrid}>
                     {Object.entries(SPORT_IMAGE_PRESETS)
                       .filter(([key]) => key !== 'default')
@@ -1484,15 +1581,19 @@ export default function CreateEventModal({
                           key={key}
                           style={styles.presetItem}
                           onPress={() => setImageDraft(uri)}
-                          accessibilityLabel={`${key}の活動写真プリセット`}
+                          accessibilityLabel={t('create.pickers.presetA11y', {
+                            name: sportDisplayLabel(key),
+                          })}
                         >
                           <Image
                             source={{ uri }}
                             style={styles.presetThumb}
-                            accessibilityLabel={`${key}の試合・活動風景`}
+                            accessibilityLabel={t('create.pickers.presetImageA11y', {
+                              name: sportDisplayLabel(key),
+                            })}
                           />
                           <Text style={styles.presetLabel} numberOfLines={1}>
-                            {key}
+                            {sportDisplayLabel(key)}
                           </Text>
                         </Pressable>
                       ))}
@@ -1504,8 +1605,10 @@ export default function CreateEventModal({
                       if (uri) {
                         if (imageUris.length >= MAX_EVENT_PHOTOS) {
                           Alert.alert(
-                            '写真は最大5枚まで',
-                            'これ以上追加できません。不要な写真を削除してください。',
+                            t('create.alerts.photoMaxTitle', {
+                              count: MAX_EVENT_PHOTOS,
+                            }),
+                            t('create.alerts.photoMaxBody'),
                           );
                         } else {
                           addImageUri(uri);
@@ -1514,7 +1617,7 @@ export default function CreateEventModal({
                       setPicker(null);
                     }}
                   >
-                    <Text style={styles.pickerDoneText}>決定</Text>
+                    <Text style={styles.pickerDoneText}>{t('common.confirm')}</Text>
                   </Pressable>
                 </>
               )}
@@ -1587,10 +1690,9 @@ export default function CreateEventModal({
         <NumericKeypadModal
           visible={capacityPickerVisible}
           value={capacity}
-          title="Participants"
-          subtitle="活動人数"
-          note="活動人数は1〜1,000人まで設定できます。"
-          suffix="人"
+          title={t('create.keypad.capacityTitle')}
+          note={t('create.keypad.capacityNote')}
+          suffix={t('create.keypad.capacityUnit')}
           min={0}
           max={1000}
           onCancel={() => setCapacityPickerVisible(false)}
@@ -1604,9 +1706,9 @@ export default function CreateEventModal({
         <NumericKeypadModal
           visible={pricePickerVisible}
           value={priceYen}
-          title="Price per person"
-          subtitle="1人あたりの参加費"
-          note="有料イベントは参加時に Stripe / Apple Pay で事前決済されます。1円以上を入力してください。"
+          title={t('create.keypad.priceTitle')}
+          subtitle={t('create.keypad.priceSubtitle')}
+          note={t('create.keypad.priceNote')}
           prefix="¥"
           min={1}
           max={999999}
@@ -1636,6 +1738,7 @@ function ChipEditor({
   draft: string;
   onChangeDraft: (value: string) => void;
 }) {
+  const { t } = useTranslation();
   const atLimit = items.length >= MAX_EVENT_ITEMS;
   const canAdd = draft.trim().length > 0 && !atLimit;
 
@@ -1675,13 +1778,15 @@ function ChipEditor({
           onPress={commit}
           disabled={!canAdd}
           accessibilityRole="button"
-          accessibilityLabel="項目を追加"
+          accessibilityLabel={t('create.chips.addA11y')}
         >
-          <Text style={styles.chipAddText}>追加</Text>
+          <Text style={styles.chipAddText}>{t('common.add')}</Text>
         </Pressable>
       </View>
       {atLimit ? (
-        <Text style={styles.chipHint}>最大{MAX_EVENT_ITEMS}件まで追加できます</Text>
+        <Text style={styles.chipHint}>
+          {t('create.chips.maxItems', { max: MAX_EVENT_ITEMS })}
+        </Text>
       ) : null}
       {items.length > 0 ? (
         <View style={styles.chipList}>
@@ -1695,7 +1800,7 @@ function ChipEditor({
                 }
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel={`${item}を削除`}
+                accessibilityLabel={t('create.chips.deleteA11y', { item })}
               >
                 <Text style={styles.chipDeleteMark}>×</Text>
               </Pressable>
@@ -1703,7 +1808,7 @@ function ChipEditor({
           ))}
         </View>
       ) : (
-        <Text style={styles.chipHint}>追加すると下に一覧表示されます</Text>
+        <Text style={styles.chipHint}>{t('create.chips.empty')}</Text>
       )}
     </View>
   );
