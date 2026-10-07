@@ -18,6 +18,7 @@ function LineCallbackInner() {
           code: query.get('code'),
           state: query.get('state'),
           error: query.get('error'),
+          errorDescription: query.get('error_description'),
         });
         if (!cancelled) router.replace('/mypage');
       } catch (error) {

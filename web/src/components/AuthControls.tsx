@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 
@@ -57,6 +58,10 @@ export function LoginPromptCard({
   body?: string;
 }) {
   const { busy, error, configured, signInGoogle, signInApple, signInLine } = useAuth();
+  const [lineCallbackHint, setLineCallbackHint] = useState('');
+  useEffect(() => {
+    setLineCallbackHint(`${window.location.origin.replace(/\/+$/, '')}/auth/line/callback`);
+  }, []);
 
   return (
     <section className="card-shadow mt-4 px-5 py-8">
@@ -88,6 +93,13 @@ export function LoginPromptCard({
           {busy ? '処理中…' : 'LINEでログイン'}
         </button>
       </div>
+      {lineCallbackHint ? (
+        <p className="mt-3 text-[11px] font-bold leading-5 text-[#8A9199]">
+          LINE Callback（LINE Developers に登録）: {lineCallbackHint}
+          <br />
+          ※ Supabase の /auth/v1/callback ではありません
+        </p>
+      ) : null}
       {error ? <p className="mt-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}
     </section>
   );

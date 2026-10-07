@@ -61,6 +61,17 @@ export function lineChannelId() {
   return readPublic(process.env.NEXT_PUBLIC_LINE_CHANNEL_ID);
 }
 
+/**
+ * LINE Developers に登録した Callback URL と完全一致させる。
+ * 未設定時は SITE_URL（本番）またはブラウザの origin（ローカル）から組み立てる。
+ * ※ Supabase の https://xxx.supabase.co/auth/v1/callback は使わない。
+ */
+export function lineRedirectUriFromEnv(): string {
+  const explicit = readPublic(process.env.NEXT_PUBLIC_LINE_REDIRECT_URI);
+  if (explicit) return explicit.replace(/\/+$/, '');
+  return '';
+}
+
 export function firebasePublicConfig(): FirebasePublicConfig {
   const fromEnv: FirebasePublicConfig = {
     apiKey: ENV_FIREBASE_API_KEY,
