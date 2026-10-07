@@ -39,26 +39,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Providers が注入した runtime 設定を含めて判定する
   const configured = isFirebaseConfigured();
 
   useEffect(() => {
-    if (!configured) {
-      setError(
-        `Firebase Web の環境変数が未設定です（${missingFirebaseEnvKeys().join(', ')}）`,
-      );
+    const missing = missingFirebaseEnvKeys();
+    if (missing.length > 0) {
+      setError(`Firebase Web の環境変数が未設定です（${missing.join(', ')}）`);
       setReady(true);
       return;
     }
+    let settled = false;
+    const finish = (next: User | null) => {
+      if (settled) return;
+      settled = true;
+      setUser(next);
+      setReady(true);
+    };
     try {
-      return watchAuth((next) => {
-        setUser(next);
-        setReady(true);
-      });
+      const unsub = watchAuth(finish);
+      // onAuthStateChanged が返らない場合でも UI を止めない
+      const timeout = window.setTimeout(() => finish(null), 8000);
+      return () => {
+        window.clearTimeout(timeout);
+        unsub();
+      };
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '認証の初期化に失敗しました');
       setReady(true);
-      return undefined;
     }
+    return undefined;
   }, [configured]);
 
   const value = useMemo<AuthContextValue>(
