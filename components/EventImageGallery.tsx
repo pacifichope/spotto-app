@@ -1,3 +1,4 @@
+import AppModal from '@/components/AppModal';
 import {
   useCallback,
   useEffect,
@@ -7,7 +8,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -209,7 +209,7 @@ function EventImageFullscreen({
   if (!visible) return null;
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       transparent
       animationType="fade"
@@ -270,7 +270,7 @@ function EventImageFullscreen({
           <Dots count={uris.length} index={index} accent={theme.colors.primary} />
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 
 import LoginModal from '@/components/LoginModal';
 import PersonalProfileModal from '@/components/PersonalProfileModal';
@@ -27,9 +27,14 @@ import {
   showAccountBannedAlert,
 } from '@/lib/accountBan';
 import { useBlocks } from '@/lib/blocksContext';
-import { clearAllChatThreads } from '@/lib/chatsContext';
+import { prepareChatsForSignOut } from '@/lib/chatsContext';
 import { useClubs } from '@/lib/clubsContext';
 import { useEvents } from '@/lib/eventsContext';
+import {
+  beginExplicitSignOut,
+  endExplicitSignOut,
+  isExplicitSignOut,
+} from '@/lib/authSessionGate';
 import {
   signOutFirebaseAuth,
   subscribeFirebaseAuth,
@@ -48,6 +53,8 @@ import { userFacingSocialLoginError } from '@/lib/socialLoginErrors';
 import { useUserProfile } from '@/lib/userProfileContext';
 import {
   getUserProfile,
+  getActiveProfileUserId,
+  GUEST_USER_PROFILE,
   hydrateUserProfileForUser,
   isProfileComplete,
   isProfileSetupMarkedComplete,
@@ -63,6 +70,11 @@ import {
 type AuthContextValue = {
   isReady: boolean;
   isLoggedIn: boolean;
+  /**
+   * 今のユーザーのプロフィールを画面に出してよいか。
+   * ログアウト直後や hydration 中は false（古い写真を出さない）。
+   */
+  accountDataReady: boolean;
   /** この起動セッションのみ有効なゲスト閲覧（永続化しない） */
   isGuestBrowsing: boolean;
   user: AuthUser | null;
@@ -98,8 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { resetAccountData, clearParticipantSessionData, hydrateParticipantSessionData } =
     useEvents();
   const { resetJoinedClubs, clearPersistedJoinedClubs } = useClubs();
-  const { clearBlockedUsers, refreshBlocks } = useBlocks();
+  const { clearBlockedUsers, refreshBlocks, releaseSessionBlocks } = useBlocks();
   const [isReady, setIsReady] = useState(false);
+  const [accountDataReady, setAccountDataReady] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isGuestBrowsing, setIsGuestBrowsing] = useState(false);
   const [loginVisible, setLoginVisible] = useState(false);
@@ -134,12 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const seedProfileFromAuth = useCallback(
     (authUser: AuthUser) => {
       if (!authUser.id) return;
+      if (isExplicitSignOut()) return;
+      const generation = hydrateGenerationRef.current;
+      const base =
+        getActiveProfileUserId() === authUser.id
+          ? getUserProfile()
+          : { ...GUEST_USER_PROFILE };
       setActiveProfileUserId(authUser.id);
-      updateUserProfile(mergeAuthUserIntoProfile(getUserProfile(), authUser));
+      updateUserProfile(mergeAuthUserIntoProfile(base, authUser));
+      setAccountDataReady(true);
       void hydrateUserProfileForUser(authUser.id)
         .then((cached) => {
+          if (isExplicitSignOut()) return;
+          if (generation !== hydrateGenerationRef.current) return;
           if (userRef.current?.id !== authUser.id) return;
           updateUserProfile(mergeAuthUserIntoProfile(cached, authUser));
+          setAccountDataReady(true);
         })
         .catch(() => undefined);
     },
@@ -153,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const previousId = userRef.current?.id;
     userRef.current = null;
     setUser(null);
+    setAccountDataReady(false);
     clearParticipantSessionData();
     clearUserProfile();
     resetJoinedClubs();
@@ -207,25 +231,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (await rejectIfBanned(authUser.id)) {
             return null;
           }
-          if (generation !== hydrateGenerationRef.current) return null;
+          if (isExplicitSignOut() || generation !== hydrateGenerationRef.current) {
+            return null;
+          }
 
           // 1) 即時表示 → 2) リモートプロフィール（UI ブロックはここまで）
           seedProfileFromAuth(authUser);
           const profile = await fetchRemoteProfileForUser(authUser);
-          if (generation !== hydrateGenerationRef.current) return null;
+          if (isExplicitSignOut() || generation !== hydrateGenerationRef.current) {
+            return null;
+          }
 
           if (await rejectIfBanned(authUser.id)) {
             return null;
           }
-          if (generation !== hydrateGenerationRef.current) return null;
+          if (isExplicitSignOut() || generation !== hydrateGenerationRef.current) {
+            return null;
+          }
 
           updateUserProfile(profile);
           lastHydratedUserIdRef.current = authUser.id;
 
           // 3) イベント／参加／チャットはプロフィール表示後に背面実行
           void hydrateParticipantSessionData().catch((error) => {
+            if (generation !== hydrateGenerationRef.current) return;
             if (__DEV__) {
-              console.warn('[auth] hydrateParticipantSessionData failed', error);
+              console.warn(
+                '[auth] hydrateParticipantSessionData failed',
+                error,
+              );
             }
           });
           void refreshBlocks().catch(() => undefined);
@@ -310,6 +344,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Firebase Auth の唯一のセッションソース
   useEffect(() => {
     return subscribeFirebaseAuth((next) => {
+      if (isExplicitSignOut()) {
+        return;
+      }
       if (!next) {
         if (userRef.current) {
           clearSessionLocalState();
@@ -566,19 +603,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithSupabase = signInWithSocial;
 
   const signOut = useCallback(() => {
-    void unregisterDevicePushToken().finally(() => {
-      // 下書き・主催キャッシュ等のローカル一時データを先にクリアしてからセッション破棄
+    if (isExplicitSignOut()) return;
+    beginExplicitSignOut();
+
+    const clearLocal = () => {
       resetAccountData();
       clearSessionLocalState();
+      prepareChatsForSignOut();
+      releaseSessionBlocks();
       setIsGuestBrowsing(true);
       pendingResume.current = null;
       pendingAfterProfile.current = null;
       setLoginVisible(false);
       setLoginReason(undefined);
       setProfileSetupVisible(false);
-      void signOutFirebaseAuth();
-    });
-  }, [clearSessionLocalState, resetAccountData]);
+    };
+
+    try {
+      clearLocal();
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[auth] signOut local clear', error);
+      }
+      try {
+        clearSessionLocalState();
+        setAccountDataReady(false);
+        setUser(null);
+        userRef.current = null;
+      } catch {
+        // 画面状態のクリアに失敗しても、以降のサインアウトは続ける
+      }
+    }
+
+    // 画面を先にゲストへ戻してから、リモートのセッション破棄を行う
+    void (async () => {
+      try {
+        await unregisterDevicePushToken();
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[auth] unregister push on sign-out', error);
+        }
+      }
+      try {
+        await signOutFirebaseAuth();
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[auth] signOutFirebaseAuth', error);
+        }
+      } finally {
+        endExplicitSignOut();
+      }
+    })();
+  }, [clearSessionLocalState, releaseSessionBlocks, resetAccountData]);
 
   const deleteAccount = useCallback(async () => {
     const current = userRef.current;
@@ -586,26 +662,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false as const, error: 'ログインしていません。' };
     }
 
-    const result = await deleteUserAccount(current.id);
-    if (!result.ok) return result;
+    try {
+      const result = await deleteUserAccount(current.id);
+      if (!result.ok) return result;
 
-    // ローカル一時データはセッション破棄前にクリア（userId がまだ取れるうちに）
-    resetAccountData();
-    clearSessionLocalState();
-    setIsGuestBrowsing(true);
-    pendingResume.current = null;
-    pendingAfterProfile.current = null;
-    setLoginVisible(false);
-    setLoginReason(undefined);
-    setProfileSetupVisible(false);
-    resetJoinedClubs();
-    clearPersistedJoinedClubs();
-    clearBlockedUsers();
-    clearAllChatThreads();
-    await clearPhoneVerification();
-    await resetNotificationSettings();
-    await signOutFirebaseAuth();
-    return { ok: true as const };
+      beginExplicitSignOut();
+      try {
+        resetAccountData();
+        clearSessionLocalState();
+        setIsGuestBrowsing(true);
+        pendingResume.current = null;
+        pendingAfterProfile.current = null;
+        setLoginVisible(false);
+        setLoginReason(undefined);
+        setProfileSetupVisible(false);
+        resetJoinedClubs();
+        clearPersistedJoinedClubs();
+        clearBlockedUsers();
+        prepareChatsForSignOut();
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[auth] deleteAccount local clear', error);
+        }
+      }
+      try {
+        await clearPhoneVerification();
+      } catch (error) {
+        if (__DEV__) console.warn('[auth] clear phone on delete', error);
+      }
+      try {
+        await resetNotificationSettings();
+      } catch (error) {
+        if (__DEV__) console.warn('[auth] reset notifications on delete', error);
+      }
+      try {
+        await signOutFirebaseAuth();
+      } catch (error) {
+        if (__DEV__) console.warn('[auth] signOut on delete', error);
+      }
+      return { ok: true as const };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : 'アカウントを削除できませんでした。',
+      };
+    } finally {
+      endExplicitSignOut();
+    }
   }, [
     clearBlockedUsers,
     clearPersistedJoinedClubs,
@@ -618,6 +721,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       isReady,
       isLoggedIn: !!user,
+      accountDataReady,
       isGuestBrowsing,
       user,
       loginVisible,
@@ -637,6 +741,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [
       applyAuthUser,
+      accountDataReady,
       closeLogin,
       continueAsGuest,
       deleteAccount,
@@ -656,24 +761,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ],
   );
 
+  // iPad の RN Modal は認可シートの親になれず、閉じたあともタッチを塞ぐ。
+  // ネイティブでは同じウィンドウ上のオーバーレイにして、ルートの画面から認可を出す。
+  const loginPresentation = Platform.OS === 'web' ? 'modal' : 'overlay';
+
   return (
     <AuthContext.Provider value={value}>
-      {children}
-      <LoginModal
-        visible={loginVisible}
-        reason={loginReason}
-        onClose={closeLogin}
-        onSocialSignIn={signInWithSocial}
-      />
-      <PersonalProfileModal
-        visible={profileSetupVisible}
-        profile={userProfile}
-        onClose={closeProfileSetup}
-        onSave={completeProfileSetup}
-      />
+      <View collapsable={false} style={styles.host}>
+        {children}
+        <LoginModal
+          visible={loginVisible}
+          reason={loginReason}
+          presentation={loginPresentation}
+          onClose={closeLogin}
+          onSocialSignIn={signInWithSocial}
+        />
+        <PersonalProfileModal
+          visible={profileSetupVisible}
+          profile={userProfile}
+          onClose={closeProfileSetup}
+          onSave={completeProfileSetup}
+        />
+      </View>
     </AuthContext.Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  host: {
+    flex: 1,
+  },
+});
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

@@ -42,10 +42,14 @@ if (!i18n.isInitialized) {
 }
 
 /** 保存済みの手動選択があれば適用（起動時） */
-export async function hydrateLanguagePreference() {
+export async function hydrateLanguagePreference(options?: {
+  signal?: { cancelled: boolean };
+}) {
   const saved = await loadLanguagePreference();
+  if (options?.signal?.cancelled) return;
   if (!saved) return;
   if (i18n.language === saved) return;
+  if (options?.signal?.cancelled) return;
   await i18n.changeLanguage(saved);
 }
 

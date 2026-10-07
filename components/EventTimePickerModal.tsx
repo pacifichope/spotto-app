@@ -1,8 +1,8 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
-  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -389,7 +389,7 @@ export default function EventTimePickerModal({
   const minuteIndex = indexOfKey(minuteItems, minuteKey);
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -460,7 +460,7 @@ export default function EventTimePickerModal({
           <View style={styles.wheelsWrap} />
         )}
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

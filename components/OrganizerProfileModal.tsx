@@ -1,10 +1,10 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -217,7 +217,7 @@ export default function OrganizerProfileModal({
       : nameError;
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -462,7 +462,7 @@ export default function OrganizerProfileModal({
             ) : null}
           </KeyboardFormScrollView>
         </View>
-    </Modal>
+    </AppModal>
   );
 }
 

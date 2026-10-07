@@ -1,9 +1,9 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -113,7 +113,7 @@ export default function PersonalProfileModal({
   };
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -240,7 +240,7 @@ export default function PersonalProfileModal({
           </View>
         </KeyboardFormScrollView>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

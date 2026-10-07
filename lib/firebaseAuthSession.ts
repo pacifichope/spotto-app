@@ -209,19 +209,16 @@ export async function signOutFirebaseAuth(): Promise<void> {
     }
 
     try {
-      const Line = (
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require('@xmartlabs/react-native-line') as typeof import('@xmartlabs/react-native-line')
-      ).default;
-      await Line.logout();
-    } catch {
-      // ignore
-    }
-
-    try {
-      const { clearPersistedLineWebSession } = await import(
-        '@/lib/firebaseLineAuth'
-      );
+      const { clearPersistedLineWebSession, ensureLineSdkReady } =
+        await import('@/lib/firebaseLineAuth');
+      // setup 前の logout は iOS で AccessTokenStore の fatalError になる
+      if (await ensureLineSdkReady()) {
+        const Line = (
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          require('@xmartlabs/react-native-line') as typeof import('@xmartlabs/react-native-line')
+        ).default;
+        await Line.logout();
+      }
       clearPersistedLineWebSession();
     } catch {
       // ignore

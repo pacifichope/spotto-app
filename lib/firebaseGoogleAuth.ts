@@ -26,9 +26,9 @@ function googleWebClientId() {
 }
 
 function googleIosClientId() {
-  return (
-    readPublicEnv('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID') || googleWebClientId()
-  );
+  // Web クライアント ID を iOS 用に流用すると本番の GIDSignIn が即失敗する。
+  // 未設定なら SDK が GoogleService-Info.plist / URL scheme を使う。
+  return readPublicEnv('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID');
 }
 
 function loadGoogleSignIn() {
@@ -59,6 +59,35 @@ function loadAuthModular(): {
   }
 }
 
+function errorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === 'object' &&
+    error &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  ) {
+    return String((error as { message: string }).message);
+  }
+  return String(error || '');
+}
+
+/** iPad でモーダル閉鎖直後だと presenter が無く、1回目だけ失敗することがある */
+async function signInWithPresenterRetry<T>(
+  attempt: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await attempt();
+  } catch (error) {
+    const blob = errorText(error);
+    if (!/NULL_PRESENTER|presenting view controller|no presenting/i.test(blob)) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    return attempt();
+  }
+}
+
 function ensureGoogleConfigured(): FirebaseGoogleSignInResult | null {
   const webClientId = googleWebClientId();
   if (!webClientId) {
@@ -75,7 +104,7 @@ function ensureGoogleConfigured(): FirebaseGoogleSignInResult | null {
     const iosClientId = googleIosClientId();
     GoogleSignin.configure({
       webClientId,
-      iosClientId: iosClientId || undefined,
+      ...(iosClientId ? { iosClientId } : {}),
       offlineAccess: false,
     });
     if (__DEV__) {
@@ -190,7 +219,9 @@ export async function signInWithGoogleFirebase(): Promise<FirebaseGoogleSignInRe
         // ignore
       }
 
-      const response = await GoogleSignin.signIn();
+      const response = await signInWithPresenterRetry(() =>
+        GoogleSignin.signIn(),
+      );
       if (!isSuccessResponse(response)) {
         return {
           ok: false,

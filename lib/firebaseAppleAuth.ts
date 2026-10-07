@@ -95,6 +95,23 @@ function mapAppleError(error: unknown): FirebaseAppleSignInResult {
   return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.apple };
 }
 
+async function signInAppleWithRetry<T>(attempt: () => Promise<T>): Promise<T> {
+  try {
+    return await attempt();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error || '');
+    if (
+      /cancel|キャンセル/i.test(message) ||
+      !/window|present|anchor|view controller/i.test(message)
+    ) {
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    return attempt();
+  }
+}
+
 /**
  * Apple Authentication → Firebase Auth (apple.com OAuthProvider)
  */
@@ -138,13 +155,15 @@ export async function signInWithAppleFirebase(): Promise<FirebaseAppleSignInResu
 
     let credential: AppleAuthentication.AppleAuthenticationCredential;
     try {
-      credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-        nonce: hashedNonce,
-      });
+      credential = await signInAppleWithRetry(() =>
+        AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+          nonce: hashedNonce,
+        }),
+      );
     } catch (error) {
       return mapAppleError(error);
     }

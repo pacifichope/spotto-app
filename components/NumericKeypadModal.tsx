@@ -1,7 +1,7 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -90,7 +90,7 @@ export default function NumericKeypadModal({
   }`;
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       transparent
       animationType="slide"
@@ -149,7 +149,7 @@ export default function NumericKeypadModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

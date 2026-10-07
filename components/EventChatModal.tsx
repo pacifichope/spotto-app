@@ -1,10 +1,10 @@
+import AppModal from '@/components/AppModal';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
   FlatList,
   Keyboard,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -155,7 +155,7 @@ export default function EventChatModal({
   };
 
   return (
-    <Modal
+    <AppModal
       visible={visible && !!event}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -285,7 +285,7 @@ export default function EventChatModal({
           </View>
         </KeyboardAvoidingScreen>
       ) : null}
-    </Modal>
+    </AppModal>
   );
 }
 

@@ -23,6 +23,7 @@ import {
   saveChatHides,
   type ChatHides,
 } from '@/lib/chatHides';
+import { isExplicitSignOut } from '@/lib/authSessionGate';
 import {
   deleteChatThreadHide,
   fetchChatThreadHides,
@@ -1424,6 +1425,19 @@ export function clearAllChatThreads() {
   }, { persistReads: false, persistHides: false });
 }
 
+/** ログアウト直後にチャットの名前・写真を画面から外す */
+export function prepareChatsForSignOut() {
+  authFlickerPending = false;
+  authUserId = null;
+  try {
+    clearAllChatThreads();
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[chats] sign-out clear', error);
+    }
+  }
+}
+
 export function renameMyChatIdentity(name: string, imageUri?: string) {
   setById((prev) => {
     let changed = false;
@@ -1466,6 +1480,20 @@ function useChatsValue(): ChatsContextValue {
       authUserId = initial?.id ?? null;
       await hydrateChatReadsForUser(authUserId);
       unsub = subscribeFirebaseAuth((user) => {
+        if (isExplicitSignOut()) {
+          authFlickerPending = false;
+          cancelPendingLogoutClear();
+          authUserId = null;
+          if (!user) {
+            try {
+              clearAllChatThreads();
+            } catch {
+              // ignore
+            }
+          }
+          return;
+        }
+
         const nextId = user?.id ?? null;
         const prevId = authUserId;
 

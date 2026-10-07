@@ -1,5 +1,6 @@
+import AppModal from '@/components/AppModal';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { theme } from '@/constants/theme';
@@ -45,7 +46,7 @@ export default function FilterPickerModal({
   };
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       transparent
       animationType="fade"
@@ -130,7 +131,7 @@ export default function FilterPickerModal({
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

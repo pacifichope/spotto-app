@@ -1,7 +1,7 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -395,7 +395,7 @@ export default function EventScheduleSection({
         })}
       </View>
 
-      <Modal
+      <AppModal
         visible={calendarOpen}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -536,7 +536,7 @@ export default function EventScheduleSection({
             </Text>
           </ScrollView>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

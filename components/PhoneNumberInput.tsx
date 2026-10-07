@@ -1,8 +1,8 @@
+import AppModal from '@/components/AppModal';
 import { useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FlatList,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -196,7 +196,7 @@ export default function PhoneNumberInput({
         <View style={styles.hintSpacer} />
       )}
 
-      <Modal
+      <AppModal
         visible={pickerOpen}
         transparent
         animationType="slide"
@@ -295,7 +295,7 @@ export default function PhoneNumberInput({
             />
           </View>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

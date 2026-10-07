@@ -808,6 +808,7 @@
       "resendWait": "再送信（{{sec}}秒）",
       "resendLabel": "認証コードを再送信",
       "later": "あとで",
+      "reopenSheet": "シートを再表示",
       "errorInvalidInput": "電話番号を正しく入力してください。",
       "errorPrepareFailed": "本人確認の準備に失敗しました。",
       "errorSendFailed": "送信に失敗しました。",

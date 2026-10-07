@@ -1,15 +1,15 @@
+import AppModal from '@/components/AppModal';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import {
     Gesture,
@@ -147,7 +147,7 @@ export default function AttendeeProfileOverlay({
   }));
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       transparent
       animationType="fade"
@@ -529,7 +529,7 @@ export default function AttendeeProfileOverlay({
           />
         ) : null}
       </GestureHandlerRootView>
-    </Modal>
+    </AppModal>
   );
 }
 

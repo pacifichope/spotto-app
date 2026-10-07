@@ -1,3 +1,4 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -5,7 +6,6 @@ import {
   Alert,
   Image,
   Keyboard,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -157,6 +157,12 @@ export default function PaymentCheckoutSheet({
   const showDevHints = __DEV__ && isStripeTestMode();
   /** 決済セッション取得〜 Stripe UI 表示中 */
   const [preparingPay, setPreparingPay] = useState(false);
+  /**
+   * iOS: RN Modal の上から PaymentSheet を present するとシートが
+   * 見えない／背面に残るため、present 直前だけ Modal を外す。
+   */
+  const [suspendModalForNativePay, setSuspendModalForNativePay] =
+    useState(false);
   const unitYen = Math.max(0, Math.floor(amountYen));
   const totalYen = unitYen * quantity;
   const spotsLeft = event ? eventSpotsLeft(event) : 1;
@@ -203,6 +209,7 @@ export default function PaymentCheckoutSheet({
     if (!visible) {
       setPreparingPay(false);
       setBusy(false);
+      setSuspendModalForNativePay(false);
       payInFlightRef.current = false;
       return;
     }
@@ -210,6 +217,7 @@ export default function PaymentCheckoutSheet({
     setBusy(false);
     setError('');
     setPreparingPay(false);
+    setSuspendModalForNativePay(false);
     payInFlightRef.current = false;
     const initialMax = Math.max(1, eventSpotsLeft(event));
     setQuantity(Math.min(1, initialMax));
@@ -236,6 +244,7 @@ export default function PaymentCheckoutSheet({
     setError(message);
     setBusy(false);
     setPreparingPay(false);
+    setSuspendModalForNativePay(false);
     payInFlightRef.current = false;
     Alert.alert(t('payment.cannotStartTitle'), message);
   };
@@ -371,8 +380,14 @@ export default function PaymentCheckoutSheet({
         });
       }
 
-      // 1フレーム待ってから present（Android でレイアウト直後の失敗を避ける）
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      // iOS: Modal を外してから PaymentSheet を出す（Modal 上 present だと非表示になる）
+      if (Platform.OS === 'ios') {
+        setSuspendModalForNativePay(true);
+        await new Promise((resolve) => setTimeout(resolve, 320));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+
       let paidOk = false;
       try {
         paidOk = await presentNativePaymentSheet(session);
@@ -380,6 +395,7 @@ export default function PaymentCheckoutSheet({
         if (__DEV__) {
           console.error('[payments] PaymentSheet failed, try hosted', nativeErr);
         }
+        setSuspendModalForNativePay(false);
         await payViaHostedCheckout();
         return;
       }
@@ -389,6 +405,7 @@ export default function PaymentCheckoutSheet({
           paymentIntentIdFromSession(session) || demoPaymentIntentId(event.id);
         const confirmed = await confirmPaymentIntentStatus(paymentIntentId);
         if (!confirmed.paid) {
+          setSuspendModalForNativePay(false);
           showPayError(
             confirmed.status
               ? t('payment.errorNotCompletedStatus', { status: confirmed.status })
@@ -400,11 +417,13 @@ export default function PaymentCheckoutSheet({
         return;
       }
 
-      // ユーザーキャンセル
+      // ユーザーキャンセル → チェックアウト Modal を戻す
+      setSuspendModalForNativePay(false);
       setBusy(false);
       setPreparingPay(false);
       payInFlightRef.current = false;
     } catch (err) {
+      setSuspendModalForNativePay(false);
       const message =
         err instanceof Error ? err.message : t('payment.errorStartFailed');
       if (__DEV__) console.error('[payments] payViaStripe failed', err);
@@ -464,6 +483,11 @@ export default function PaymentCheckoutSheet({
   };
 
   if (!visible || !event) return null;
+
+  // Modal を外しているあいだは Stripe ネイティブシートに前面を譲る
+  if (suspendModalForNativePay) {
+    return null;
+  }
 
   const ctaLabel = paid
     ? t('payment.ctaPay', { amount: formatYenAmount(totalYen) })
@@ -960,7 +984,7 @@ export default function PaymentCheckoutSheet({
   // Android では Modal の方が確実に全面表示される（絶対配置オーバーレイだと
   // 端末によっては見えない / 背面に残るケースがある）
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       transparent={false}
@@ -970,7 +994,7 @@ export default function PaymentCheckoutSheet({
       onRequestClose={resetAndClose}
     >
       {sheetBody}
-    </Modal>
+    </AppModal>
   );
 }
 

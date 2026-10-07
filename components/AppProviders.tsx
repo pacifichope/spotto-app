@@ -19,7 +19,16 @@ import { UserProfileProvider } from '@/lib/userProfileContext';
 
 function LanguageHydration({ children }: { children: ReactNode }) {
   useEffect(() => {
-    void hydrateLanguagePreference();
+    const signal = { cancelled: false };
+    void (async () => {
+      // 子ツリーの初回マウントが終わるまで言語切替を遅らせる
+      await Promise.resolve();
+      if (signal.cancelled) return;
+      await hydrateLanguagePreference({ signal });
+    })();
+    return () => {
+      signal.cancelled = true;
+    };
   }, []);
   return children;
 }

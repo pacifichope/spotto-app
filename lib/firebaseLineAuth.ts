@@ -279,7 +279,11 @@ function clearWebLineSessionBackup() {
   }
 }
 
-async function ensureLineSetup(): Promise<FirebaseLineSignInResult | null> {
+/**
+ * LineSDK の LoginManager.setup が終わるまで true を返さない。
+ * 未設定・失敗時は false。ログアウトやトークン操作はこの後にだけ行う。
+ */
+export async function ensureLineSdkReady(): Promise<boolean> {
   const channelId = lineChannelId();
   if (!channelId) {
     if (__DEV__) {
@@ -287,12 +291,14 @@ async function ensureLineSetup(): Promise<FirebaseLineSignInResult | null> {
         '[auth] EXPO_PUBLIC_LINE_CHANNEL_ID が未設定です（LINE → Firebase）',
       );
     }
-    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
+    return false;
   }
 
   if (!lineSetupPromise) {
-    const Line = loadLineSdk().default;
-    lineSetupPromise = Line.setup({ channelId }).catch((error) => {
+    lineSetupPromise = (async () => {
+      const Line = loadLineSdk().default;
+      await Line.setup({ channelId });
+    })().catch((error) => {
       lineSetupPromise = null;
       throw error;
     });
@@ -300,13 +306,19 @@ async function ensureLineSetup(): Promise<FirebaseLineSignInResult | null> {
 
   try {
     await lineSetupPromise;
-    return null;
+    return true;
   } catch (error) {
     if (__DEV__) {
       console.warn('[auth] LINE SDK setup', error);
     }
-    return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
+    return false;
   }
+}
+
+async function ensureLineSetup(): Promise<FirebaseLineSignInResult | null> {
+  const ready = await ensureLineSdkReady();
+  if (ready) return null;
+  return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.line };
 }
 
 function mapLineError(error: unknown): FirebaseLineSignInResult {
@@ -530,14 +542,30 @@ export async function signInWithLineFirebase(): Promise<FirebaseLineSignInResult
     let loginResult: {
       accessToken: LineAccessTokenLike;
     };
-    try {
-      loginResult = await Line.login({
+    const login = () =>
+      Line.login({
         scopes: [Scope.Profile, Scope.OpenId],
         onlyWebLogin: false,
       });
+    try {
+      loginResult = await login();
     } catch (error) {
-      console.error('[auth] Line.login', error);
-      return mapLineError(error);
+      const message =
+        error instanceof Error ? error.message : String(error || '');
+      if (
+        /cancel|キャンセル/i.test(message) ||
+        !/present|window|view controller|setup/i.test(message)
+      ) {
+        console.error('[auth] Line.login', error);
+        return mapLineError(error);
+      }
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        loginResult = await login();
+      } catch (retryError) {
+        console.error('[auth] Line.login', retryError);
+        return mapLineError(retryError);
+      }
     }
 
     const accessToken = loginResult.accessToken?.accessToken?.trim();

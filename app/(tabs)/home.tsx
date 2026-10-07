@@ -29,6 +29,7 @@ import SortPickerModal from '@/components/SortPickerModal';
 import { ListIcon } from '@/components/icons';
 import { theme } from '@/constants/theme';
 import { filterEventsByMapRegion } from '@/lib/areas';
+import { isDemoCatalogEventId } from '@/lib/devTestFlags';
 import {
   areaLocatingLabel,
   areaUnsetLabel,
@@ -227,7 +228,15 @@ export default function SportsAppScreen() {
       : [];
     try {
       const inRegion = filterEventsByMapRegion(source, mapRegion);
-      const scoped = filterActiveBrowseEvents(inRegion, safeNow);
+      // 審査・デモ撮影向け: demo-* は現在地が海外でもリストに残す
+      const demosOutside = source.filter(
+        (event) =>
+          isDemoCatalogEventId(event.id) &&
+          !inRegion.some((item) => item.id === event.id),
+      );
+      const merged =
+        demosOutside.length > 0 ? [...demosOutside, ...inRegion] : inRegion;
+      const scoped = filterActiveBrowseEvents(merged, safeNow);
       return typeof filterEvents === 'function' ? filterEvents(scoped) : scoped;
     } catch {
       try {
@@ -627,8 +636,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    width: '100%',
-    height: '100%',
     zIndex: 1,
   },
   mapLayerHidden: {

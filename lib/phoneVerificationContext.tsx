@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import {
   createContext,
   useCallback,
@@ -8,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { InteractionManager, Platform } from 'react-native';
 
 import PhoneVerificationModal from '@/components/PhoneVerificationModal';
 import { useAuth } from '@/lib/authContext';
@@ -21,6 +24,39 @@ import {
   type PhoneVerificationRecord,
 } from '@/lib/phoneVerification';
 
+/** シミュレータでは SMS が使えず決済確認を阻害するため、DEV では本人確認をスキップ */
+function shouldSkipPhoneVerificationInDev() {
+  if (typeof __DEV__ === 'undefined' || !__DEV__) return false;
+  const flag = String(process.env.EXPO_PUBLIC_SKIP_PHONE_VERIFY || '')
+    .trim()
+    .toLowerCase();
+  if (flag === '1' || flag === 'true' || flag === 'yes') return true;
+  if (flag === '0' || flag === 'false' || flag === 'no') return false;
+  // 未指定時: シミュレータ / エミュレータのみスキップ
+  return Constants.isDevice === false;
+}
+
+function pushPhoneAuthRoute() {
+  if (Platform.OS === 'web') return;
+  InteractionManager.runAfterInteractions(() => {
+    try {
+      router.navigate('/auth/phone');
+      if (__DEV__) console.log('[phone] navigated to /auth/phone');
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[phone] router.navigate(/auth/phone) failed', error);
+      }
+      try {
+        router.push('/auth/phone');
+      } catch (retryError) {
+        if (__DEV__) {
+          console.warn('[phone] router.push(/auth/phone) failed', retryError);
+        }
+      }
+    }
+  });
+}
+
 export type OpenPhoneVerificationOptions = {
   /** true のとき閉じる／「あとで」不可 */
   required?: boolean;
@@ -31,9 +67,11 @@ type PhoneVerificationContextValue = {
   isPhoneVerified: boolean;
   phoneDisplay: string | null;
   phoneE164: string | null;
+  /** Join ゲートなどで「あとで」不可かどうか */
+  isPhoneGateRequired: boolean;
   /**
-   * 未認証なら本人確認シートを直接開き、完了後に resume を呼ぶ。
-   * 認証済みなら true。未認証（シート表示中）なら false。
+   * 未認証なら本人確認を開き、完了後に resume を呼ぶ。
+   * 認証済みなら true。未認証（画面表示中）なら false。
    */
   requirePhoneVerified: (resume?: () => void) => boolean;
   openPhoneVerification: (
@@ -41,6 +79,8 @@ type PhoneVerificationContextValue = {
     options?: OpenPhoneVerificationOptions,
   ) => void;
   closePhoneVerification: () => void;
+  /** OTP 成功後の保存・resume（/auth/phone 埋め込み用） */
+  completePhoneVerification: (phoneE164: string) => Promise<void>;
   refreshPhoneVerification: () => Promise<void>;
   clearLocalPhoneVerification: () => Promise<void>;
 };
@@ -99,9 +139,27 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
 
   const openPhoneVerification = useCallback(
     (resume?: () => void, options?: OpenPhoneVerificationOptions) => {
-      pendingResume.current = resume ?? null;
-      setRequired(Boolean(options?.required));
-      setVisible(true);
+      // resume 未指定時は既存の pending（参加ゲート等）を消さない
+      if (resume) {
+        pendingResume.current = resume;
+      }
+      if (options && typeof options.required === 'boolean') {
+        setRequired(options.required);
+      }
+      if (__DEV__) {
+        console.log('[phone] openPhoneVerification', {
+          hasResume: Boolean(pendingResume.current),
+          required: options?.required,
+          platform: Platform.OS,
+        });
+      }
+      // ネイティブは /auth/phone に埋め込み表示（root Modal は見えないことがある）
+      if (Platform.OS === 'web') {
+        setVisible(true);
+        return;
+      }
+      setVisible(false);
+      pushPhoneAuthRoute();
     },
     [],
   );
@@ -117,16 +175,31 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
   const requirePhoneVerified = useCallback(
     (resume?: () => void) => {
       if (record?.phoneE164) return true;
-      // 確認ポップアップは出さず、本人確認シートを直接表示
+      if (shouldSkipPhoneVerificationInDev()) {
+        if (__DEV__) {
+          console.log(
+            '[phone] requirePhoneVerified skipped (dev / simulator)',
+          );
+        }
+        return true;
+      }
       pendingResume.current = resume ?? null;
-      setRequired(false);
-      setVisible(true);
+      setRequired(true);
+      if (__DEV__) {
+        console.log('[phone] requirePhoneVerified → /auth/phone');
+      }
+      if (Platform.OS === 'web') {
+        setVisible(true);
+      } else {
+        setVisible(false);
+        pushPhoneAuthRoute();
+      }
       return false;
     },
     [record?.phoneE164],
   );
 
-  const handleVerified = useCallback(
+  const completePhoneVerification = useCallback(
     async (phoneE164: string) => {
       if (!user?.id) {
         setVisible(false);
@@ -146,6 +219,7 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
         setRequired(false);
         const resume = pendingResume.current;
         pendingResume.current = null;
+        // /auth/phone の back と競合しないよう、遷移が落ち着いてから再開
         setTimeout(() => {
           try {
             resume?.();
@@ -154,12 +228,11 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
               console.warn('[phone] resume after verify failed', error);
             }
           }
-        }, 80);
+        }, 280);
       } catch (error) {
         if (__DEV__) {
           console.warn('[phone] save after verify failed', error);
         }
-        // 保存失敗時はモーダルを開いたままにし、呼び出し側でメッセージ表示
         throw error instanceof Error
           ? error
           : new Error('認証結果の保存に失敗しました。');
@@ -174,58 +247,65 @@ export function PhoneVerificationProvider({ children }: { children: ReactNode })
       isPhoneVerified: Boolean(record?.phoneE164),
       phoneDisplay: record?.phoneDisplay ?? null,
       phoneE164: record?.phoneE164 ?? null,
+      isPhoneGateRequired: required,
       requirePhoneVerified,
       openPhoneVerification,
       closePhoneVerification,
+      completePhoneVerification,
       refreshPhoneVerification,
       clearLocalPhoneVerification,
     }),
     [
       clearLocalPhoneVerification,
       closePhoneVerification,
+      completePhoneVerification,
       isReady,
       openPhoneVerification,
       record,
       refreshPhoneVerification,
       requirePhoneVerified,
+      required,
     ],
   );
 
   return (
     <PhoneVerificationContext.Provider value={value}>
       {children}
-      <PhoneVerificationModal
-        visible={visible}
-        required={required}
-        onClose={closePhoneVerification}
-        onVerified={handleVerified}
-        requestOtp={async (phoneInput, options) => {
-          try {
-            return await requestPhoneOtp(phoneInput, options);
-          } catch (error) {
-            return {
-              ok: false as const,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : '認証コードの送信に失敗しました。',
-            };
-          }
-        }}
-        confirmOtp={async (phoneE164, code, channel) => {
-          try {
-            return await confirmPhoneOtp(phoneE164, code, channel);
-          } catch (error) {
-            return {
-              ok: false as const,
-              error:
-                error instanceof Error
-                  ? error.message
-                  : '認証コードの確認に失敗しました。',
-            };
-          }
-        }}
-      />
+      {/* Web のみ root Modal。ネイティブは /auth/phone 埋め込み */}
+      {Platform.OS === 'web' ? (
+        <PhoneVerificationModal
+          visible={visible}
+          required={required}
+          onClose={closePhoneVerification}
+          onVerified={completePhoneVerification}
+          requestOtp={async (phoneInput, options) => {
+            try {
+              return await requestPhoneOtp(phoneInput, options);
+            } catch (error) {
+              return {
+                ok: false as const,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : '認証コードの送信に失敗しました。',
+              };
+            }
+          }}
+          confirmOtp={async (phoneE164, code, channel) => {
+            try {
+              return await confirmPhoneOtp(phoneE164, code, channel);
+            } catch (error) {
+              return {
+                ok: false as const,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : '認証コードの確認に失敗しました。',
+              };
+            }
+          }}
+        />
+      ) : null}
     </PhoneVerificationContext.Provider>
   );
 }

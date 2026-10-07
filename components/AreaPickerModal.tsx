@@ -1,7 +1,7 @@
+import AppModal from '@/components/AppModal';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -45,7 +45,7 @@ export default function AreaPickerModal({
     selection?.mode === 'prefecture' ? selection.prefectureId : null;
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -104,7 +104,7 @@ export default function AreaPickerModal({
           ))}
         </ScrollView>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

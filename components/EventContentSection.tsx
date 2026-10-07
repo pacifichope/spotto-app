@@ -1,8 +1,8 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutAnimation,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -122,7 +122,7 @@ export default function EventContentSection({
         ) : null}
       </View>
 
-      <Modal
+      <AppModal
         visible={fullOpen}
         animationType="slide"
         presentationStyle="pageSheet"
@@ -149,7 +149,7 @@ export default function EventContentSection({
             <Text style={styles.body}>{body}</Text>
           </ScrollView>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

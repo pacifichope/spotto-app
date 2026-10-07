@@ -844,6 +844,7 @@
       "resendWait": "Resend ({{sec}}s)",
       "resendLabel": "Resend verification code",
       "later": "Later",
+      "reopenSheet": "Show verification again",
       "errorInvalidInput": "Please enter a valid phone number.",
       "errorPrepareFailed": "Couldn’t prepare verification.",
       "errorSendFailed": "Couldn’t send the code.",

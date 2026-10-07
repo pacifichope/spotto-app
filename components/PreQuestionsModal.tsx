@@ -1,8 +1,8 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Switch,
@@ -132,7 +132,7 @@ export default function PreQuestionsModal({
   };
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -296,7 +296,7 @@ export default function PreQuestionsModal({
           </Pressable>
         </KeyboardFormScrollView>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

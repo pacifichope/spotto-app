@@ -25,6 +25,7 @@ import {
   type BlockUserInput,
   type BlocksSnapshot,
 } from '@/lib/blocks';
+import { isExplicitSignOut } from '@/lib/authSessionGate';
 import type { EventAttendee } from '@/lib/attendees';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
@@ -44,6 +45,8 @@ type BlocksContextValue = {
   blockUser: (input: BlockUserInput) => Promise<boolean>;
   unblockUser: (userId: string) => Promise<void>;
   clearBlockedUsers: () => void;
+  /** メモリ上のブロック表示だけ消す（ログアウト） */
+  releaseSessionBlocks: () => void;
   refreshBlocks: () => Promise<void>;
 };
 
@@ -100,15 +103,17 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
       unsub = subscribeFirebaseAuth((user) => {
         setTimeout(() => {
           void (async () => {
-            if (!user) {
-              if (cancelled) return;
+            if (cancelled) return;
+            if (isExplicitSignOut() || !user) {
               setBlockedUsers([]);
               setBlockedMeIds([]);
-              void saveBlocksSnapshot({ blockedUsers: [], blockedMeIds: [] });
+              if (!user && !isExplicitSignOut()) {
+                void saveBlocksSnapshot({ blockedUsers: [], blockedMeIds: [] });
+              }
               return;
             }
             const remote = await fetchBlocksFromSupabase();
-            if (cancelled || !remote) return;
+            if (cancelled || !remote || isExplicitSignOut()) return;
             applySnapshot(remote, setBlockedUsers, setBlockedMeIds);
           })();
         }, 0);
@@ -214,6 +219,13 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
     }
   }, [blockedUsers, persistLocal]);
 
+  /** ログアウト時の画面クリア。リモートのブロック一覧は消さない */
+  const releaseSessionBlocks = useCallback(() => {
+    setBlockedUsers([]);
+    setBlockedMeIds([]);
+    void saveBlocksSnapshot({ blockedUsers: [], blockedMeIds: [] });
+  }, []);
+
   const value = useMemo<BlocksContextValue>(
     () => ({
       blockedUsers,
@@ -229,6 +241,7 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
       blockUser,
       unblockUser,
       clearBlockedUsers,
+      releaseSessionBlocks,
       refreshBlocks,
     }),
     [
@@ -238,6 +251,7 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
       blockUser,
       unblockUser,
       clearBlockedUsers,
+      releaseSessionBlocks,
       refreshBlocks,
     ],
   );

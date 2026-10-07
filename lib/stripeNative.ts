@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import {
   AddressCollectionMode,
@@ -21,6 +22,13 @@ function isValidPaymentIntentClientSecret(secret: string | undefined) {
   return value.startsWith('pi_') && value.length >= 20;
 }
 
+/** シミュレータでは Apple Pay を付けない（カード決済シートの表示を優先） */
+function shouldEnableApplePay() {
+  if (Platform.OS !== 'ios') return false;
+  // isDevice === false → シミュレータ / エミュレータ
+  return Constants.isDevice !== false;
+}
+
 /** PaymentSheet を初期化。present は別途呼ぶ。 */
 export async function initNativePaymentSheet(
   session: PaymentSession,
@@ -35,11 +43,14 @@ export async function initNativePaymentSheet(
   if (!publishableKey) {
     throw new Error('Stripe の公開鍵が未設定です。');
   }
+  const applePay = shouldEnableApplePay();
   if (__DEV__) {
     console.log('[payments] initNativePaymentSheet', {
       platform: Platform.OS,
       paymentIntentId: session.paymentIntentId,
       hasClientSecret: Boolean(clientSecret),
+      applePay,
+      isDevice: Constants.isDevice,
       publishableKeyMode: publishableKey.startsWith('pk_live_')
         ? 'live'
         : publishableKey.startsWith('pk_test_')
@@ -57,7 +68,7 @@ export async function initNativePaymentSheet(
     customerId: session.customerId,
     customerEphemeralKeySecret: session.customerEphemeralKey,
     allowsDelayedPaymentMethods: false,
-    ...(Platform.OS === 'ios'
+    ...(applePay
       ? { applePay: { merchantCountryCode: 'JP' as const } }
       : null),
     ...(Platform.OS === 'android'
@@ -113,9 +124,8 @@ export async function presentNativePaymentSheet(
   session: PaymentSession,
 ): Promise<boolean> {
   await initNativePaymentSheet(session);
-  // Android: Activity が前面に来るまで少し待つ
-  if (Platform.OS === 'android') {
-    await new Promise((resolve) => setTimeout(resolve, 120));
-  }
+  // iOS: Modal 解除直後や init 直後だとシートが透明/非表示になることがある
+  const settleMs = Platform.OS === 'ios' ? 450 : 120;
+  await new Promise((resolve) => setTimeout(resolve, settleMs));
   return presentPreparedPaymentSheet();
 }

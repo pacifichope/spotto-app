@@ -1,7 +1,7 @@
 {
   "name": "spotto",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.14",
@@ -85,7 +85,7 @@
     "check:firebase": "node scripts/check-firebase-build.cjs",
     "ios:clean": "rm -rf .expo node_modules/.cache ios/build && bash scripts/run-ios-sim.sh",
     "clean:metro": "rm -rf .expo node_modules/.cache node_modules/react-native-svg && npm install react-native-svg@15.15.4 --save-exact && npx expo start -c",
-    "postinstall": "node scripts/patch-line-bot-prompt.cjs && node scripts/patch-maps-user-location.cjs"
+    "postinstall": "node scripts/patch-line-bot-prompt.cjs && node scripts/patch-line-sdk-setup.cjs && node scripts/patch-maps-user-location.cjs && node scripts/patch-apple-auth-window.cjs"
   },
   "private": true
 }

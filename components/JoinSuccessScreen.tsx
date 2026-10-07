@@ -1,7 +1,7 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -281,7 +281,7 @@ export default function JoinSuccessScreen({
     : '';
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="none"
       presentationStyle="fullScreen"
@@ -425,7 +425,7 @@ export default function JoinSuccessScreen({
           </Animated.View>
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

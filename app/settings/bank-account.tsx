@@ -1,3 +1,4 @@
+import AppModal from '@/components/AppModal';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -5,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -453,7 +453,7 @@ export default function BankAccountSettingsScreen() {
         )}
       </KeyboardFormScrollView>
 
-      <Modal
+      <AppModal
         visible={bankPickerOpen}
         animationType="fade"
         transparent
@@ -524,8 +524,8 @@ export default function BankAccountSettingsScreen() {
             </Pressable>
           </View>
         </View>
-      </Modal>
-      <Modal
+      </AppModal>
+      <AppModal
         visible={confirmOpen}
         animationType="fade"
         transparent
@@ -614,7 +614,7 @@ export default function BankAccountSettingsScreen() {
             </Pressable>
           </View>
         </View>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

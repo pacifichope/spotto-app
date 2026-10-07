@@ -10,8 +10,8 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -20,7 +20,12 @@ import 'react-native-reanimated';
 import AppProviders from '@/components/AppProviders';
 import ConnectionBanner from '@/components/ConnectionBanner';
 import { theme } from '@/constants/theme';
+import { ensureLineSdkReady } from '@/lib/firebaseLineAuth';
 import { useNotificationDeepLinks } from '@/lib/notificationDeepLink';
+import { useSettledWindow } from '@/lib/useSettledWindow';
+
+// 画面やログアウトより先に LineSDK を初期化する（未初期化の AccessTokenStore は落ちる）
+void ensureLineSdkReady();
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -38,6 +43,7 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const windowSize = useSettledWindow();
 
   useEffect(() => {
     if (error) throw error;
@@ -50,7 +56,13 @@ export default function RootLayout() {
   }, [loaded]);
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <GestureHandlerRootView
+      collapsable={false}
+      style={[
+        styles.root,
+        { width: windowSize.width, height: windowSize.height },
+      ]}
+    >
       <SafeAreaProvider>
         <BottomSheetModalProvider>
           <AppProviders>
@@ -69,7 +81,12 @@ function RootLayoutNav() {
     <ThemeProvider value={DefaultTheme}>
       <StatusBar style="dark" />
       <ConnectionBanner />
-      <Stack>
+      <Stack
+        screenOptions={{
+          freezeOnBlur: false,
+          contentStyle: { flex: 1 },
+        }}
+      >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen

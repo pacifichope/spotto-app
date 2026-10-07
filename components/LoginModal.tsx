@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import AppModal from '@/components/AppModal';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -26,13 +26,8 @@ import {
   type AuthResult,
   type SocialProvider,
 } from '@/lib/auth';
-import {
-  SOCIAL_LOGIN_USER_ERRORS,
-  userFacingSocialLoginError,
-} from '@/lib/socialLoginErrors';
-
-/** ネイティブ SDK 認証の UI ガード（ブラウザ OAuth 待ちは使わない） */
-const NATIVE_AUTH_UI_GUARD_MS = 90_000;
+import { runGuardedSocialSignIn } from '@/lib/socialSignInGuard';
+import { useSettledWindow } from '@/lib/useSettledWindow';
 
 type LoginModalProps = {
   visible: boolean;
@@ -51,70 +46,137 @@ export default function LoginModal({
 }: LoginModalProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { width, height } = useSettledWindow();
   const [submitting, setSubmitting] = useState(false);
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
+    null,
+  );
+  /** システム認可シートを出す直前に RN Modal を閉じる */
+  const [sheetHidden, setSheetHidden] = useState(false);
+  const busyRef = useRef(false);
+  const dismissListeners = useRef<Array<() => void>>([]);
+  const ipad = Platform.OS === 'ios' && Platform.isPad;
+  const centerSheet = ipad || width >= 600;
 
   useEffect(() => {
-    if (!visible) return;
+    if (visible) return;
+    busyRef.current = false;
     setSubmitting(false);
-  }, [visible, reason]);
+    setPendingProvider(null);
+    setSheetHidden(false);
+  }, [visible]);
 
   const copy = reason ? getAuthReasonCopy(reason) : null;
 
+  const hideSheetForNativeAuth = useCallback(() => {
+    // オーバーレイは別の ViewController を作らないので、隠さずに認可シートを出せる。
+    // 隠すと iPad で画面が空のまま固まり、戻ったあともタッチが死ぬ。
+    if (Platform.OS === 'web' || presentation === 'overlay') {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      const fallbackMs = ipad ? 700 : 500;
+      const timer = setTimeout(finish, fallbackMs);
+      dismissListeners.current.push(() => {
+        clearTimeout(timer);
+        finish();
+      });
+      setSheetHidden(true);
+    });
+  }, [ipad, presentation]);
+
   const submitSocial = async (provider: SocialProvider) => {
-    if (submitting) return;
-    setSubmitting(true);
-    let settled = false;
-    const clearBusy = () => {
-      if (settled) return;
-      settled = true;
-      setSubmitting(false);
-    };
-    const showLoginError = (message: string) => {
-      if (isAccountBannedMessage(message)) {
-        showAccountBannedAlert(message);
-        return;
-      }
-      Alert.alert(t('auth.loginErrorTitle'), message);
-    };
-    const uiGuard = setTimeout(() => {
-      clearBusy();
-      showLoginError(SOCIAL_LOGIN_USER_ERRORS.timeout);
-    }, NATIVE_AUTH_UI_GUARD_MS);
-    try {
-      const result = await onSocialSignIn(provider);
-      if (!result.ok && !result.cancelled) {
-        if (result.banned) {
-          showAccountBannedAlert(result.error);
+    if (busyRef.current) return;
+    let holdSheetUntilAlert = false;
+    const outcome = await runGuardedSocialSignIn({
+      provider,
+      busyRef,
+      setBusy: (busy) => {
+        setSubmitting(busy);
+        setPendingProvider(busy ? provider : null);
+      },
+      signIn: onSocialSignIn,
+      beforeNativePrompt: hideSheetForNativeAuth,
+      showError: (message) => {
+        if (isAccountBannedMessage(message)) {
+          showAccountBannedAlert(message);
+          setSheetHidden(false);
           return;
         }
-        showLoginError(userFacingSocialLoginError(provider, result.error));
-      }
-    } catch (error) {
-      if (__DEV__) {
-        console.warn('[LoginModal] social sign-in', provider, error);
-      }
-      showLoginError(userFacingSocialLoginError(provider));
-    } finally {
-      clearTimeout(uiGuard);
-      clearBusy();
-    }
+        holdSheetUntilAlert = true;
+        Alert.alert(t('auth.loginErrorTitle'), message, [
+          { text: t('common.ok'), onPress: () => setSheetHidden(false) },
+        ]);
+      },
+      showBanned: (message) => {
+        showAccountBannedAlert(message);
+        setSheetHidden(false);
+      },
+    });
+    if (outcome.ignored || outcome.result?.ok) return;
+    if (!holdSheetUntilAlert) setSheetHidden(false);
   };
 
+  const [contentHeight, setContentHeight] = useState(0);
+  const [scrollHeight, setScrollHeight] = useState(0);
+  const sheetMaxHeight = Math.max(
+    280,
+    height > 200
+      ? height - insets.top - insets.bottom - (centerSheet ? 48 : 12)
+      : 280,
+  );
+  const needsScroll = contentHeight > scrollHeight + 8;
+
   const body = (
-    <View style={styles.root} pointerEvents="box-none">
-      <Pressable style={styles.backdrop} onPress={onClose} />
+    <View
+      collapsable={false}
+      pointerEvents="box-none"
+      style={[styles.root, centerSheet && styles.rootCentered]}
+    >
+      <Pressable
+        accessibilityElementsHidden
+        disabled={submitting}
+        importantForAccessibility="no"
+        style={styles.backdrop}
+        onPress={submitting ? undefined : onClose}
+      />
       <View
+        collapsable={false}
+        pointerEvents="auto"
         style={[
           styles.sheet,
-          { paddingBottom: Math.max(insets.bottom, 16) },
+          centerSheet ? styles.sheetCentered : styles.sheetBottom,
+          {
+            maxHeight: sheetMaxHeight,
+            paddingBottom: Math.max(insets.bottom, 16),
+            width: '100%',
+            maxWidth: centerSheet ? 480 : undefined,
+          },
         ]}
       >
         <View style={styles.handle} />
         <ScrollView
-          showsVerticalScrollIndicator={false}
           bounces={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          nestedScrollEnabled
+          scrollEnabled={needsScroll}
+          showsVerticalScrollIndicator={needsScroll}
+          style={[styles.scroll, { maxHeight: sheetMaxHeight - 28 }]}
           contentContainerStyle={styles.content}
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.height);
+            setScrollHeight((prev) => (prev === next ? prev : next));
+          }}
+          onContentSizeChange={(_w, nextHeight) => {
+            const next = Math.round(nextHeight);
+            setContentHeight((prev) => (prev === next ? prev : next));
+          }}
         >
           <Text style={styles.kicker}>spotto</Text>
           <Text style={styles.title}>{copy?.title ?? t('auth.loginTitleDefault')}</Text>
@@ -124,7 +186,10 @@ export default function LoginModal({
 
           <SocialLoginButtons
             disabled={submitting}
-            onPress={(provider) => void submitSocial(provider)}
+            pendingProvider={pendingProvider}
+            onPress={(provider) => {
+              void submitSocial(provider);
+            }}
           />
 
           {submitting ? (
@@ -137,10 +202,13 @@ export default function LoginModal({
           <LegalConsentNote variant="continue" />
 
           <Pressable
-            onPress={onClose}
-            style={styles.guestBtn}
             accessibilityRole="button"
             accessibilityLabel={t('auth.keepBrowsing')}
+            accessibilityState={{ disabled: submitting }}
+            disabled={submitting}
+            hitSlop={8}
+            onPress={onClose}
+            style={styles.guestBtn}
           >
             <Text style={styles.guestText}>{t('auth.keepBrowsing')}</Text>
           </Pressable>
@@ -149,23 +217,30 @@ export default function LoginModal({
     </View>
   );
 
-  // overlay: 親 Modal 内でも前面に出せるよう View オーバーレイにする
+  const showSurface = visible && !sheetHidden;
+
   if (presentation === 'overlay') {
-    if (!visible) return null;
-    return <View style={styles.overlayRoot}>{body}</View>;
+    if (!showSurface) return null;
+    return <View accessibilityViewIsModal style={styles.overlayRoot}>{body}</View>;
   }
 
   return (
-    <Modal
-      visible={visible}
-      transparent
+    <AppModal
       animationType="fade"
       presentationStyle="overFullScreen"
       statusBarTranslucent
-      onRequestClose={onClose}
+      transparent
+      visible={showSurface}
+      onDismiss={() => {
+        const listeners = dismissListeners.current.splice(0);
+        listeners.forEach((listener) => listener());
+      }}
+      onRequestClose={submitting ? () => undefined : onClose}
     >
-      <View style={styles.modalFill}>{body}</View>
-    </Modal>
+      <View collapsable={false} style={styles.modalFill}>
+        {body}
+      </View>
+    </AppModal>
   );
 }
 
@@ -190,15 +265,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  rootCentered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: 'rgba(17, 24, 39, 0.45)',
+    zIndex: 0,
   },
   sheet: {
+    position: 'relative',
     backgroundColor: theme.colors.surface,
+    zIndex: 2,
+    elevation: 8,
+  },
+  sheetBottom: {
     borderTopLeftRadius: theme.radius.xxl,
     borderTopRightRadius: theme.radius.xxl,
-    maxHeight: '92%',
+    alignSelf: 'stretch',
+  },
+  sheetCentered: {
+    borderRadius: theme.radius.xxl,
+    alignSelf: 'center',
+  },
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   handle: {
     alignSelf: 'center',
@@ -246,7 +344,8 @@ const styles = StyleSheet.create({
   guestBtn: {
     marginTop: 14,
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+    minHeight: 44,
   },
   guestText: {
     fontSize: 13,

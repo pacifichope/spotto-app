@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   Linking,
   Platform,
   Pressable,
@@ -49,7 +50,8 @@ export default function SettingsScreen() {
   const { t } = useTranslation();
   const language = getCurrentAppLanguage();
   const { userProfile, updateUserProfile } = useUserProfile();
-  const { isLoggedIn, user, openLogin, signOut, deleteAccount } = useAuth();
+  const { isLoggedIn, user, openLogin, signOut, deleteAccount, accountDataReady } =
+    useAuth();
   const { blockedUsers } = useBlocks();
   const [profileVisible, setProfileVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -60,11 +62,17 @@ export default function SettingsScreen() {
       return;
     }
     const performLogout = () => {
-      signOut();
-      router.replace('/');
-      setTimeout(() => {
-        Alert.alert(t('settings.logoutDone'));
-      }, 100);
+      setProfileVisible(false);
+      try {
+        signOut();
+      } catch (error) {
+        if (__DEV__) console.warn('[settings] logout', error);
+      }
+      // 確認アラートの dismiss と同時に replace すると iOS が落ちる。
+      // ローカル状態を消したあと、遷移だけを次のターンで行う。
+      InteractionManager.runAfterInteractions(() => {
+        router.replace('/(tabs)/home');
+      });
     };
     if (Platform.OS === 'web') {
       performLogout();
@@ -93,10 +101,19 @@ export default function SettingsScreen() {
     const message = t('settings.deleteDoneMessage');
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message);
+      router.replace('/(tabs)/home');
+      return;
     }
-    router.replace('/');
+    Alert.alert(title, message, [
+      {
+        text: t('common.ok'),
+        onPress: () => {
+          InteractionManager.runAfterInteractions(() => {
+            router.replace('/(tabs)/home');
+          });
+        },
+      },
+    ]);
   };
 
   const onPressDelete = () => {
@@ -277,7 +294,11 @@ export default function SettingsScreen() {
 
       <PersonalProfileModal
         visible={profileVisible}
-        profile={isLoggedIn ? userProfile : { name: '', gender: '', imageUri: undefined }}
+        profile={
+          isLoggedIn && accountDataReady
+            ? userProfile
+            : { name: '', gender: '', imageUri: undefined }
+        }
         onClose={() => setProfileVisible(false)}
         onSave={(next) => {
           if (user?.id) {

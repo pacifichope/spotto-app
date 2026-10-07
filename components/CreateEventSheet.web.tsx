@@ -1,3 +1,4 @@
+import AppModal from '@/components/AppModal';
 import {
   forwardRef,
   useImperativeHandle,
@@ -6,7 +7,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -109,7 +109,7 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
     };
 
     return (
-      <Modal
+      <AppModal
         visible={visible}
         animationType="slide"
         transparent
@@ -244,7 +244,7 @@ const CreateEventSheet = forwardRef<CreateEventSheetRef, CreateEventSheetProps>(
             </KeyboardFormScrollView>
           </SafeAreaView>
         </View>
-      </Modal>
+      </AppModal>
     );
   },
 );

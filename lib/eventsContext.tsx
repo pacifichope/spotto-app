@@ -10,8 +10,10 @@ import {
 } from 'react';
 
 import type { CreateEventPayload } from '@/components/createEventSheetTypes';
+import { isExplicitSignOut } from '@/lib/authSessionGate';
 import {
     ALLOW_JOIN_PAST_EVENTS,
+    shouldShowDemoEvents,
 } from '@/lib/devTestFlags';
 import {
     applyToggleJoin,
@@ -225,7 +227,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => new Date());
   // 本番は空配列スタート（リモート取得までサンプルを出さない）
   const [events, setEvents] = useState<SportEvent[]>(() =>
-    __DEV__ ? getDevSampleEvents() : [],
+    shouldShowDemoEvents() ? getDevSampleEvents() : [],
   );
   const [joinedIds, setJoinedIds] = useState<Set<string>>(() => new Set());
   const [hostedIds, setHostedIds] = useState<Set<string>>(() => new Set());
@@ -269,9 +271,23 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
   const hydrateDoneRef = useRef(false);
+  /** Provider 生存中のみ非同期 setState を許可 */
+  const mountedRef = useRef(false);
+  /** アンマウントや連続 hydrate で古い非同期結果を捨てる */
+  const asyncGenerationRef = useRef(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      asyncGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (mountedRef.current) setNow(new Date());
+    }, 60_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -302,21 +318,29 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   const refreshEvents = useCallback(async () => {
     if (!isSupabaseConfigured()) {
-      setEventsLoading(false);
-      if (__DEV__) {
-        applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+      if (mountedRef.current) {
+        setEventsLoading(false);
+        if (shouldShowDemoEvents()) {
+          applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
+        }
       }
       return;
     }
-    setEventsLoading(true);
-    setEventsError(null);
+    const gen = asyncGenerationRef.current;
+    if (mountedRef.current) {
+      setEventsLoading(true);
+      setEventsError(null);
+    }
     try {
       const remote = await fetchRemoteEvents();
+      if (!mountedRef.current || gen !== asyncGenerationRef.current) return;
       if (!remote.ok) {
         setEventsError(userFacingNetworkError(remote.error));
-        if (__DEV__) {
-          console.warn('[events] fetch failed', remote.error);
-          // 開発中はモックを残してマップ／リストを空にしない
+        if (shouldShowDemoEvents()) {
+          if (__DEV__) {
+            console.warn('[events] fetch failed', remote.error);
+          }
+          // デモカタログを残してホームを空にしない（審査・撮影用）
           applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
         }
         return;
@@ -326,13 +350,18 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         currentUserIdRef.current,
       );
     } catch (error) {
+      if (!mountedRef.current || gen !== asyncGenerationRef.current) return;
       setEventsError(userFacingNetworkError(error));
-      if (__DEV__) {
-        console.warn('[events] fetch threw', error);
+      if (shouldShowDemoEvents()) {
+        if (__DEV__) {
+          console.warn('[events] fetch threw', error);
+        }
         applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
       }
     } finally {
-      setEventsLoading(false);
+      if (mountedRef.current && gen === asyncGenerationRef.current) {
+        setEventsLoading(false);
+      }
     }
   }, [applyEventsList]);
 
@@ -350,22 +379,16 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         return null;
       }
       if (!remote.data) return null;
+      if (!mountedRef.current) return remote.data;
 
-      setEvents((prev) => {
-        if (prev.some((item) => item.id === id)) {
-          eventsRef.current = prev;
-          return prev;
-        }
-        const next = [remote.data!, ...prev];
-        eventsRef.current = next;
-        const nextHosted = hostedIdsFromEvents(next, currentUserIdRef.current);
-        hostedIdsRef.current = nextHosted;
-        setHostedIds(nextHosted);
-        return next;
-      });
+      const existingAfter = eventsRef.current.find((item) => item.id === id);
+      if (existingAfter) return existingAfter;
+
+      // setState updater 内で別 state を更新しない（マウント前警告の原因になる）
+      applyEventsList([remote.data, ...eventsRef.current]);
       return remote.data;
     },
-    [],
+    [applyEventsList],
   );
 
   const applyOrganizerProfile = useCallback((next: OrganizerProfile) => {
@@ -449,6 +472,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
         setCurrentUserId(initial?.id ?? null);
       }
       unsub = subscribeFirebaseAuth((user) => {
+        if (isExplicitSignOut()) {
+          setCurrentUserId(null);
+          return;
+        }
         setCurrentUserId(user?.id ?? null);
       });
     })();
@@ -488,8 +515,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       joinedRef.current = new Set();
       setJoinedIds(new Set());
 
-      eventsRef.current = __DEV__ ? getDevSampleEvents() : [];
-      setEvents(__DEV__ ? getDevSampleEvents() : []);
+      const seed = shouldShowDemoEvents() ? getDevSampleEvents() : [];
+      eventsRef.current = seed;
+      setEvents(seed);
       hydrateDoneRef.current = true;
 
       if (isSupabaseConfigured()) {
@@ -512,19 +540,23 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             }
           } else {
             setEventsError(userFacingNetworkError(remote.error));
-            if (__DEV__) {
-              console.warn('[events] initial fetch failed', remote.error);
+            if (shouldShowDemoEvents()) {
+              if (__DEV__) {
+                console.warn('[events] initial fetch failed', remote.error);
+              }
               applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
             }
           }
         } catch (error) {
           if (!cancelled) {
             setEventsError(userFacingNetworkError(error));
-            if (__DEV__) {
+            if (shouldShowDemoEvents()) {
               applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
             }
           }
         }
+      } else if (shouldShowDemoEvents()) {
+        applyEventsList(getDevSampleEvents(), currentUserIdRef.current);
       }
       if (!cancelled) setEventsLoading(false);
     })();
@@ -579,6 +611,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       if (__DEV__) console.warn('[participants] mine fetch', remote.error);
       return;
     }
+    if (!mountedRef.current) return;
     const nextJoined = new Set(remote.data.joinedIds);
     joinedRef.current = nextJoined;
     setJoinedIds(nextJoined);
@@ -596,6 +629,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           if (__DEV__) console.warn('[participants] list', remote.error);
           return [];
         }
+        if (!mountedRef.current) return remote.data.attendees;
         setParticipantsByEvent((prev) => {
           const next = { ...prev, [eventId]: remote.data.attendees };
           participantsByEventRef.current = next;
@@ -656,6 +690,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
           if (__DEV__) console.warn('[participants] batch', remote.error);
           return;
         }
+        if (!mountedRef.current) return;
         setParticipantsByEvent((prev) => {
           const next = { ...prev };
           for (const id of pending) {
@@ -715,7 +750,14 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       setJoinedIds(new Set());
       return;
     }
-    void refreshMyParticipations();
+    let cancelled = false;
+    void (async () => {
+      await refreshMyParticipations();
+      if (cancelled || !mountedRef.current) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [currentUserId, refreshMyParticipations]);
 
   const persistHostedEvents = useCallback(
@@ -1333,12 +1375,19 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
         // 翻訳は作成成功後にバックグラウンド実行（失敗しても公開は維持）
         const createdIds = created.map((item) => item.id);
+        const translateGen = asyncGenerationRef.current;
         void requestEventTranslation({
           eventIds: createdIds,
           title: payload.title,
           description: payload.description,
           sourceLang: getCurrentAppLanguage(),
         }).then((translated) => {
+          if (
+            !mountedRef.current ||
+            translateGen !== asyncGenerationRef.current
+          ) {
+            return;
+          }
           if (!translated.ok) {
             if (__DEV__) {
               console.warn('[events] translate skipped/failed', translated.error);
@@ -1367,7 +1416,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
         return { ok: true, event: primary, events: created };
       } finally {
-        setEventsSaving(false);
+        if (mountedRef.current) setEventsSaving(false);
       }
     },
     [persistHostedEvents],
@@ -1375,7 +1424,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
 
   const resetAccountData = useCallback(() => {
     const previousUserId = currentUserIdRef.current;
-    const nextEvents = __DEV__ ? getDevSampleEvents() : [];
+    asyncGenerationRef.current += 1;
+    currentUserIdRef.current = null;
+    setCurrentUserId(null);
+    const nextEvents = shouldShowDemoEvents() ? getDevSampleEvents() : [];
     const nextJoined = new Set<string>();
     const nextFavorites = new Set<string>();
     const nextHosted = new Set<string>();
@@ -1409,10 +1461,16 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hydrateParticipantSessionData = useCallback(async () => {
+    const gen = asyncGenerationRef.current;
+    const stillActive = () =>
+      mountedRef.current && gen === asyncGenerationRef.current;
+
     const [favoritesLoaded, watchlistLoaded] = await Promise.all([
       loadFavoriteEventIds(),
       loadWatchlistEventIds(),
     ]);
+    if (!stillActive()) return;
+
     const cleaned = favoritesLoaded.filter(
       (id) => !LEGACY_DEMO_PARTICIPANT_IDS.has(id),
     );
@@ -1422,9 +1480,13 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     setFavoriteIds(new Set(cleaned));
     setWatchlistIds(new Set(watchlistLoaded));
     await refreshEvents();
+    if (!stillActive()) return;
     await refreshMyParticipations();
+    if (!stillActive()) return;
     await refreshMyFavorites();
+    if (!stillActive()) return;
     await refreshMyWatchlist();
+    if (!stillActive()) return;
 
     // 参加／主催イベントのチャット履歴を DB から復元（再ログイン・再起動対策）
     try {

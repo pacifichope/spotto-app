@@ -1,3 +1,5 @@
+import { isExplicitSignOut } from '@/lib/authSessionGate';
+
 type AsyncStorageType =
   typeof import('@react-native-async-storage/async-storage').default;
 
@@ -234,6 +236,10 @@ export async function hydrateUserProfileForUser(userId: string) {
   activeUserId = uid;
   hydratePromise = (async () => {
     const stored = await readStoredProfile(uid);
+    // ログアウトで activeUserId が外れていたら、古い写真を画面へ戻さない
+    if (isExplicitSignOut() || activeUserId !== uid) {
+      return { ...GUEST_USER_PROFILE };
+    }
     if (stored) {
       currentProfile = stored;
       emit();

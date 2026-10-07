@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -17,13 +18,8 @@ import {
 } from '@/lib/accountBan';
 import { useAuth } from '@/lib/authContext';
 import type { SocialProvider } from '@/lib/auth';
-import {
-  SOCIAL_LOGIN_USER_ERRORS,
-  userFacingSocialLoginError,
-} from '@/lib/socialLoginErrors';
+import { runGuardedSocialSignIn } from '@/lib/socialSignInGuard';
 import { theme } from '@/constants/theme';
-
-const NATIVE_AUTH_UI_GUARD_MS = 90_000;
 
 type LoginProps = {
   /** true のとき「ゲストとして続ける」を表示 */
@@ -36,64 +32,41 @@ export default function Login({ allowGuest = true }: LoginProps) {
   const router = useRouter();
   const { signInWithSocial, continueAsGuest } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
+    null,
+  );
+  const busyRef = useRef(false);
 
   const goHome = () => {
     router.replace('/(tabs)/home');
   };
 
   const handleGuest = () => {
+    if (busyRef.current) return;
     continueAsGuest();
     goHome();
   };
 
-  const handleProvider = async (provider: SocialProvider) => {
-    if (loading) return;
-    setLoading(true);
-
-    let settled = false;
-    const clearBusy = () => {
-      if (settled) return;
-      settled = true;
-      setLoading(false);
-    };
-
-    const showLoginError = (message: string) => {
-      if (isAccountBannedMessage(message)) {
-        showAccountBannedAlert(message);
-        return;
-      }
-      Alert.alert(t('auth.loginErrorTitle'), message);
-    };
-
-    // UI 側の最終ガード: 内部がハングしてもローディングを必ず解除
-    const uiGuard = setTimeout(() => {
-      clearBusy();
-      showLoginError(SOCIAL_LOGIN_USER_ERRORS.timeout);
-    }, NATIVE_AUTH_UI_GUARD_MS);
-
-    try {
-      const result = await signInWithSocial(provider);
-
-      if (!result.ok) {
-        if (!result.cancelled) {
-          if (result.banned) {
-            showAccountBannedAlert(result.error);
-            return;
-          }
-          showLoginError(userFacingSocialLoginError(provider, result.error));
+  const handleProvider = (provider: SocialProvider) => {
+    void runGuardedSocialSignIn({
+      provider,
+      busyRef,
+      setBusy: (busy) => {
+        setLoading(busy);
+        setPendingProvider(busy ? provider : null);
+      },
+      signIn: signInWithSocial,
+      showError: (message) => {
+        if (isAccountBannedMessage(message)) {
+          showAccountBannedAlert(message);
+          return;
         }
-        return;
-      }
-      goHome();
-    } catch (error) {
-      if (__DEV__) {
-        console.warn('[Login] social sign-in', provider, error);
-      }
-      showLoginError(userFacingSocialLoginError(provider));
-    } finally {
-      clearTimeout(uiGuard);
-      clearBusy();
-    }
+        Alert.alert(t('auth.loginErrorTitle'), message);
+      },
+      showBanned: showAccountBannedAlert,
+    }).then((outcome) => {
+      if (!outcome.ignored && outcome.result?.ok) goHome();
+    });
   };
 
   return (
@@ -122,18 +95,21 @@ export default function Login({ allowGuest = true }: LoginProps) {
 
         <SocialLoginButtons
           disabled={loading}
-          onPress={(provider) => void handleProvider(provider)}
+          pendingProvider={pendingProvider}
+          onPress={handleProvider}
         />
 
         {allowGuest ? (
-          <Text
-            style={styles.guestText}
-            onPress={loading ? undefined : handleGuest}
+          <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('auth.continueAsGuest')}
+            accessibilityState={{ disabled: loading }}
+            disabled={loading}
+            hitSlop={8}
+            onPress={handleGuest}
           >
-            {t('auth.continueAsGuest')}
-          </Text>
+            <Text style={styles.guestText}>{t('auth.continueAsGuest')}</Text>
+          </Pressable>
         ) : null}
       </View>
     </View>

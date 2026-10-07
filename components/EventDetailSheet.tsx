@@ -1,16 +1,16 @@
+import AppModal from '@/components/AppModal';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
@@ -567,6 +567,13 @@ export default function EventDetailSheet({
       );
       return 'unchanged';
     }
+    if (__DEV__) {
+      console.log('[payments] opening checkout sheet', {
+        eventId: checkoutEvent.id,
+        priceYen,
+        platform: Platform.OS,
+      });
+    }
     setPaying(true);
     return 'unchanged';
   };
@@ -575,12 +582,16 @@ export default function EventDetailSheet({
     if (ended && (activeJoined || !ALLOW_JOIN_PAST_EVENTS)) return 'unchanged';
     // ログイン → BAN → プロフィール → 電話番号認証 → 参加/決済
     const runGate = async (): Promise<JoinActionResult> => {
-      if (!(await ensureNotBanned())) return 'unchanged';
+      if (!(await ensureNotBanned())) {
+        if (__DEV__) console.warn('[payments] join blocked: banned');
+        return 'unchanged';
+      }
       if (
         !requireCompleteProfile(() => {
           void runGate();
         })
       ) {
+        if (__DEV__) console.warn('[payments] join blocked: profile incomplete');
         return 'unchanged';
       }
       if (
@@ -588,6 +599,15 @@ export default function EventDetailSheet({
           void runGate();
         })
       ) {
+        // context 側でも navigate するが、Stack 内から二重で確実に遷移
+        if (__DEV__) {
+          console.log('[payments] phone gate → /auth/phone');
+        }
+        try {
+          router.push('/auth/phone');
+        } catch {
+          // context の navigate に任せる
+        }
         return 'unchanged';
       }
       return startJoin();
@@ -617,7 +637,14 @@ export default function EventDetailSheet({
     void (async () => {
       if (!(await ensureNotBanned())) return;
       if (!requireCompleteProfile(() => applyJoinRef.current())) return;
-      if (!requirePhoneVerified(() => applyJoinRef.current())) return;
+      if (!requirePhoneVerified(() => applyJoinRef.current())) {
+        try {
+          router.push('/auth/phone');
+        } catch {
+          // ignore
+        }
+        return;
+      }
       await startJoin();
     })();
     return 'unchanged';
@@ -1754,7 +1781,7 @@ export default function EventDetailSheet({
         }}
       />
       {leaveConfirmVisible ? (
-      <Modal
+      <AppModal
         visible
         transparent
         animationType="fade"
@@ -1820,10 +1847,10 @@ export default function EventDetailSheet({
             </View>
           </View>
         </View>
-      </Modal>
+      </AppModal>
       ) : null}
       {roomMode ? (
-        <Modal
+        <AppModal
           visible
           animationType="slide"
           presentationStyle="fullScreen"
@@ -1845,7 +1872,7 @@ export default function EventDetailSheet({
               setRoomDmUserId(null);
             }}
           />
-        </Modal>
+        </AppModal>
       ) : null}
       <SaveToast
         message={toast}

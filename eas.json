@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 24.7.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -10,6 +10,7 @@
       "env": {
         "APP_ENV": "development",
         "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com",
+        "EXPO_PUBLIC_SHOW_DEMO_EVENTS": "1",
         "EAS_NO_FROZEN_LOCKFILE": "1"
       },
       "android": {
@@ -25,6 +26,7 @@
       "env": {
         "APP_ENV": "development",
         "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com",
+        "EXPO_PUBLIC_SHOW_DEMO_EVENTS": "1",
         "EAS_NO_FROZEN_LOCKFILE": "1"
       },
       "ios": {
@@ -37,6 +39,7 @@
       "env": {
         "APP_ENV": "preview",
         "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com",
+        "EXPO_PUBLIC_SHOW_DEMO_EVENTS": "1",
         "EAS_NO_FROZEN_LOCKFILE": "1"
       },
       "android": {
@@ -44,12 +47,13 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "channel": "production",
       "environment": "production",
       "env": {
         "APP_ENV": "production",
         "EXPO_PUBLIC_API_BASE_URL_REMOTE": "https://spotto-api-rupy.onrender.com",
+        "EXPO_PUBLIC_SHOW_DEMO_EVENTS": "1",
         "EAS_NO_FROZEN_LOCKFILE": "1"
       },
       "android": {

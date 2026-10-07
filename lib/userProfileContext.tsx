@@ -44,12 +44,17 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       profile,
       uid ? { userId: uid } : undefined,
     );
-    renameMyChatIdentity(userDisplayName(next), next.imageUri);
+    // 同一レンダー／マウント中に chats の外部ストアを同期更新しない
+    queueMicrotask(() => {
+      renameMyChatIdentity(userDisplayName(next), next.imageUri);
+    });
   }, []);
 
   const clearUserProfile = useCallback(() => {
     const next = resetStoredUserProfile();
-    renameMyChatIdentity(userDisplayName(next), next.imageUri);
+    queueMicrotask(() => {
+      renameMyChatIdentity(userDisplayName(next), next.imageUri);
+    });
   }, []);
 
   const value = useMemo(

@@ -1,9 +1,9 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Keyboard,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -39,6 +39,11 @@ type PhoneVerificationModalProps = {
   visible: boolean;
   /** true のとき閉じる／スキップ不可 */
   required?: boolean;
+  /**
+   * true: Modal を使わず画面内に描画（/auth/phone 用）。
+   * iOS で root Modal が見えない問題を避ける。
+   */
+  embedded?: boolean;
   onClose: () => void;
   onVerified: (phoneE164: string) => void | Promise<void>;
   requestOtp: (
@@ -58,6 +63,7 @@ const OTP_LEN = 6;
 export default function PhoneVerificationModal({
   visible,
   required = false,
+  embedded = false,
   onClose,
   onVerified,
   requestOtp,
@@ -247,242 +253,263 @@ export default function PhoneVerificationModal({
     }
   };
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      presentationStyle="overFullScreen"
-      onRequestClose={() => {
-        if (!required && !submitting) onClose();
-      }}
+  if (!visible) return null;
+
+  const sheet = (
+    <View
+      style={[
+        styles.root,
+        embedded ? styles.rootEmbedded : styles.rootFullScreen,
+      ]}
     >
-      <View style={styles.root}>
-        {required ? (
-          <View style={styles.backdrop} />
-        ) : (
-          <Pressable
-            style={styles.backdrop}
-            onPress={() => {
-              if (!submitting) {
-                Keyboard.dismiss();
-                onClose();
-              }
-            }}
-          />
-        )}
-        <KeyboardFormScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          keyboardDismissMode="interactive"
-          bounces={false}
-          showsVerticalScrollIndicator={false}
-          bottomGap={Math.max(insets.bottom, 24)}
-          keyboardVerticalOffset={
-            Platform.OS === 'ios' ? Math.max(insets.top, 8) : 0
-          }
+      {embedded ? (
+        <View style={styles.embeddedFill} />
+      ) : required ? (
+        <View style={styles.backdrop} />
+      ) : (
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => {
+            if (!submitting) {
+              Keyboard.dismiss();
+              onClose();
+            }
+          }}
+        />
+      )}
+      <KeyboardFormScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        keyboardDismissMode="interactive"
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        bottomGap={Math.max(insets.bottom, 24)}
+        keyboardVerticalOffset={
+          Platform.OS === 'ios' ? Math.max(insets.top, 8) : 0
+        }
+      >
+        <View
+          style={[
+            styles.sheet,
+            embedded ? styles.sheetEmbedded : null,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
         >
-          <View
-            style={[
-              styles.sheet,
-              { paddingBottom: Math.max(insets.bottom, 16) },
-            ]}
-          >
-            <View style={styles.handle} />
-            <Text style={styles.kicker}>{t('auth.phone.kicker')}</Text>
-            <Text style={styles.title}>
-              {step === 'phone'
-                ? t('auth.phone.titlePhone')
-                : t('auth.phone.titleCode')}
-            </Text>
-            <Text style={styles.body}>
-              {step === 'phone'
-                ? t('auth.phone.bodyPhone')
-                : t('auth.phone.bodyCode', {
-                    phone: formatPhoneDisplay(phoneE164),
-                  })}
-            </Text>
+          {embedded ? null : <View style={styles.handle} />}
+          <Text style={styles.kicker}>{t('auth.phone.kicker')}</Text>
+          <Text style={styles.title}>
+            {step === 'phone'
+              ? t('auth.phone.titlePhone')
+              : t('auth.phone.titleCode')}
+          </Text>
+          <Text style={styles.body}>
+            {step === 'phone'
+              ? t('auth.phone.bodyPhone')
+              : t('auth.phone.bodyCode', {
+                  phone: formatPhoneDisplay(phoneE164),
+                })}
+          </Text>
 
-            {step === 'phone' ? (
-              <PhoneNumberInput
-                value={phoneDigits}
-                country={phoneCountry}
-                onChangeDigits={(digits) => {
-                  setPhoneDigits(digits);
-                  setError('');
-                }}
-                onChangeCountry={(next) => {
-                  setPhoneCountry(next);
-                  setError('');
-                }}
-                editable={!submitting}
-                inputRef={phoneInputRef}
-                onSubmitEditing={() => {
-                  if (canSend) void sendCode(false);
-                }}
-              />
-            ) : (
-              <>
-                <Pressable
-                  style={styles.otpWrap}
-                  onPress={() => codeInputRef.current?.focus()}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('auth.phone.otpFieldLabel')}
-                >
-                  {Array.from({ length: OTP_LEN }).map((_, i) => {
-                    const char = code[i] ?? '';
-                    const active =
-                      codeFocused &&
-                      (i === code.length ||
-                        (code.length === OTP_LEN && i === OTP_LEN - 1));
-                    return (
-                      <View
-                        key={`otp-${i}`}
-                        style={[
-                          styles.otpCell,
-                          active && styles.otpCellActive,
-                          char ? styles.otpCellFilled : null,
-                        ]}
-                      >
-                        <Text style={styles.otpDigit}>{char}</Text>
-                      </View>
-                    );
-                  })}
-                  <TextInput
-                    ref={codeInputRef}
-                    style={styles.otpHiddenInput}
-                    value={code}
-                    onChangeText={onChangeCode}
-                    onFocus={() => {
-                      setCodeFocused(true);
-                      requestAnimationFrame(() => {
-                        scrollRef.current?.scrollToEnd(true);
-                      });
-                    }}
-                    onBlur={() => setCodeFocused(false)}
-                    keyboardType="number-pad"
-                    inputMode="numeric"
-                    textContentType="oneTimeCode"
-                    autoComplete="sms-otp"
-                    importantForAutofill="yes"
-                    maxLength={OTP_LEN}
-                    caretHidden
-                    editable={!submitting}
-                    accessibilityLabel={t('auth.phone.otpInputLabel')}
-                  />
-                </Pressable>
-                <Text style={styles.otpAssist}>
-                  {t('auth.phone.otpAssist')}
-                </Text>
-              </>
-            )}
+          {step === 'phone' ? (
+            <PhoneNumberInput
+              value={phoneDigits}
+              country={phoneCountry}
+              onChangeDigits={(digits) => {
+                setPhoneDigits(digits);
+                setError('');
+              }}
+              onChangeCountry={(next) => {
+                setPhoneCountry(next);
+                setError('');
+              }}
+              editable={!submitting}
+              inputRef={phoneInputRef}
+              onSubmitEditing={() => {
+                if (canSend) void sendCode(false);
+              }}
+            />
+          ) : (
+            <>
+              <Pressable
+                style={styles.otpWrap}
+                onPress={() => codeInputRef.current?.focus()}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.phone.otpFieldLabel')}
+              >
+                {Array.from({ length: OTP_LEN }).map((_, i) => {
+                  const char = code[i] ?? '';
+                  const active =
+                    codeFocused &&
+                    (i === code.length ||
+                      (code.length === OTP_LEN && i === OTP_LEN - 1));
+                  return (
+                    <View
+                      key={`otp-${i}`}
+                      style={[
+                        styles.otpCell,
+                        active && styles.otpCellActive,
+                        char ? styles.otpCellFilled : null,
+                      ]}
+                    >
+                      <Text style={styles.otpDigit}>{char}</Text>
+                    </View>
+                  );
+                })}
+                <TextInput
+                  ref={codeInputRef}
+                  style={styles.otpHiddenInput}
+                  value={code}
+                  onChangeText={onChangeCode}
+                  onFocus={() => {
+                    setCodeFocused(true);
+                    requestAnimationFrame(() => {
+                      scrollRef.current?.scrollToEnd(true);
+                    });
+                  }}
+                  onBlur={() => setCodeFocused(false)}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
+                  importantForAutofill="yes"
+                  maxLength={OTP_LEN}
+                  caretHidden
+                  editable={!submitting}
+                  accessibilityLabel={t('auth.phone.otpInputLabel')}
+                />
+              </Pressable>
+              <Text style={styles.otpAssist}>{t('auth.phone.otpAssist')}</Text>
+            </>
+          )}
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            {step === 'phone' ? (
+          {step === 'phone' ? (
+            <Pressable
+              style={[
+                styles.submit,
+                (!canSend || submitting) && styles.submitDisabled,
+              ]}
+              onPress={() => void sendCode(false)}
+              disabled={!canSend || submitting}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.phone.sendCode')}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.submitText}>{t('auth.phone.sendCode')}</Text>
+              )}
+            </Pressable>
+          ) : (
+            <>
               <Pressable
                 style={[
                   styles.submit,
-                  (!canSend || submitting) && styles.submitDisabled,
+                  (!canVerify || submitting) && styles.submitDisabled,
                 ]}
-                onPress={() => void sendCode(false)}
-                disabled={!canSend || submitting}
+                onPress={() => void verifyCode(code)}
+                disabled={!canVerify || submitting}
                 accessibilityRole="button"
-                accessibilityLabel={t('auth.phone.sendCode')}
+                accessibilityLabel={t('auth.phone.verify')}
               >
                 {submitting ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitText}>{t('auth.phone.sendCode')}</Text>
+                  <Text style={styles.submitText}>
+                    {t('auth.phone.verifyContinue')}
+                  </Text>
                 )}
               </Pressable>
-            ) : (
-              <>
+
+              <View style={styles.codeActions}>
                 <Pressable
-                  style={[
-                    styles.submit,
-                    (!canVerify || submitting) && styles.submitDisabled,
-                  ]}
-                  onPress={() => void verifyCode(code)}
-                  disabled={!canVerify || submitting}
+                  style={styles.secondary}
+                  onPress={() => {
+                    if (submitting) return;
+                    setStep('phone');
+                    setCode('');
+                    setError('');
+                    autoVerifyRef.current = '';
+                  }}
+                  disabled={submitting}
                   accessibilityRole="button"
-                  accessibilityLabel={t('auth.phone.verify')}
+                  accessibilityLabel={t('auth.phone.changeNumberLabel')}
                 >
-                  {submitting ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitText}>{t('auth.phone.verifyContinue')}</Text>
-                  )}
+                  <Text style={styles.secondaryText}>
+                    {t('auth.phone.changeNumber')}
+                  </Text>
                 </Pressable>
 
-                <View style={styles.codeActions}>
-                  <Pressable
-                    style={styles.secondary}
-                    onPress={() => {
-                      if (submitting) return;
-                      setStep('phone');
-                      setCode('');
-                      setError('');
-                      autoVerifyRef.current = '';
-                    }}
-                    disabled={submitting}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('auth.phone.changeNumberLabel')}
+                <Pressable
+                  style={styles.secondary}
+                  onPress={() => {
+                    if (submitting || resendSec > 0) return;
+                    void sendCode(true);
+                  }}
+                  disabled={submitting || resendSec > 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('auth.phone.resendLabel')}
+                >
+                  <Text
+                    style={[
+                      styles.secondaryText,
+                      resendSec > 0 && styles.secondaryMuted,
+                    ]}
                   >
-                    <Text style={styles.secondaryText}>{t('auth.phone.changeNumber')}</Text>
-                  </Pressable>
+                    {resendSec > 0
+                      ? t('auth.phone.resendWait', { sec: resendSec })
+                      : t('auth.phone.resend')}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
 
-                  <Pressable
-                    style={styles.secondary}
-                    onPress={() => {
-                      if (submitting || resendSec > 0) return;
-                      void sendCode(true);
-                    }}
-                    disabled={submitting || resendSec > 0}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('auth.phone.resendLabel')}
-                  >
-                    <Text
-                      style={[
-                        styles.secondaryText,
-                        resendSec > 0 && styles.secondaryMuted,
-                      ]}
-                    >
-                      {resendSec > 0
-                        ? t('auth.phone.resendWait', { sec: resendSec })
-                        : t('auth.phone.resend')}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+          {required ? null : (
+            <Pressable
+              style={styles.guestBtn}
+              onPress={() => {
+                if (!submitting) onClose();
+              }}
+              disabled={submitting}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.phone.later')}
+            >
+              <Text style={styles.guestText}>{t('auth.phone.later')}</Text>
+            </Pressable>
+          )}
 
-            {required ? null : (
-              <Pressable
-                style={styles.guestBtn}
-                onPress={() => {
-                  if (!submitting) onClose();
-                }}
-                disabled={submitting}
-                accessibilityRole="button"
-                accessibilityLabel={t('auth.phone.later')}
-              >
-                <Text style={styles.guestText}>{t('auth.phone.later')}</Text>
-              </Pressable>
-            )}
+          {Platform.OS === 'web' ? (
+            <View
+              nativeID="firebase-recaptcha"
+              {...({ id: 'firebase-recaptcha' } as object)}
+              style={styles.recaptchaSlot}
+            />
+          ) : null}
+        </View>
+      </KeyboardFormScrollView>
+    </View>
+  );
 
-            {Platform.OS === 'web' ? (
-              <View
-                nativeID="firebase-recaptcha"
-                {...({ id: 'firebase-recaptcha' } as object)}
-                style={styles.recaptchaSlot}
-              />
-            ) : null}
-          </View>
-        </KeyboardFormScrollView>
-      </View>
-    </Modal>
+  if (embedded) {
+    return sheet;
+  }
+
+  return (
+    <AppModal
+      visible={visible}
+      transparent={Platform.OS !== 'ios'}
+      animationType="slide"
+      presentationStyle={Platform.OS === 'ios' ? 'fullScreen' : 'overFullScreen'}
+      statusBarTranslucent={Platform.OS !== 'ios'}
+      onRequestClose={() => {
+        if (!required && !submitting) onClose();
+      }}
+    >
+      {sheet}
+    </AppModal>
   );
 }
 
@@ -490,6 +517,23 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  rootFullScreen: {
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+  },
+  rootEmbedded: {
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+  embeddedFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+  sheetEmbedded: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    flexGrow: 1,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   backdrop: {
     position: 'absolute',

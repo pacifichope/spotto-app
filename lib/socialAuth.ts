@@ -95,6 +95,25 @@ function cancelledResult(): SocialAuthResult {
   return { ok: false, error: SOCIAL_LOGIN_USER_ERRORS.cancelled, cancelled: true };
 }
 
+/** iPad の form sheet はアンカー不足で即 dismiss になる。全画面の認証セッションにする。 */
+function nativeAuthPromptOptions(): AuthSession.AuthRequestPromptOptions {
+  if (Platform.OS !== 'ios') return {};
+  return {
+    preferEphemeralSession: false,
+    presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+  };
+}
+
+function providerFailure(provider: 'line' | 'google'): SocialAuthResult {
+  return {
+    ok: false,
+    error:
+      provider === 'google'
+        ? SOCIAL_LOGIN_USER_ERRORS.google
+        : SOCIAL_LOGIN_USER_ERRORS.line,
+  };
+}
+
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split('.')[1];
@@ -183,15 +202,15 @@ async function authenticateGoogle(): Promise<SocialAuthResult> {
     prompt: AuthSession.Prompt.SelectAccount,
   });
 
-  const result = await request.promptAsync(GOOGLE_DISCOVERY);
+  const result = await request.promptAsync(
+    GOOGLE_DISCOVERY,
+    nativeAuthPromptOptions(),
+  );
   if (result.type === 'cancel' || result.type === 'dismiss') {
     return cancelledResult();
   }
   if (result.type !== 'success' || !result.params.code) {
-    return {
-      ok: false,
-      error: SOCIAL_LOGIN_USER_ERRORS.google,
-    };
+    return providerFailure('google');
   }
 
   const tokens = await AuthSession.exchangeCodeAsync(
@@ -239,15 +258,15 @@ async function authenticateLine(): Promise<SocialAuthResult> {
     usePKCE: true,
   });
 
-  const result = await request.promptAsync(LINE_DISCOVERY);
+  const result = await request.promptAsync(
+    LINE_DISCOVERY,
+    nativeAuthPromptOptions(),
+  );
   if (result.type === 'cancel' || result.type === 'dismiss') {
     return cancelledResult();
   }
   if (result.type !== 'success' || !result.params.code) {
-    return {
-      ok: false,
-      error: SOCIAL_LOGIN_USER_ERRORS.line,
-    };
+    return providerFailure('line');
   }
 
   const response = await fetch(`${apiBase.replace(/\/$/, '')}/auth/line-token`, {
@@ -297,10 +316,7 @@ export async function authenticateSocial(
     }
     return {
       ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : SOCIAL_LOGIN_USER_ERRORS.generic,
+      error: SOCIAL_LOGIN_USER_ERRORS.generic,
     };
   }
 }

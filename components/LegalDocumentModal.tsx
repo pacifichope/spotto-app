@@ -1,5 +1,6 @@
+import AppModal from '@/components/AppModal';
 import { useEffect } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   openLegalDocument,
@@ -31,9 +32,9 @@ export default function LegalDocumentModal({
   if (!document) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <AppModal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop} />
-    </Modal>
+    </AppModal>
   );
 }
 

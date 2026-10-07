@@ -1,5 +1,16 @@
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+  type TextStyle,
+} from 'react-native';
 
 import {
   AppleLogoMark,
@@ -10,8 +21,12 @@ import type { SocialProvider } from '@/lib/auth';
 
 type SocialLoginButtonsProps = {
   disabled?: boolean;
+  /** 処理中のプロバイダー。そのボタンだけスピナーにする */
+  pendingProvider?: SocialProvider | null;
   onPress: (provider: SocialProvider) => void;
 };
+
+const HIT_SLOP = { top: 10, bottom: 10, left: 8, right: 8 };
 
 /**
  * LINE / Google / Apple のログインボタン群。
@@ -20,75 +35,113 @@ type SocialLoginButtonsProps = {
  */
 export default function SocialLoginButtons({
   disabled,
+  pendingProvider,
   onPress,
 }: SocialLoginButtonsProps) {
   const { t } = useTranslation();
   const showApple = Platform.OS === 'ios' || Platform.OS === 'web';
 
   return (
-    <View style={styles.stack}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('auth.social.line')}
-        accessibilityState={{ disabled: !!disabled }}
+    <View collapsable={false} pointerEvents="auto" style={styles.stack}>
+      <ProviderButton
+        provider="line"
+        label={t('auth.social.line')}
         disabled={disabled}
-        onPress={() => onPress('line')}
-        style={({ pressed }) => [
-          styles.lineBtn,
-          disabled && styles.disabled,
-          pressed && !disabled && styles.linePressed,
-        ]}
-      >
-        <View style={styles.iconSlot}>
-          <LineSpeechMark size={22} color="#FFFFFF" />
-        </View>
-        <Text style={styles.lineText} numberOfLines={1}>
-          {t('auth.social.line')}
-        </Text>
-      </Pressable>
+        pending={pendingProvider === 'line'}
+        pendingLabel={t('auth.authenticating')}
+        onPress={onPress}
+        buttonStyle={styles.lineBtn}
+        pressedStyle={styles.linePressed}
+        textStyle={styles.lineText}
+        spinnerColor="#FFFFFF"
+        icon={<LineSpeechMark size={22} color="#FFFFFF" />}
+      />
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('auth.social.google')}
-        accessibilityState={{ disabled: !!disabled }}
+      <ProviderButton
+        provider="google"
+        label={t('auth.social.google')}
         disabled={disabled}
-        onPress={() => onPress('google')}
-        style={({ pressed }) => [
-          styles.googleBtn,
-          disabled && styles.disabled,
-          pressed && !disabled && styles.googlePressed,
-        ]}
-      >
-        <View style={styles.iconSlot}>
-          <GoogleGMark size={20} />
-        </View>
-        <Text style={styles.googleText} numberOfLines={1}>
-          {t('auth.social.google')}
-        </Text>
-      </Pressable>
+        pending={pendingProvider === 'google'}
+        pendingLabel={t('auth.authenticating')}
+        onPress={onPress}
+        buttonStyle={styles.googleBtn}
+        pressedStyle={styles.googlePressed}
+        textStyle={styles.googleText}
+        spinnerColor="#1F1F1F"
+        icon={<GoogleGMark size={20} />}
+      />
 
       {showApple ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('auth.social.apple')}
-          accessibilityState={{ disabled: !!disabled }}
+        <ProviderButton
+          provider="apple"
+          label={t('auth.social.apple')}
           disabled={disabled}
-          onPress={() => onPress('apple')}
-          style={({ pressed }) => [
-            styles.appleBtn,
-            disabled && styles.disabled,
-            pressed && !disabled && styles.applePressed,
-          ]}
-        >
-          <View style={styles.iconSlot}>
-            <AppleLogoMark size={18} color="#FFFFFF" />
-          </View>
-          <Text style={styles.appleText} numberOfLines={1}>
-            {t('auth.social.apple')}
-          </Text>
-        </Pressable>
+          pending={pendingProvider === 'apple'}
+          pendingLabel={t('auth.authenticating')}
+          onPress={onPress}
+          buttonStyle={styles.appleBtn}
+          pressedStyle={styles.applePressed}
+          textStyle={styles.appleText}
+          spinnerColor="#FFFFFF"
+          icon={<AppleLogoMark size={18} color="#FFFFFF" />}
+        />
       ) : null}
     </View>
+  );
+}
+
+function ProviderButton({
+  provider,
+  label,
+  disabled,
+  pending,
+  pendingLabel,
+  onPress,
+  buttonStyle,
+  pressedStyle,
+  textStyle,
+  spinnerColor,
+  icon,
+}: {
+  provider: SocialProvider;
+  label: string;
+  disabled?: boolean;
+  pending: boolean;
+  pendingLabel: string;
+  onPress: (provider: SocialProvider) => void;
+  buttonStyle: StyleProp<ViewStyle>;
+  pressedStyle: StyleProp<ViewStyle>;
+  textStyle: StyleProp<TextStyle>;
+  spinnerColor: string;
+  icon: ReactNode;
+}) {
+  const blocked = !!disabled || pending;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={pending ? pendingLabel : label}
+      accessibilityState={{ disabled: blocked, busy: pending }}
+      collapsable={false}
+      disabled={blocked}
+      hitSlop={HIT_SLOP}
+      onPress={() => onPress(provider)}
+      style={({ pressed }) => [
+        buttonStyle,
+        blocked && !pending && styles.disabled,
+        pressed && !blocked && pressedStyle,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.iconSlot}>
+        {pending ? (
+          <ActivityIndicator color={spinnerColor} size="small" />
+        ) : (
+          icon
+        )}
+      </View>
+      <Text pointerEvents="none" style={textStyle} numberOfLines={1}>
+        {pending ? pendingLabel : label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -108,6 +161,7 @@ const styles = StyleSheet.create({
   stack: {
     gap: 12,
     marginTop: 18,
+    alignSelf: 'stretch',
   },
   disabled: {
     opacity: 0.55,
@@ -122,7 +176,7 @@ const styles = StyleSheet.create({
 
   // --- LINE ---
   lineBtn: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: 8,
     backgroundColor: '#06C755',
     flexDirection: 'row',
@@ -130,6 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   linePressed: {
     backgroundColor: '#04A848',
@@ -140,11 +195,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.2,
     textAlign: 'center',
+    flexShrink: 1,
   },
 
   // --- Google ---
   googleBtn: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: 4,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -154,6 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   googlePressed: {
     backgroundColor: '#F2F2F2',
@@ -166,11 +223,12 @@ const styles = StyleSheet.create({
     fontFamily: GOOGLE_FONT,
     letterSpacing: 0.15,
     textAlign: 'center',
+    flexShrink: 1,
   },
 
   // --- Apple ---
   appleBtn: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: 8,
     backgroundColor: '#000000',
     flexDirection: 'row',
@@ -178,6 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   applePressed: {
     backgroundColor: '#1A1A1A',
@@ -189,5 +248,6 @@ const styles = StyleSheet.create({
     fontFamily: APPLE_FONT,
     letterSpacing: -0.2,
     textAlign: 'center',
+    flexShrink: 1,
   },
 });

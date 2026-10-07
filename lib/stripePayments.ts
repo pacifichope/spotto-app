@@ -6,6 +6,9 @@ import { Platform } from 'react-native';
 import {
   apiConnectionErrorMessage,
   getDevMachineHost,
+  getRemoteApiBaseUrl,
+  isApiConnectionError,
+  listApiBaseUrlCandidates,
   publicApiUrl,
   readPublicEnv,
 } from '@/lib/env';
@@ -145,12 +148,36 @@ export function paymentReturnUrl() {
   return Linking.createURL('payment-complete');
 }
 
+function paymentUrlCandidates(primary: string): string[] {
+  const ordered: string[] = [];
+  const push = (url: string) => {
+    const next = String(url || '').trim().replace(/\/$/, '');
+    if (!next || ordered.includes(next)) return;
+    ordered.push(next);
+  };
+
+  push(primary);
+
+  const specific = readPublicEnv('EXPO_PUBLIC_STRIPE_PAYMENT_API_URL');
+  if (specific) push(specific);
+
+  for (const base of listApiBaseUrlCandidates()) {
+    push(`${base}/payments`);
+  }
+
+  const remote = getRemoteApiBaseUrl();
+  if (remote) push(`${remote}/payments`);
+
+  return ordered;
+}
+
 export async function createPaymentSession(
   input: CheckoutRequest,
 ): Promise<PaymentSession | null> {
   const configuredBase = readPublicEnv('EXPO_PUBLIC_API_BASE_URL');
   const configuredPayment = readPublicEnv('EXPO_PUBLIC_STRIPE_PAYMENT_API_URL');
-  const url = stripePaymentApiUrl();
+  const primaryUrl = stripePaymentApiUrl();
+  const urls = primaryUrl ? paymentUrlCandidates(primaryUrl) : [];
 
   if (__DEV__) {
     console.log('[payments] createPaymentSession resolve', {
@@ -158,13 +185,14 @@ export async function createPaymentSession(
       configuredBase: configuredBase || '(empty)',
       configuredPayment: configuredPayment || '(empty)',
       devMachineHost: getDevMachineHost() || '(empty)',
-      resolvedUrl: url || '(empty)',
+      resolvedUrl: primaryUrl || '(empty)',
+      candidateUrls: urls,
       eventId: input.eventId,
       amountYen: input.amountYen,
     });
   }
 
-  if (!url) {
+  if (!urls.length) {
     const msg = i18n.t('payment.errorApiUrlEmpty');
     if (__DEV__) console.warn('[payments]', msg);
     return null;
@@ -182,38 +210,53 @@ export async function createPaymentSession(
         : Platform.OS === 'web',
   };
 
-  if (__DEV__) {
-    console.log('[payments] POST request', {
-      method: 'POST',
-      url,
-      body,
-    });
-  }
+  let response: Response | null = null;
+  let usedUrl = urls[0];
+  let lastConnectionError: unknown;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
+  for (const url of urls) {
+    usedUrl = url;
     if (__DEV__) {
-      console.error('[payments] fetch threw', {
+      console.log('[payments] POST request', {
+        method: 'POST',
         url,
-        name: error instanceof Error ? error.name : typeof error,
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        error,
+        body,
       });
     }
-    throw new Error(apiConnectionErrorMessage(url, error));
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      lastConnectionError = undefined;
+      break;
+    } catch (error) {
+      lastConnectionError = error;
+      if (__DEV__) {
+        console.error('[payments] fetch threw', {
+          url,
+          name: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error),
+          willRetry: isApiConnectionError(error) && url !== urls[urls.length - 1],
+        });
+      }
+      if (!isApiConnectionError(error)) {
+        throw new Error(apiConnectionErrorMessage(url, error));
+      }
+    }
+  }
+
+  if (!response) {
+    throw new Error(
+      apiConnectionErrorMessage(usedUrl, lastConnectionError),
+    );
   }
 
   const responseText = await response.text();
   if (__DEV__) {
     console.log('[payments] POST response', {
-      url,
+      url: usedUrl,
       status: response.status,
       ok: response.ok,
       bodyPreview: responseText.slice(0, 500),
@@ -237,7 +280,7 @@ export async function createPaymentSession(
     }
     const base = i18n.t('payment.errorSessionCreateFailed');
     const msg = __DEV__
-      ? `${base}${detail}（URL: ${url}, status: ${response.status}）`
+      ? `${base}${detail}（URL: ${usedUrl}, status: ${response.status}）`
       : `${base}${detail}`;
     if (__DEV__) console.error('[payments]', msg);
     throw new Error(msg);
@@ -276,14 +319,14 @@ export async function createPaymentSession(
   } catch (error) {
     if (__DEV__) {
       console.error('[payments] invalid JSON response', {
-        url,
+        url: usedUrl,
         responseText: responseText.slice(0, 500),
         error,
       });
     }
     throw new Error(
       __DEV__
-        ? `${i18n.t('payment.errorApiInvalidResponse')}（URL: ${url}）`
+        ? `${i18n.t('payment.errorApiInvalidResponse')}（URL: ${usedUrl}）`
         : i18n.t('payment.errorApiInvalidResponse'),
     );
   }

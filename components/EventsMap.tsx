@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import MapView, {
   PROVIDER_GOOGLE,
@@ -92,6 +92,9 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   const mapRef = useRef<MapView>(null);
   /** Marker onPress の直後に MapView onPress が走って選択解除されるのを防ぐ */
   const ignoreNextMapPressRef = useRef(false);
+  /** 回転中の region 通知で animate が往復して UI が固まらないようにする */
+  const resizeMuteUntilRef = useRef(0);
+  const resizeFrameRef = useRef(0);
   /** 親へ通知した直後の region（自分発の更新で再 animate しない） */
   const lastEmittedRegionRef = useRef<MapCameraRegion | null>(null);
   const mountedRef = useRef(false);
@@ -115,7 +118,17 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
     return () => {
       mountedRef.current = false;
       readyRef.current = false;
+      if (resizeFrameRef.current) {
+        cancelAnimationFrame(resizeFrameRef.current);
+      }
     };
+  }, []);
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', () => {
+      resizeMuteUntilRef.current = Date.now() + 700;
+    });
+    return () => subscription.remove();
   }, []);
 
   // フィルター変更でイベント集合が変わったら展開状態をリセット
@@ -146,6 +159,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
   // マップ ready 前は initialRegion / onMapReady に任せ、マウント完了前の animate 連鎖を避ける
   useEffect(() => {
     if (!mountedRef.current || !readyRef.current) return;
+    if (Date.now() < resizeMuteUntilRef.current) return;
     if (
       lastEmittedRegionRef.current &&
       regionsNearlyEqual(propRegion, lastEmittedRegionRef.current)
@@ -236,6 +250,18 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(function EventsMap(
         onRegionChangeComplete={(next) => {
           if (!mountedRef.current || !readyRef.current) return;
           const camera = toCameraRegion(next);
+          if (Date.now() < resizeMuteUntilRef.current) {
+            if (resizeFrameRef.current) {
+              cancelAnimationFrame(resizeFrameRef.current);
+            }
+            resizeFrameRef.current = requestAnimationFrame(() => {
+              resizeFrameRef.current = 0;
+              if (!mountedRef.current) return;
+              setViewRegion(camera);
+              lastEmittedRegionRef.current = camera;
+            });
+            return;
+          }
           setViewRegion(camera);
           lastEmittedRegionRef.current = camera;
           onRegionChangeComplete?.(camera);
@@ -356,12 +382,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    width: '100%',
-    height: '100%',
   },
   map: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
   },
   userDotOuter: {
     width: 22,

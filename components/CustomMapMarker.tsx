@@ -61,7 +61,8 @@ export default function CustomMapMarker({
 
   useEffect(() => {
     generationRef.current += 1;
-    if (mountedRef.current) setTracking(true);
+    // 初回は useState(true) 済み。見た目キー変更時だけ再トラッキング
+    setTracking((prev) => (prev ? prev : true));
     return () => {
       if (settleTimerRef.current) {
         clearTimeout(settleTimerRef.current);

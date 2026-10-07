@@ -153,12 +153,12 @@ export function getDevMachineHost() {
 
 /**
  * ローカル API（localhost → LAN 置換）を使ってよいか。
- * EAS 実機ビルド・スタンドアロン・物理デバイスでは原則不可。
  * 明示的に EXPO_PUBLIC_USE_LOCAL_API=1 のときのみ許可。
+ * 未設定のシミュレータでもリモート API（Render 等）を使う。
  */
 export function allowLocalDevApiRewrite() {
-  if (readPublicEnv('EXPO_PUBLIC_USE_LOCAL_API') === '1') {
-    return true;
+  if (readPublicEnv('EXPO_PUBLIC_USE_LOCAL_API') !== '1') {
+    return false;
   }
   if (!__DEV__) return false;
 
@@ -167,11 +167,6 @@ export function allowLocalDevApiRewrite() {
     (Constants as { executionEnvironment?: string }).executionEnvironment || '',
   );
   if (execution === 'standalone') return false;
-
-  // 物理実機は LAN 依存を避ける（シミュレータ／エミュレータのみ許可）
-  if (Platform.OS !== 'web' && Constants.isDevice !== false) {
-    return false;
-  }
 
   return true;
 }

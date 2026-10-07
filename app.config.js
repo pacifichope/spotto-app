@@ -324,6 +324,8 @@ const plugins = [
   ],
   // LINE Login SDK（AppDelegate の URL コールバック + Info.plist）
   '@xmartlabs/react-native-line',
+  // 起動直後に LoginManager.setup（URL 処理やログアウトより前）
+  ['./plugins/withLineSdkSetup', { channelId: lineChannelId }],
 ];
 
 // Firebase Auth（電話番号 SMS）。google-services があるときだけプラグインを有効化
@@ -369,7 +371,7 @@ const config = {
   // EAS プロジェクト（my-sports-app）の slug と一致させる
   slug: 'my-sports-app',
   owner: 'patto1',
-  version: '1.0.0',
+  version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   // Linking.createURL / Expo Router 用は単一スキームのみ（配列にすると警告＆競合）
@@ -383,6 +385,9 @@ const config = {
   },
   ios: {
     supportsTablet: true,
+    // Split View / Slide Over だと認可シートのプレゼンターが外れ、iPad 審査で
+    // ログインボタンが無反応になる。全画面のまま横向きは Info.plist で許可する。
+    requireFullScreen: true,
     bundleIdentifier: IOS_BUNDLE_ID,
     usesAppleSignIn: true,
     ...(hasGoogleServicesPlist
@@ -409,6 +414,12 @@ const config = {
       CFBundleName: 'spotto',
       // システム画像クロップ等の標準 UI を日本語寄りにする
       CFBundleDevelopmentRegion: 'ja',
+      'UISupportedInterfaceOrientations~ipad': [
+        'UIInterfaceOrientationPortrait',
+        'UIInterfaceOrientationPortraitUpsideDown',
+        'UIInterfaceOrientationLandscapeLeft',
+        'UIInterfaceOrientationLandscapeRight',
+      ],
       CFBundleURLTypes: [
         {
           CFBundleURLName: APP_SCHEME,
@@ -434,6 +445,8 @@ const config = {
   android: {
     // Google / LINE のコンソール登録と一致させる（iOS Bundle ID と同値）
     package: BUNDLE_ID,
+    // Play Store 提出用（前回 EAS remote が 4 → 今回 5）
+    versionCode: 5,
     // adjustResize 相当。キーボード表示時にウィンドウをリサイズし、
     // ChatRoom の KeyboardAvoidingView（Android: height）と併用して入力欄を隠さない。
     softwareKeyboardLayoutMode: 'resize',
@@ -561,6 +574,12 @@ const config = {
       String(process.env.EXPO_PUBLIC_USE_LOCAL_API || '').trim() || undefined,
     easBuildProfile: easBuildProfile || undefined,
     appEnv: appEnv || undefined,
+    // 審査・デモ撮影向けカタログ。オフにするときは EXPO_PUBLIC_SHOW_DEMO_EVENTS=0
+    showDemoEvents:
+      String(
+        process.env.EXPO_PUBLIC_SHOW_DEMO_EVENTS ||
+          (isReleaseLikeEasProfile ? '1' : ''),
+      ).trim() || undefined,
   },
 };
 

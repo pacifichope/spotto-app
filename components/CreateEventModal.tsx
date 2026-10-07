@@ -1,20 +1,20 @@
+import AppModal from '@/components/AppModal';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Keyboard,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -746,7 +746,7 @@ export default function CreateEventModal({
   const deadlineLabel = deadlineDisplayLabel(deadlineOffset);
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -1350,7 +1350,7 @@ export default function CreateEventModal({
         </View>
 
         {/* Pickers */}
-        <Modal
+        <AppModal
           visible={picker !== null}
           transparent
           animationType="fade"
@@ -1623,7 +1623,7 @@ export default function CreateEventModal({
               )}
             </Pressable>
           </Pressable>
-        </Modal>
+        </AppModal>
 
         <LocationPickerModal
           visible={locationPickerVisible}
@@ -1719,7 +1719,7 @@ export default function CreateEventModal({
           }}
         />
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

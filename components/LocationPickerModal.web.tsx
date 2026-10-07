@@ -1,9 +1,9 @@
+import AppModal from '@/components/AppModal';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -142,7 +142,7 @@ export default function LocationPickerModal({
   };
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
@@ -272,7 +272,7 @@ export default function LocationPickerModal({
           </Pressable>
         </KeyboardFormScrollView>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 

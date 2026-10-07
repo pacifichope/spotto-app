@@ -1,6 +1,7 @@
 import type { PreQuestion } from '@/lib/preQuestions';
 import type { EventAttendee } from '@/lib/attendees';
 import type { SnsLink } from '@/lib/snsLinks';
+import { shouldShowDemoEvents } from '@/lib/devTestFlags';
 import { compactLocationAddress } from '@/lib/formatLocationAddress';
 import i18n from '@/lib/i18n';
 
@@ -1656,7 +1657,7 @@ function startOfLocalDay(value: Date) {
  * リモート取得で上書きされないよう eventsContext からマージする。
  */
 export function getDevSampleEvents(now = new Date()): SportEvent[] {
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) return [];
+  if (!shouldShowDemoEvents()) return [];
 
   const anchor = startOfLocalDay(parseEventDateTime(DEV_SAMPLE_DATE_ANCHOR, '00:00'));
   const today = startOfLocalDay(now);
@@ -1712,11 +1713,11 @@ export function mergeWithDevSampleEvents(
   now = new Date(),
 ): SportEvent[] {
   const remoteList = Array.isArray(remote) ? remote : [];
-  if (typeof __DEV__ !== 'undefined' && !__DEV__) return remoteList;
-
   const samples = getDevSampleEvents(now);
+  if (samples.length === 0) return remoteList;
+
   const sampleIds = new Set(samples.map((item) => item.id));
-  const merged = [
+  return [
     ...samples,
     ...remoteList.filter((item) => {
       const id = String(item?.id || '');
@@ -1726,7 +1727,6 @@ export function mergeWithDevSampleEvents(
       return true;
     }),
   ];
-  return merged;
 }
 
 export function getNearbyEvents(

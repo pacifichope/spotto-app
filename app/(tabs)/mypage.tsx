@@ -88,7 +88,8 @@ export default function MyPageScreen() {
   } = useEvents();
   const { joinedClubIds, refreshJoinedClubs } = useClubs();
   const { userProfile, displayName, updateUserProfile } = useUserProfile();
-  const { isLoggedIn, openLogin, user, isReady: authReady } = useAuth();
+  const { isLoggedIn, openLogin, user, isReady: authReady, accountDataReady } =
+    useAuth();
   const requestCreateAccess = useCreateEventAccess();
   const openOrganizerEditor = useOrganizerEditor();
   const { filterEvents } = useBlocks();
@@ -133,8 +134,10 @@ export default function MyPageScreen() {
 
   const isOrganizer = mode === 'organizer';
 
-  /** 認証確定後かつログイン中のみリストを出す（起動直後のチラつき防止） */
-  const canShowAccountLists = authReady && isLoggedIn && Boolean(user?.id);
+  /** 認証確定後かつ、今のユーザーのプロフィールが載ってからリストを出す */
+  const showAccountIdentity = isLoggedIn && accountDataReady;
+  const canShowAccountLists =
+    authReady && showAccountIdentity && Boolean(user?.id);
   const showParticipantLists = canShowAccountLists;
   const visibleUpcomingJoined = showParticipantLists
     ? upcomingJoinedEvents
@@ -266,7 +269,11 @@ export default function MyPageScreen() {
   const organizerName = organizerNameReady
     ? organizerDisplayName(organizerProfile)
     : '';
-  const accountTitle = isLoggedIn ? displayName : t('mypage.loginSignup');
+  const accountTitle = showAccountIdentity
+    ? displayName
+    : isLoggedIn
+      ? t('common.loading')
+      : t('mypage.loginSignup');
   const hostedActiveCount = visibleUpcomingHosted.length;
   const hostedPastCount = visiblePastHosted.length;
   /** 主催イベントが1件以上あるとき、右下 FAB で追加作成できるようにする */
@@ -370,7 +377,8 @@ export default function MyPageScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('mypage.editOrganizerProfileA11y')}
           >
-            {organizerName || organizerProfile.imageUri ? (
+            {showAccountIdentity &&
+            (organizerName || organizerProfile.imageUri) ? (
               <HostAvatar
                 name={organizerName || t('mypage.organizerDefaultName')}
                 imageUri={organizerProfile.imageUri}
@@ -422,6 +430,7 @@ export default function MyPageScreen() {
               }
               setPersonalEditorVisible(true);
             }}
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={
               isLoggedIn
@@ -429,7 +438,7 @@ export default function MyPageScreen() {
                 : t('mypage.loginSignup')
             }
           >
-            {isLoggedIn ? (
+            {showAccountIdentity ? (
               <View style={styles.avatarRing}>
                 <HostAvatar
                   name={displayName}
@@ -458,7 +467,7 @@ export default function MyPageScreen() {
               <Text style={styles.heroName} numberOfLines={1}>
                 {accountTitle}
               </Text>
-              {isLoggedIn ? (
+              {showAccountIdentity ? (
                 <Text style={styles.heroMeta}>
                   {t('mypage.editPersonalProfile')}
                 </Text>
@@ -660,6 +669,7 @@ export default function MyPageScreen() {
         <Pressable
           style={styles.emptyCreateBtn}
           onPress={() => openLogin('mypage')}
+          hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel={t('common.login')}
         >
@@ -1130,7 +1140,9 @@ const styles = StyleSheet.create({
     marginTop: 22,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
+    minHeight: 48,
     backgroundColor: theme.colors.primary,
     borderRadius: theme.radius.pill,
     paddingHorizontal: 22,
