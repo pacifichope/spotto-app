@@ -146,12 +146,12 @@ export function HomeScreen({
           </div>
         </div>
         {error ? <p className="mb-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}
-        {!error && visible.length === 0 ? (
+        {view === 'map' ? (
+          <EventMap events={visible} />
+        ) : visible.length === 0 ? (
           <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
             条件に合うイベントはまだありません
           </p>
-        ) : view === 'map' ? (
-          <EventMap events={visible} />
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visible.map((event) => (
