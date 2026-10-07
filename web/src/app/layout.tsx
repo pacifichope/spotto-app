@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 
+import { BottomNav } from '@/components/BottomNav';
 import { siteUrl } from '@/lib/env';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -12,7 +14,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        <div className="app-bg">
+          <div className="app-frame">
+            {children}
+            <BottomNav />
+          </div>
+        </div>
+      </body>
     </html>
   );
 }

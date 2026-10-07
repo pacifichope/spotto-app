@@ -104,26 +104,49 @@ function BookControls({
     }
   }
 
+  const label = busy
+    ? '処理中…'
+    : event.priceYen > 0
+      ? '支払って参加する'
+      : '参加する';
+
   return (
-    <div>
+    <div className="glass fixed bottom-[76px] left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 px-4 py-3">
       {user ? (
-        <div className="row">
-          <button type="button" disabled={busy} onClick={() => void reserve()}>
-            {busy ? '処理中…' : event.priceYen > 0 ? '支払って参加する' : '参加する'}
-          </button>
-        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void reserve()}
+          className="brand-gradient h-12 w-full rounded-full text-sm font-extrabold disabled:opacity-60"
+        >
+          {label}
+        </button>
       ) : (
-        <div className="row">
-          <button type="button" disabled={busy} onClick={() => void signIn('google')}>
-            Googleでログイン
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void signIn('google')}
+            className="h-12 rounded-full bg-white text-sm font-extrabold text-[#12202A] disabled:opacity-60"
+          >
+            Google
           </button>
-          <button type="button" disabled={busy} onClick={() => void signIn('apple')}>
-            Appleでサインイン
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void signIn('apple')}
+            className="brand-gradient h-12 rounded-full text-sm font-extrabold disabled:opacity-60"
+          >
+            Appleで参加
           </button>
         </div>
       )}
       {message ? (
-        <p className={message.includes('失敗') || message.includes('ません') ? 'error' : 'meta'}>
+        <p
+          className={`mt-2 text-center text-xs font-bold ${
+            message.includes('失敗') || message.includes('ません') ? 'text-[#EF4444]' : 'text-[#5B6B75]'
+          }`}
+        >
           {message}
         </p>
       ) : null}
