@@ -20,3 +20,8 @@ export function siteUrl() {
     '',
   );
 }
+
+export function googleMapsApiKey() {
+  // Next.js はクライアントへ静的な process.env.NEXT_PUBLIC_* のみ埋め込む
+  return (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '').trim();
+}

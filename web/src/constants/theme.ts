@@ -102,3 +102,76 @@ export const SPORT_COVERS: Record<string, string> = {
 export function sportCover(sport: string) {
   return SPORT_COVERS[sport] || unsplash('photo-1461896836934-ffe607ba6851');
 }
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  サッカー: '#0F6E56',
+  フットサル: '#0F6E56',
+  バスケットボール: '#BA7517',
+  バスケ: '#BA7517',
+  野球: '#185FA5',
+  ランニング: '#0E7490',
+  バドミントン: '#BE185D',
+  テニス: '#4D7C0F',
+  バレーボール: '#7C3AED',
+  バレー: '#7C3AED',
+  ヨガ: '#9333EA',
+  その他: '#57534E',
+};
+
+export function categoryColor(sport: string) {
+  return CATEGORY_COLORS[sport.trim()] || '#8A9199';
+}
+
+export const SPORT_EMOJIS: Record<string, string> = {
+  サッカー: '⚽',
+  フットサル: '⚽',
+  バスケットボール: '🏀',
+  バスケ: '🏀',
+  テニス: '🎾',
+  ランニング: '🏃',
+  バドミントン: '🏸',
+  バレーボール: '🏐',
+  バレー: '🏐',
+  野球: '⚾',
+  ヨガ: '🧘',
+  その他: '🏷️',
+};
+
+export function sportEmoji(sport: string) {
+  return SPORT_EMOJIS[sport.trim()] || '🏅';
+}
+
+/** 座標が無いイベント用の都道府県フォールバック（概位置）。 */
+export const AREA_CENTERS: { match: string; lat: number; lng: number }[] = [
+  { match: '北海道', lat: 43.0618, lng: 141.3545 },
+  { match: '札幌', lat: 43.0618, lng: 141.3545 },
+  { match: '東京', lat: 35.6812, lng: 139.7671 },
+  { match: '渋谷', lat: 35.6595, lng: 139.7004 },
+  { match: '新宿', lat: 35.6938, lng: 139.7034 },
+  { match: '大阪', lat: 34.7024, lng: 135.4959 },
+  { match: '京都', lat: 35.0116, lng: 135.7681 },
+  { match: '愛知', lat: 35.1709, lng: 136.8815 },
+  { match: '名古屋', lat: 35.1709, lng: 136.8815 },
+  { match: '福岡', lat: 33.5902, lng: 130.4017 },
+  { match: '神奈川', lat: 35.4437, lng: 139.638 },
+  { match: '横浜', lat: 35.4437, lng: 139.638 },
+  { match: '埼玉', lat: 35.8617, lng: 139.6455 },
+  { match: '千葉', lat: 35.6074, lng: 140.1065 },
+];
+
+export function resolveEventCoords(event: {
+  latitude: number | null;
+  longitude: number | null;
+  location: string;
+}): { lat: number; lng: number; approximate: boolean } | null {
+  if (event.latitude != null && event.longitude != null) {
+    return { lat: event.latitude, lng: event.longitude, approximate: false };
+  }
+  const place = event.location || '';
+  for (const area of AREA_CENTERS) {
+    if (place.includes(area.match)) {
+      return { lat: area.lat, lng: area.lng, approximate: true };
+    }
+  }
+  return null;
+}
