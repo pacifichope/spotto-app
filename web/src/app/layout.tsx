@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { Providers } from '@/components/Providers';
 import { BottomNav, SiteHeader } from '@/components/SiteNav';
 import { siteUrl } from '@/lib/env';
 
@@ -15,11 +16,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body>
-        <div className="app-bg">
-          <SiteHeader />
-          <div className="app-shell">{children}</div>
-          <BottomNav />
-        </div>
+        <Providers>
+          <div className="app-bg">
+            <SiteHeader />
+            <div className="app-shell">{children}</div>
+            <BottomNav />
+          </div>
+        </Providers>
       </body>
     </html>
   );

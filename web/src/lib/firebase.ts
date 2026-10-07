@@ -3,8 +3,10 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   getAuth,
+  onAuthStateChanged,
   signInWithCustomToken,
   signInWithPopup,
+  signOut,
   type User,
 } from 'firebase/auth';
 
@@ -27,14 +29,26 @@ export function getFirebaseApp(): FirebaseApp {
   return getApps()[0] ?? initializeApp(config);
 }
 
+export function getFirebaseAuth() {
+  return getAuth(getFirebaseApp());
+}
+
+export function watchAuth(onChange: (user: User | null) => void) {
+  return onAuthStateChanged(getFirebaseAuth(), onChange);
+}
+
+export async function signOutFirebase(): Promise<void> {
+  await signOut(getFirebaseAuth());
+}
+
 export async function signInWithGoogle(): Promise<User> {
-  const auth = getAuth(getFirebaseApp());
+  const auth = getFirebaseAuth();
   const credential = await signInWithPopup(auth, new GoogleAuthProvider());
   return credential.user;
 }
 
 export async function signInWithApple(): Promise<User> {
-  const auth = getAuth(getFirebaseApp());
+  const auth = getFirebaseAuth();
   const provider = new OAuthProvider('apple.com');
   provider.addScope('email');
   provider.addScope('name');
@@ -63,10 +77,7 @@ export async function signInWithLineToken(input: {
   if (!response.ok || !data.customToken) {
     throw new Error(data.error || 'LINE ログインに失敗しました');
   }
-  const credential = await signInWithCustomToken(
-    getAuth(getFirebaseApp()),
-    data.customToken,
-  );
+  const credential = await signInWithCustomToken(getFirebaseAuth(), data.customToken);
   return credential.user;
 }
 
