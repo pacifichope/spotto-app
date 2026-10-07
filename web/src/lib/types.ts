@@ -12,6 +12,7 @@ export type PublicEvent = {
   longitude: number | null;
   capacity: number;
   joinedCount: number;
+  hostId: string;
   hostName: string;
   description: string;
   imageUri: string | null;
@@ -32,6 +33,7 @@ export type EventRow = {
   longitude: number | null;
   capacity: number | null;
   joined_count: number | null;
+  host_id: string | null;
   host_name: string | null;
   description: string | null;
   image_uri: string | null;
@@ -40,7 +42,7 @@ export type EventRow = {
 };
 
 const EVENT_COLUMNS =
-  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_name, description, image_uri, price_yen, cancelled_at';
+  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_id, host_name, description, image_uri, price_yen, cancelled_at';
 
 export function eventColumns() {
   return EVENT_COLUMNS;
@@ -67,9 +69,26 @@ export function mapEventRow(row: EventRow): PublicEvent | null {
     longitude: numberOrNull(row.longitude),
     capacity: Number(row.capacity) || 0,
     joinedCount: Number(row.joined_count) || 0,
+    hostId: row.host_id?.trim() || '',
     hostName: row.host_name?.trim() || '',
     description: row.description?.trim() || '',
     imageUri: row.image_uri?.trim() || null,
     priceYen: Math.max(0, Math.floor(Number(row.price_yen) || 0)),
   };
+}
+
+/** 終了日時が過去なら true（終了日が無ければ開始日時で判定） */
+export function isEventPast(event: PublicEvent, now = Date.now()) {
+  const endDate = event.endDate || event.eventDate;
+  const endTime = event.endTime || event.eventTime || '23:59';
+  if (!endDate) return false;
+  const ms = Date.parse(`${endDate}T${normalizeClock(endTime)}`);
+  return Number.isFinite(ms) ? ms < now : false;
+}
+
+function normalizeClock(time: string) {
+  const t = time.trim();
+  if (/^\d{1,2}:\d{2}:\d{2}$/.test(t)) return t;
+  if (/^\d{1,2}:\d{2}$/.test(t)) return `${t}:00`;
+  return '23:59:00';
 }
