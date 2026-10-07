@@ -1,10 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 
+import { useAuth } from '@/lib/auth-context';
 import { joinEvent } from '@/lib/booking';
+import { chatHref } from '@/lib/chatsWeb';
 import {
   beginLineLogin,
   idTokenWithAuthenticatedRole,
@@ -47,9 +50,14 @@ function BookControls({
   returnStatus = '',
   checkoutSessionId = '',
 }: BookPanelProps) {
+  const { user: authUser } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (authUser) setUser(authUser);
+  }, [authUser]);
 
   async function signIn(kind: 'google' | 'apple' | 'line') {
     setBusy(true);
@@ -122,14 +130,30 @@ function BookControls({
       <p className="mb-1 hidden text-xs font-extrabold text-[#12B8D0] lg:block">参加する</p>
       <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">{formatPrice(event.priceYen)}</p>
       {user ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void reserve()}
-          className="brand-gradient h-12 w-full rounded-full text-sm font-extrabold disabled:opacity-60"
-        >
-          {label}
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void reserve()}
+            className="brand-gradient h-12 w-full rounded-full text-sm font-extrabold disabled:opacity-60"
+          >
+            {label}
+          </button>
+          <Link
+            href={chatHref(event.id, 'group')}
+            className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
+          >
+            グループチャット
+          </Link>
+          {event.hostId && event.hostId !== user.uid ? (
+            <Link
+              href={chatHref(event.id, 'host', event.hostId)}
+              className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
+            >
+              主催者にメッセージ
+            </Link>
+          ) : null}
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <button
