@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { BottomNav } from '@/components/BottomNav';
+import { BottomNav, SiteHeader } from '@/components/SiteNav';
 import { siteUrl } from '@/lib/env';
 
 import './globals.css';
@@ -16,10 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ja">
       <body>
         <div className="app-bg">
-          <div className="app-frame">
-            {children}
-            <BottomNav />
-          </div>
+          <SiteHeader />
+          <div className="app-shell">{children}</div>
+          <BottomNav />
         </div>
       </body>
     </html>

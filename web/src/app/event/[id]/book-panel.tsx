@@ -10,6 +10,7 @@ import {
   signInWithApple,
   signInWithGoogle,
 } from '@/lib/firebase';
+import { formatPrice } from '@/lib/eventSeo';
 import { confirmHostedCheckout, createHostedCheckout } from '@/lib/payments';
 import type { PublicEvent } from '@/lib/types';
 
@@ -111,7 +112,9 @@ function BookControls({
       : '参加する';
 
   return (
-    <div className="glass fixed bottom-[76px] left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 px-4 py-3">
+    <div className="glass fixed inset-x-0 bottom-[72px] z-30 px-4 py-3 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:p-5">
+      <p className="mb-1 hidden text-xs font-extrabold text-[#12B8D0] lg:block">参加する</p>
+      <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">{formatPrice(event.priceYen)}</p>
       {user ? (
         <button
           type="button"

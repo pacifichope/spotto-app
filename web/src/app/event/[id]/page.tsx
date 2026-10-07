@@ -58,22 +58,22 @@ export default async function EventPage({ params }: PageProps) {
   const open = event.capacity <= 0 || event.joinedCount < event.capacity;
 
   return (
-    <main className="pb-28">
+    <main className="pb-36 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start lg:gap-8 lg:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <article>
-        <div className="flex gap-3 overflow-x-auto px-4 pt-4 [scrollbar-width:none]">
+        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:overflow-visible">
           {gallery.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={src}
               src={src}
               alt={event.title}
-              className="hero card-shadow h-56 w-[86%] shrink-0 rounded-3xl"
+              className="hero card-shadow h-56 w-[86%] shrink-0 rounded-3xl lg:h-72 lg:w-full"
             />
           ))}
         </div>
 
-        <div className="px-4 pt-4">
+        <div className="pt-4">
           <p className="text-xs font-extrabold text-[#12B8D0]">
             <Link href="/">spotto</Link>
             {event.sport ? ` · ${event.sport}` : ''}

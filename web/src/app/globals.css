@@ -37,15 +37,19 @@ input {
 
 .app-bg {
   min-height: 100dvh;
-  background: linear-gradient(165deg, #7eeaf2 0%, #e8f8f2 46%, #ffd4b0 100%);
+  background: linear-gradient(165deg, #7eeaf2 0%, #e8f8f2 42%, #ffd4b0 100%);
 }
 
-.app-frame {
-  position: relative;
-  width: min(480px, 100%);
-  min-height: 100dvh;
+.app-shell {
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding-bottom: 92px;
+  padding: 8px 16px 104px;
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    padding: 28px 28px 40px;
+  }
 }
 
 .glass {
