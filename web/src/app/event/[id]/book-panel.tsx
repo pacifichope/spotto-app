@@ -64,6 +64,7 @@ function BookControls({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'ログインに失敗しました');
     } finally {
+      // キャンセル・エラー・LINE 画面遷移のいずれでもボタンを戻す
       setBusy(false);
     }
   }

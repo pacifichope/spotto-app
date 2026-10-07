@@ -2,9 +2,11 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -39,8 +41,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  // Providers が注入した runtime 設定を含めて判定する
+  const busyTimerRef = useRef<number | null>(null);
   const configured = isFirebaseConfigured();
+
+  const clearBusy = useCallback(() => {
+    if (busyTimerRef.current != null) {
+      window.clearTimeout(busyTimerRef.current);
+      busyTimerRef.current = null;
+    }
+    setBusy(false);
+  }, []);
+
+  const startBusy = useCallback(() => {
+    setBusy(true);
+    setError('');
+    if (busyTimerRef.current != null) window.clearTimeout(busyTimerRef.current);
+    // ポップアップ放置などで Promise が返らない場合の保険
+    busyTimerRef.current = window.setTimeout(() => {
+      setBusy(false);
+      busyTimerRef.current = null;
+    }, 60_000);
+  }, []);
 
   useEffect(() => {
     const missing = missingFirebaseEnvKeys();
@@ -49,17 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return;
     }
-    let settled = false;
-    const finish = (next: User | null) => {
-      if (settled) return;
-      settled = true;
-      setUser(next);
-      setReady(true);
-    };
     try {
-      const unsub = watchAuth(finish);
-      // onAuthStateChanged が返らない場合でも UI を止めない
-      const timeout = window.setTimeout(() => finish(null), 8000);
+      const unsub = watchAuth((next) => {
+        setUser(next);
+        setReady(true);
+        // ログイン成功・ログアウト後もローディングを残さない
+        clearBusy();
+      });
+      const timeout = window.setTimeout(() => setReady(true), 8000);
       return () => {
         window.clearTimeout(timeout);
         unsub();
@@ -67,9 +85,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '認証の初期化に失敗しました');
       setReady(true);
+      clearBusy();
     }
     return undefined;
-  }, [configured]);
+  }, [configured, clearBusy]);
+
+  // LINE 認可画面からブラウザバック（bfcache）すると busy が残ることがある
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) clearBusy();
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      if (busyTimerRef.current != null) window.clearTimeout(busyTimerRef.current);
+    };
+  }, [clearBusy]);
+
+  const runSignIn = useCallback(
+    async (action: () => void | Promise<unknown>, fallback: string) => {
+      startBusy();
+      try {
+        await action();
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : fallback);
+      } finally {
+        // 成功・キャンセル・エラー・LINE 遷移直前のいずれでも必ず解除
+        clearBusy();
+      }
+    },
+    [startBusy, clearBusy],
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -79,51 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       configured,
       clearError: () => setError(''),
-      signInGoogle: async () => {
-        setBusy(true);
-        setError('');
-        try {
-          await signInWithGoogle();
-        } catch (caught) {
-          setError(caught instanceof Error ? caught.message : 'ログインに失敗しました');
-        } finally {
-          setBusy(false);
-        }
-      },
-      signInApple: async () => {
-        setBusy(true);
-        setError('');
-        try {
-          await signInWithApple();
-        } catch (caught) {
-          setError(caught instanceof Error ? caught.message : 'ログインに失敗しました');
-        } finally {
-          setBusy(false);
-        }
-      },
-      signInLine: async () => {
-        setBusy(true);
-        setError('');
-        try {
+      signInGoogle: () => runSignIn(() => signInWithGoogle(), 'ログインに失敗しました'),
+      signInApple: () => runSignIn(() => signInWithApple(), 'ログインに失敗しました'),
+      signInLine: () =>
+        runSignIn(() => {
           beginLineLogin();
-        } catch (caught) {
-          setError(caught instanceof Error ? caught.message : 'LINE ログインに失敗しました');
-          setBusy(false);
-        }
-      },
-      signOut: async () => {
-        setBusy(true);
-        setError('');
-        try {
+        }, 'LINE ログインに失敗しました'),
+      signOut: () =>
+        runSignIn(async () => {
           await signOutFirebase();
-        } catch (caught) {
-          setError(caught instanceof Error ? caught.message : 'ログアウトに失敗しました');
-        } finally {
-          setBusy(false);
-        }
-      },
+        }, 'ログアウトに失敗しました'),
     }),
-    [user, ready, busy, error, configured],
+    [user, ready, busy, error, configured, runSignIn],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
