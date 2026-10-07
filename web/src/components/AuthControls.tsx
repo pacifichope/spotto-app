@@ -1,14 +1,20 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { useAuth } from '@/lib/auth-context';
 
 const loginButtonClass =
   'flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60';
 
-export function HeaderAuthButton() {
-  const { user, ready, busy, signInGoogle, signOut } = useAuth();
+/**
+ * ヘッダー右のアカウント導線。
+ * 未ログイン時は Google を自動起動せず、/mypage のプロバイダ選択へ誘導する。
+ */
+export function HeaderAccountButton() {
+  const { ready } = useAuth();
+  const pathname = usePathname();
 
   if (!ready) {
     return (
@@ -16,28 +22,16 @@ export function HeaderAuthButton() {
     );
   }
 
-  if (user) {
-    return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void signOut()}
-        className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-[#5B6B75] shadow-sm disabled:opacity-60"
-      >
-        {busy ? '処理中…' : 'ログアウト'}
-      </button>
-    );
-  }
-
+  // 未ログインでも Google 等を自動起動せず、/mypage のプロバイダ選択へ進む
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={() => void signInGoogle()}
-      className="brand-gradient rounded-full px-4 py-2 text-sm font-extrabold disabled:opacity-60"
+    <Link
+      href="/mypage"
+      className={`brand-gradient rounded-full px-4 py-2 text-sm font-extrabold ${
+        pathname.startsWith('/mypage') ? 'ring-2 ring-[#12B8D0]/40' : ''
+      }`}
     >
-      {busy ? '処理中…' : 'ログイン'}
-    </button>
+      マイページ
+    </Link>
   );
 }
 
@@ -46,18 +40,18 @@ export function HeaderGuestHint() {
   if (!ready || user) return null;
   return (
     <p className="hidden text-xs font-bold text-[#5B6B75] lg:block">
-      未ログインです。参加やマイページの確認には
+      未ログインです。参加や予約の確認は
       <Link href="/mypage" className="mx-1 font-extrabold text-[#12B8D0] underline">
-        ログイン
+        マイページ
       </Link>
-      が必要です。
+      からログインしてください。
     </p>
   );
 }
 
 export function LoginPromptCard({
   title = 'ログインが必要です',
-  body = '参加予定やプロフィールを確認するには、ログインしてください。',
+  body = '参加予定やプロフィールを確認するには、Google・Apple・LINE のいずれかでログインしてください。',
 }: {
   title?: string;
   body?: string;

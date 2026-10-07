@@ -4,13 +4,12 @@ import { Home, MessageCircle, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { HeaderAuthButton, HeaderGuestHint } from '@/components/AuthControls';
+import { HeaderAccountButton, HeaderGuestHint } from '@/components/AuthControls';
 import { useAuth } from '@/lib/auth-context';
 
 const TABS = [
   { href: '/', label: 'ホーム', icon: Home },
   { href: '/messages', label: 'メッセージ', icon: MessageCircle },
-  { href: '/mypage', label: 'マイページ', icon: UserRound },
 ] as const;
 
 function isActive(pathname: string, href: string) {
@@ -59,19 +58,25 @@ export function SiteHeader() {
               );
             })}
           </nav>
-          <HeaderAuthButton />
+          <HeaderAccountButton />
         </div>
       </div>
     </header>
   );
 }
 
+const BOTTOM_TABS = [
+  { href: '/', label: 'ホーム', icon: Home },
+  { href: '/messages', label: 'メッセージ', icon: MessageCircle },
+  { href: '/mypage', label: 'マイページ', icon: UserRound },
+] as const;
+
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
     <nav className="glass fixed inset-x-0 bottom-0 z-40 flex justify-around px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 md:hidden">
-      {TABS.map((tab) => {
+      {BOTTOM_TABS.map((tab) => {
         const active = isActive(pathname, tab.href);
         const Icon = tab.icon;
         return (
