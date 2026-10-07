@@ -5,22 +5,36 @@ import { useState } from 'react';
 
 import { AREAS, CATEGORIES, type CategoryId } from '@/constants/theme';
 
+export const PRICE_FILTERS = [
+  { id: 'all', label: '指定なし' },
+  { id: 'free', label: '無料' },
+  { id: 'lte1000', label: '1,000円以下' },
+  { id: 'lte3000', label: '3,000円以下' },
+  { id: 'gt3000', label: '3,000円超' },
+] as const;
+
+export type PriceFilterId = (typeof PRICE_FILTERS)[number]['id'];
+
 type HeaderProps = {
   area: string;
   query: string;
   category: CategoryId;
+  price: PriceFilterId;
   onArea: (area: string) => void;
   onQuery: (query: string) => void;
   onCategory: (category: CategoryId) => void;
+  onPrice: (price: PriceFilterId) => void;
 };
 
 export function Header({
   area,
   query,
   category,
+  price,
   onArea,
   onQuery,
   onCategory,
+  onPrice,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
 
@@ -62,7 +76,8 @@ export function Header({
         ) : null}
       </div>
 
-      <label className="glass mt-3 flex h-11 items-center gap-2 rounded-full px-3.5">
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">キーワード</p>
+      <label className="glass flex h-11 items-center gap-2 rounded-full px-3.5">
         <Search size={16} className="shrink-0 text-[#8A9199]" />
         <input
           value={query}
@@ -72,7 +87,8 @@ export function Header({
         />
       </label>
 
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] lg:flex-wrap lg:overflow-visible">
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">カテゴリー</p>
+      <div className="flex flex-wrap gap-2">
         {CATEGORIES.map((item) => {
           const active = item.id === category;
           return (
@@ -84,6 +100,26 @@ export function Header({
                 active ? 'brand-gradient' : 'bg-white/70 text-[#5B6B75]'
               }`}
               onClick={() => onCategory(active && item.id !== 'all' ? 'all' : item.id)}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">価格帯</p>
+      <div className="flex flex-wrap gap-2">
+        {PRICE_FILTERS.map((item) => {
+          const active = item.id === price;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={active}
+              className={`rounded-full px-3 py-1.5 text-sm font-extrabold ${
+                active ? 'brand-gradient' : 'bg-white/70 text-[#5B6B75]'
+              }`}
+              onClick={() => onPrice(item.id)}
             >
               {item.label}
             </button>
