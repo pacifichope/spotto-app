@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth';
 
 import { joinEvent } from '@/lib/booking';
 import {
+  beginLineLogin,
   idTokenWithAuthenticatedRole,
   signInWithApple,
   signInWithGoogle,
@@ -50,10 +51,14 @@ function BookControls({
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function signIn(kind: 'google' | 'apple') {
+  async function signIn(kind: 'google' | 'apple' | 'line') {
     setBusy(true);
     setMessage('');
     try {
+      if (kind === 'line') {
+        beginLineLogin();
+        return;
+      }
       const next = kind === 'google' ? await signInWithGoogle() : await signInWithApple();
       setUser(next);
     } catch (error) {
@@ -125,22 +130,30 @@ function BookControls({
           {label}
         </button>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => void signIn('google')}
-            className="h-12 rounded-full bg-white text-sm font-extrabold text-[#12202A] disabled:opacity-60"
+            className="h-12 w-full rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE] disabled:opacity-60"
           >
-            Google
+            Googleでログイン
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void signIn('apple')}
-            className="brand-gradient h-12 rounded-full text-sm font-extrabold disabled:opacity-60"
+            className="h-12 w-full rounded-full bg-[#111111] text-sm font-extrabold text-white disabled:opacity-60"
           >
-            Appleで参加
+            Appleでサインイン
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void signIn('line')}
+            className="h-12 w-full rounded-full bg-[#06C755] text-sm font-extrabold text-white disabled:opacity-60"
+          >
+            LINEでログイン
           </button>
         </div>
       )}

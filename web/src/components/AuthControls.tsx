@@ -4,6 +4,9 @@ import Link from 'next/link';
 
 import { useAuth } from '@/lib/auth-context';
 
+const loginButtonClass =
+  'flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60';
+
 export function HeaderAuthButton() {
   const { user, ready, busy, signInGoogle, signOut } = useAuth();
 
@@ -59,28 +62,36 @@ export function LoginPromptCard({
   title?: string;
   body?: string;
 }) {
-  const { busy, error, signInGoogle, signInApple } = useAuth();
+  const { busy, error, configured, signInGoogle, signInApple, signInLine } = useAuth();
 
   return (
     <section className="card-shadow mt-4 px-5 py-8">
       <p className="text-base font-extrabold tracking-tight">{title}</p>
       <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">{body}</p>
-      <div className="mt-5 grid gap-2 sm:grid-cols-2">
+      <div className="mt-5 flex max-w-md flex-col gap-3">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !configured}
           onClick={() => void signInGoogle()}
-          className="brand-gradient h-12 rounded-full text-sm font-extrabold disabled:opacity-60"
+          className={`${loginButtonClass} bg-white text-[#12202A] shadow-sm ring-1 ring-[#E4EBEE]`}
         >
           {busy ? '処理中…' : 'Googleでログイン'}
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !configured}
           onClick={() => void signInApple()}
-          className="h-12 rounded-full bg-white text-sm font-extrabold text-[#12202A] shadow-sm disabled:opacity-60"
+          className={`${loginButtonClass} bg-[#111111] text-white`}
         >
-          Appleでサインイン
+          {busy ? '処理中…' : 'Appleでサインイン'}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !configured}
+          onClick={() => void signInLine()}
+          className={`${loginButtonClass} bg-[#06C755] text-white`}
+        >
+          {busy ? '処理中…' : 'LINEでログイン'}
         </button>
       </div>
       {error ? <p className="mt-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}

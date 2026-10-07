@@ -10,7 +10,9 @@ import {
 } from 'react';
 import type { User } from 'firebase/auth';
 
+import { isFirebaseConfigured, missingFirebaseEnvKeys } from '@/lib/env';
 import {
+  beginLineLogin,
   signInWithApple,
   signInWithGoogle,
   signOutFirebase,
@@ -22,8 +24,10 @@ type AuthContextValue = {
   ready: boolean;
   busy: boolean;
   error: string;
+  configured: boolean;
   signInGoogle: () => Promise<void>;
   signInApple: () => Promise<void>;
+  signInLine: () => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 };
@@ -35,8 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const configured = isFirebaseConfigured();
 
   useEffect(() => {
+    if (!configured) {
+      setError(
+        `Firebase Web の環境変数が未設定です（${missingFirebaseEnvKeys().join(', ')}）`,
+      );
+      setReady(true);
+      return;
+    }
     try {
       return watchAuth((next) => {
         setUser(next);
@@ -47,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setReady(true);
       return undefined;
     }
-  }, []);
+  }, [configured]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -55,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ready,
       busy,
       error,
+      configured,
       clearError: () => setError(''),
       signInGoogle: async () => {
         setBusy(true);
@@ -78,6 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setBusy(false);
         }
       },
+      signInLine: async () => {
+        setBusy(true);
+        setError('');
+        try {
+          beginLineLogin();
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : 'LINE ログインに失敗しました');
+          setBusy(false);
+        }
+      },
       signOut: async () => {
         setBusy(true);
         setError('');
@@ -90,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [user, ready, busy, error],
+    [user, ready, busy, error, configured],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

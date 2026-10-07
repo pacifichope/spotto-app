@@ -22,7 +22,7 @@ export function MyPageScreen() {
         <p className="mt-2 text-sm font-bold text-[#8A9199]">現在：未ログイン</p>
         <LoginPromptCard
           title="ログインしてマイページを開く"
-          body="参加予定やプロフィールは、ログイン後にこの画面で確認できます。Google または Apple でサインインしてください。"
+          body="参加予定やプロフィールは、ログイン後にこの画面で確認できます。Google・Apple・LINE のいずれかでサインインしてください。"
         />
       </main>
     );

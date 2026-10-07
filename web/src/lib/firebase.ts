@@ -10,21 +10,24 @@ import {
   type User,
 } from 'firebase/auth';
 
-import { apiBaseUrl } from '@/lib/env';
+import {
+  apiBaseUrl,
+  firebasePublicConfig,
+  isFirebaseConfigured,
+  lineChannelId,
+  missingFirebaseEnvKeys,
+} from '@/lib/env';
 
-function firebaseConfig() {
-  return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
-  };
-}
+const LINE_STATE_KEY = 'spotto_line_oauth_state';
+const LINE_REDIRECT_KEY = 'spotto_line_oauth_redirect';
 
 export function getFirebaseApp(): FirebaseApp {
-  const config = firebaseConfig();
-  if (!config.apiKey || !config.projectId) {
-    throw new Error('Firebase Web の環境変数が未設定です');
+  const config = firebasePublicConfig();
+  const missing = missingFirebaseEnvKeys();
+  if (missing.length > 0) {
+    throw new Error(
+      `Firebase Web の環境変数が未設定です（${missing.join(', ')}）。web/.env.local または Vercel の Environment Variables を確認してください。`,
+    );
   }
   return getApps()[0] ?? initializeApp(config);
 }
@@ -34,6 +37,10 @@ export function getFirebaseAuth() {
 }
 
 export function watchAuth(onChange: (user: User | null) => void) {
+  if (!isFirebaseConfigured()) {
+    onChange(null);
+    return () => {};
+  }
   return onAuthStateChanged(getFirebaseAuth(), onChange);
 }
 
@@ -54,6 +61,36 @@ export async function signInWithApple(): Promise<User> {
   provider.addScope('name');
   const credential = await signInWithPopup(auth, provider);
   return credential.user;
+}
+
+export function lineLoginRedirectUri() {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}/auth/line/callback`;
+}
+
+/** LINE Login の認可画面へ遷移する。 */
+export function beginLineLogin() {
+  const channelId = lineChannelId();
+  if (!channelId) {
+    throw new Error(
+      'NEXT_PUBLIC_LINE_CHANNEL_ID が未設定です。web/.env.local に LINE Login のチャネル ID を設定してください。',
+    );
+  }
+  const redirectUri = lineLoginRedirectUri();
+  const state =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  sessionStorage.setItem(LINE_STATE_KEY, state);
+  sessionStorage.setItem(LINE_REDIRECT_KEY, redirectUri);
+
+  const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', channelId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('state', state);
+  url.searchParams.set('scope', 'profile openid email');
+  window.location.assign(url.toString());
 }
 
 /**
@@ -79,6 +116,26 @@ export async function signInWithLineToken(input: {
   }
   const credential = await signInWithCustomToken(getFirebaseAuth(), data.customToken);
   return credential.user;
+}
+
+export async function completeLineLoginFromCallback(params: {
+  code: string | null;
+  state: string | null;
+  error?: string | null;
+}): Promise<User> {
+  if (params.error) {
+    throw new Error(params.error === 'access_denied' ? 'LINE ログインがキャンセルされました' : params.error);
+  }
+  if (!params.code) throw new Error('LINE の認可コードがありません');
+  const expected = sessionStorage.getItem(LINE_STATE_KEY);
+  const redirectUri =
+    sessionStorage.getItem(LINE_REDIRECT_KEY) || lineLoginRedirectUri();
+  if (expected && params.state && expected !== params.state) {
+    throw new Error('LINE ログインの state が一致しません');
+  }
+  sessionStorage.removeItem(LINE_STATE_KEY);
+  sessionStorage.removeItem(LINE_REDIRECT_KEY);
+  return signInWithLineToken({ code: params.code, redirectUri });
 }
 
 /** Supabase RLS が authenticated と認めるまで、既存 API でクレームを付与して取り直す。 */
