@@ -116,3 +116,46 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+/* 価格帯デュアルレンジスライダー */
+.price-range-thumb {
+  pointer-events: none;
+  height: 100%;
+  margin: 0;
+}
+
+.price-range-thumb::-webkit-slider-runnable-track {
+  height: 1.5rem;
+  background: transparent;
+}
+
+.price-range-thumb::-moz-range-track {
+  height: 1.5rem;
+  background: transparent;
+  border: none;
+}
+
+.price-range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: linear-gradient(120deg, #29d1e8 0%, #ff9533 100%);
+  box-shadow: 0 4px 12px rgba(18, 184, 208, 0.35);
+  cursor: pointer;
+}
+
+.price-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: linear-gradient(120deg, #29d1e8 0%, #ff9533 100%);
+  box-shadow: 0 4px 12px rgba(18, 184, 208, 0.35);
+  cursor: pointer;
+}

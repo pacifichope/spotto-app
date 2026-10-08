@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { BookPanel } from '@/app/event/[id]/book-panel';
+import { EventAttendeesSection } from '@/components/EventAttendeesSection';
 import { sportCover } from '@/constants/theme';
 import { getPublicEvent, listPublicEvents } from '@/lib/events';
 import {
@@ -54,13 +55,22 @@ export default async function EventPage({ params }: PageProps) {
   const jsonLd = JSON.stringify(eventJsonLd(event)).replace(/</g, '\\u003c');
   const photo = absoluteImageUrl(event.imageUri);
   const gallery = photo ? [photo, sportCover(event.sport)].filter((src, index, all) => all.indexOf(src) === index) : [sportCover(event.sport)];
-  const faceCount = Math.min(6, Math.max(event.joinedCount, event.hostName ? 1 : 0));
   const open = event.capacity <= 0 || event.joinedCount < event.capacity;
 
   return (
     <main className="pb-36 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start lg:gap-8 lg:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <article>
+        <nav aria-label="パンくず" className="mb-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-sm font-extrabold text-[#5B6B75] transition-colors hover:text-[#12B8D0]"
+          >
+            <span aria-hidden>←</span>
+            イベント一覧に戻る
+          </Link>
+        </nav>
+
         <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:overflow-visible">
           {gallery.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
@@ -75,8 +85,17 @@ export default async function EventPage({ params }: PageProps) {
 
         <div className="pt-4">
           <p className="text-xs font-extrabold text-[#12B8D0]">
-            <Link href="/">spotto</Link>
-            {event.sport ? ` · ${event.sport}` : ''}
+            <Link href="/" className="hover:underline">
+              イベント一覧
+            </Link>
+            {event.sport ? (
+              <>
+                <span className="mx-1.5 text-[#8A9199]" aria-hidden>
+                  /
+                </span>
+                <span>{event.sport}</span>
+              </>
+            ) : null}
           </p>
           <div className="mt-2 flex items-start justify-between gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight">{event.title}</h1>
@@ -111,32 +130,13 @@ export default async function EventPage({ params }: PageProps) {
             <p className="mt-4 text-sm font-medium leading-7 text-[#5B6B75]">{event.description}</p>
           ) : null}
 
-          <section className="card-shadow mt-4 p-4" aria-label="参加者">
-            <h2 className="text-sm font-extrabold">参加者</h2>
-            {faceCount === 0 ? (
-              <p className="mt-3 text-sm font-bold text-[#8A9199]">まだ参加者はいません</p>
-            ) : (
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex shrink-0">
-                  {Array.from({ length: faceCount }, (_, index) => {
-                    const label = index === 0 && event.hostName ? event.hostName.slice(0, 1) : String(index + 1);
-                    return (
-                      <span
-                        key={`${label}-${index}`}
-                        className="brand-gradient -ml-2 grid h-9 w-9 place-items-center rounded-full border-2 border-white text-xs font-extrabold first:ml-0"
-                        title={index === 0 && event.hostName ? `主催 ${event.hostName}` : '参加者'}
-                      >
-                        {label}
-                      </span>
-                    );
-                  })}
-                </div>
-                <p className="min-w-0 flex-1 text-sm font-extrabold leading-5">
-                  {`${event.joinedCount}人参加${event.capacity > 0 ? ` / ${event.capacity}人` : ''}${event.hostName ? ` · 主催 ${event.hostName}` : ''}`}
-                </p>
-              </div>
-            )}
-          </section>
+          <EventAttendeesSection
+            eventId={event.id}
+            hostId={event.hostId}
+            hostName={event.hostName}
+            capacity={event.capacity}
+            joinedCountFallback={event.joinedCount}
+          />
         </div>
       </article>
       <Suspense fallback={null}>

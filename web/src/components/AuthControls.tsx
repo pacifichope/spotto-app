@@ -4,10 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import {
+  AppleLogoMark,
+  GoogleGMark,
+  LineSpeechMark,
+} from '@/components/socialBrandMarks';
 import { useAuth } from '@/lib/auth-context';
 
 const loginButtonClass =
-  'flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60';
+  'flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-extrabold disabled:opacity-60';
 
 /**
  * ヘッダー右のアカウント導線。
@@ -74,7 +79,8 @@ export function LoginPromptCard({
           onClick={() => void signInGoogle()}
           className={`${loginButtonClass} bg-white text-[#12202A] shadow-sm ring-1 ring-[#E4EBEE]`}
         >
-          {busy ? '処理中…' : 'Googleでログイン'}
+          <GoogleGMark size={20} />
+          <span>{busy ? '処理中…' : 'Googleでログイン'}</span>
         </button>
         <button
           type="button"
@@ -82,7 +88,8 @@ export function LoginPromptCard({
           onClick={() => void signInApple()}
           className={`${loginButtonClass} bg-[#111111] text-white`}
         >
-          {busy ? '処理中…' : 'Appleでサインイン'}
+          <AppleLogoMark size={18} color="#FFFFFF" />
+          <span>{busy ? '処理中…' : 'Appleでサインイン'}</span>
         </button>
         <button
           type="button"
@@ -90,7 +97,8 @@ export function LoginPromptCard({
           onClick={() => void signInLine()}
           className={`${loginButtonClass} bg-[#06C755] text-white`}
         >
-          {busy ? '処理中…' : 'LINEでログイン'}
+          <LineSpeechMark size={22} color="#FFFFFF" />
+          <span>{busy ? '処理中…' : 'LINEでログイン'}</span>
         </button>
       </div>
       {lineCallbackHint ? (

@@ -5,6 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 
+import {
+  AppleLogoMark,
+  GoogleGMark,
+  LineSpeechMark,
+} from '@/components/socialBrandMarks';
 import { useAuth } from '@/lib/auth-context';
 import { joinEvent } from '@/lib/booking';
 import { chatHref } from '@/lib/chatsWeb';
@@ -17,6 +22,9 @@ import {
 import { formatPrice } from '@/lib/eventSeo';
 import { confirmHostedCheckout, createHostedCheckout } from '@/lib/payments';
 import type { PublicEvent } from '@/lib/types';
+
+const socialButtonClass =
+  'flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-extrabold disabled:opacity-60';
 
 type BookPanelProps = {
   event: PublicEvent;
@@ -160,25 +168,28 @@ function BookControls({
             type="button"
             disabled={busy}
             onClick={() => void signIn('google')}
-            className="h-12 w-full rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE] disabled:opacity-60"
+            className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
           >
-            Googleでログイン
+            <GoogleGMark size={20} />
+            <span>Googleでログイン</span>
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void signIn('apple')}
-            className="h-12 w-full rounded-full bg-[#111111] text-sm font-extrabold text-white disabled:opacity-60"
+            className={`${socialButtonClass} bg-[#111111] text-white`}
           >
-            Appleでサインイン
+            <AppleLogoMark size={18} color="#FFFFFF" />
+            <span>Appleでサインイン</span>
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void signIn('line')}
-            className="h-12 w-full rounded-full bg-[#06C755] text-sm font-extrabold text-white disabled:opacity-60"
+            className={`${socialButtonClass} bg-[#06C755] text-white`}
           >
-            LINEでログイン
+            <LineSpeechMark size={22} color="#FFFFFF" />
+            <span>LINEでログイン</span>
           </button>
         </div>
       )}

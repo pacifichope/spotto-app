@@ -1,0 +1,339 @@
+'use client';
+
+import { ChevronLeft, Users, X } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+
+import { useAuth } from '@/lib/auth-context';
+import {
+  fetchEventAttendees,
+  type EventAttendee,
+} from '@/lib/attendees';
+import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+
+type Props = {
+  eventId: string;
+  hostId?: string;
+  hostName?: string;
+  capacity: number;
+  joinedCountFallback: number;
+};
+
+function AvatarBubble({
+  person,
+  size = 36,
+  className = '',
+}: {
+  person: Pick<EventAttendee, 'name' | 'imageUri' | 'gender'>;
+  size?: number;
+  className?: string;
+}) {
+  const initial = (person.name.trim() || '?').slice(0, 1);
+  const ring =
+    person.gender === '女性'
+      ? 'ring-[#F9A8D4]'
+      : person.gender === '男性'
+        ? 'ring-[#7DD3FC]'
+        : 'ring-white';
+
+  if (person.imageUri) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={person.imageUri}
+        alt=""
+        width={size}
+        height={size}
+        className={`rounded-full object-cover ring-2 ${ring} ${className}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`brand-gradient grid place-items-center rounded-full text-xs font-extrabold ring-2 ${ring} ${className}`}
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {initial}
+    </span>
+  );
+}
+
+export function EventAttendeesSection({
+  eventId,
+  hostId,
+  hostName,
+  capacity,
+  joinedCountFallback,
+}: Props) {
+  const { user } = useAuth();
+  const titleId = useId();
+  const [attendees, setAttendees] = useState<EventAttendee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [listOpen, setListOpen] = useState(false);
+  const [selected, setSelected] = useState<EventAttendee | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void fetchEventAttendees({
+      eventId,
+      hostId,
+      hostName,
+      currentUserId: user?.uid,
+      getIdToken: user
+        ? async () => idTokenWithAuthenticatedRole(user)
+        : undefined,
+    })
+      .then((next) => {
+        if (!cancelled) setAttendees(next);
+      })
+      .catch(() => {
+        if (!cancelled) setAttendees([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, hostId, hostName, user]);
+
+  useEffect(() => {
+    if (!listOpen && !selected) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (selected) setSelected(null);
+      else setListOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [listOpen, selected]);
+
+  const preview = attendees.slice(0, 6);
+  const count = Math.max(attendees.length, joinedCountFallback);
+  const capacityLabel =
+    capacity > 0 ? `${count}人参加 / ${capacity}人` : `${count}人参加`;
+
+  function openList() {
+    setSelected(null);
+    setListOpen(true);
+  }
+
+  function closeAll() {
+    setListOpen(false);
+    setSelected(null);
+  }
+
+  return (
+    <>
+      <section className="card-shadow mt-4 p-4" aria-label="参加者">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-extrabold">参加者</h2>
+          {count > 0 ? (
+            <button
+              type="button"
+              onClick={openList}
+              className="text-xs font-extrabold text-[#12B8D0] hover:underline"
+            >
+              一覧を見る
+            </button>
+          ) : null}
+        </div>
+
+        {loading ? (
+          <p className="mt-3 text-sm font-bold text-[#8A9199]">参加者を読み込み中…</p>
+        ) : count === 0 && attendees.length === 0 ? (
+          <p className="mt-3 text-sm font-bold text-[#8A9199]">まだ参加者はいません</p>
+        ) : (
+          <button
+            type="button"
+            onClick={openList}
+            className="mt-3 flex w-full items-center gap-3 rounded-2xl text-left transition hover:bg-[#F7FBFC]"
+            aria-label={`参加者一覧を開く（${capacityLabel}）`}
+          >
+            <div className="flex shrink-0 pl-1">
+              {preview.length > 0 ? (
+                preview.map((person, index) => (
+                  <AvatarBubble
+                    key={person.id}
+                    person={person}
+                    size={36}
+                    className={`-ml-2 first:ml-0 ${index === 0 ? '' : ''}`}
+                  />
+                ))
+              ) : (
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#E5F9FC] text-[#12B8D0]">
+                  <Users size={18} />
+                </span>
+              )}
+            </div>
+            <p className="min-w-0 flex-1 text-sm font-extrabold leading-5">
+              {capacityLabel}
+              {hostName ? (
+                <span className="font-bold text-[#5B6B75]"> · 主催 {hostName}</span>
+              ) : null}
+            </p>
+          </button>
+        )}
+      </section>
+
+      {listOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
+          <button
+            type="button"
+            aria-label="閉じる"
+            className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md"
+            onClick={closeAll}
+          />
+          <div
+            role="dialog"
+            aria-modal
+            aria-labelledby={titleId}
+            className="relative z-10 flex max-h-[min(88dvh,640px)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_24px_64px_rgba(11,26,34,0.28)]"
+          >
+            {selected ? (
+              <>
+                <div className="flex items-center justify-between border-b border-[#E4EBEE] px-4 py-3.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="inline-flex items-center gap-1 text-sm font-extrabold text-[#12B8D0]"
+                  >
+                    <ChevronLeft size={18} />
+                    一覧へ
+                  </button>
+                  <h2 id={titleId} className="text-sm font-extrabold">
+                    プロフィール
+                  </h2>
+                  <button
+                    type="button"
+                    aria-label="閉じる"
+                    onClick={closeAll}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="overflow-y-auto px-5 py-8">
+                  <div className="flex flex-col items-center text-center">
+                    <AvatarBubble person={selected} size={96} />
+                    <p className="mt-4 text-xl font-extrabold tracking-tight">
+                      {selected.name}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                      {selected.isHost ? (
+                        <span className="rounded-full bg-[#E5F9FC] px-2.5 py-1 text-[11px] font-extrabold text-[#12B8D0]">
+                          主催者
+                        </span>
+                      ) : null}
+                      {selected.gender ? (
+                        <span className="rounded-full bg-[#F4F7F8] px-2.5 py-1 text-[11px] font-extrabold text-[#5B6B75]">
+                          {selected.gender}
+                        </span>
+                      ) : null}
+                      {selected.self ? (
+                        <span className="rounded-full bg-[#FFF4E8] px-2.5 py-1 text-[11px] font-extrabold text-[#E8742A]">
+                          あなた
+                        </span>
+                      ) : null}
+                    </div>
+                    {selected.bio ? (
+                      <p className="mt-4 text-sm font-bold leading-6 text-[#5B6B75]">
+                        {selected.bio}
+                      </p>
+                    ) : (
+                      <p className="mt-4 text-sm font-bold text-[#8A9199]">
+                        自己紹介はまだありません
+                      </p>
+                    )}
+                    {(selected.ticketQuantity ?? 1) > 1 ? (
+                      <p className="mt-3 text-xs font-bold text-[#5B6B75]">
+                        参加枠 {selected.ticketQuantity} 名分
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-[#E4EBEE] px-4 py-3.5">
+                  <div>
+                    <h2 id={titleId} className="text-base font-extrabold tracking-tight">
+                      参加者一覧
+                    </h2>
+                    <p className="mt-0.5 text-xs font-bold text-[#5B6B75]">
+                      {capacityLabel}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="閉じる"
+                    onClick={closeAll}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <ul className="overflow-y-auto">
+                  {attendees.length === 0 ? (
+                    <li className="px-5 py-10 text-center text-sm font-bold text-[#8A9199]">
+                      まだ参加者はいません
+                    </li>
+                  ) : (
+                    attendees.map((person, index) => (
+                      <li key={person.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelected(person)}
+                          className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-[#F7FBFC] sm:px-5 ${
+                            index > 0 ? 'border-t border-[#E4EBEE]' : ''
+                          }`}
+                        >
+                          <AvatarBubble person={person} size={44} />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-sm font-extrabold">
+                                {person.name}
+                              </span>
+                              {person.isHost ? (
+                                <span className="shrink-0 rounded-full bg-[#E5F9FC] px-2 py-0.5 text-[10px] font-extrabold text-[#12B8D0]">
+                                  主催
+                                </span>
+                              ) : null}
+                              {person.self ? (
+                                <span className="shrink-0 rounded-full bg-[#FFF4E8] px-2 py-0.5 text-[10px] font-extrabold text-[#E8742A]">
+                                  あなた
+                                </span>
+                              ) : null}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs font-bold text-[#5B6B75]">
+                              {person.gender ||
+                                (person.isHost ? 'イベント主催者' : '参加者')}
+                              {(person.ticketQuantity ?? 1) > 1
+                                ? ` · ${person.ticketQuantity}名分`
+                                : ''}
+                            </span>
+                          </span>
+                          <span className="text-[#8A9199]" aria-hidden>
+                            ›
+                          </span>
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}

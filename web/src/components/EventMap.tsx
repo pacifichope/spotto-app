@@ -6,7 +6,7 @@ import {
   Map,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { Clock, MapPin, X } from 'lucide-react';
+import { Clock, LocateFixed, MapPin, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -19,6 +19,11 @@ import {
 import { absoluteImageUrl, formatPrice, formatWhen } from '@/lib/eventSeo';
 import { googleMapsApiKey } from '@/lib/env';
 import type { PublicEvent } from '@/lib/types';
+import {
+  FALLBACK_COORDS,
+  toMapLatLng,
+  type LatLng,
+} from '@/lib/userLocation';
 
 type MappableEvent = PublicEvent & {
   lat: number;
@@ -26,8 +31,26 @@ type MappableEvent = PublicEvent & {
   approximate: boolean;
 };
 
-const DEFAULT_CENTER = { lat: 35.6812, lng: 139.7671 };
+const DEFAULT_CENTER = toMapLatLng(FALLBACK_COORDS);
 const MAP_ID = 'DEMO_MAP_ID';
+/** nearby 用 delta ≈ 0.32 に相当するズーム目安 */
+const NEARBY_ZOOM = 11;
+
+export type EventMapProps = {
+  events: PublicEvent[];
+  /** マップの中心（現在地 or エリア）。未指定時はフォールバック */
+  center?: { lat: number; lng: number };
+  /** ユーザー現在地（ドット表示用）。無いときは非表示 */
+  userCoords?: LatLng | null;
+  locating?: boolean;
+  /** 「現在地へ」ボタン。未指定ならボタン非表示 */
+  onRecenter?: () => void;
+  /**
+   * true のときイベント全体への FitBounds を行わず center を優先。
+   * 現在地モードやエリア選択時に使う。
+   */
+  preferCenter?: boolean;
+};
 
 function toMappable(events: PublicEvent[]): MappableEvent[] {
   return events.flatMap((event) => {
@@ -37,16 +60,47 @@ function toMappable(events: PublicEvent[]): MappableEvent[] {
   });
 }
 
-function FitBounds({ events }: { events: MappableEvent[] }) {
+function MapCamera({
+  center,
+  preferCenter,
+  events,
+}: {
+  center: { lat: number; lng: number };
+  preferCenter: boolean;
+  events: MappableEvent[];
+}) {
   const map = useMap();
+  const eventBoundsKey = useMemo(
+    () =>
+      events
+        .map((event) => `${event.id}:${event.lat.toFixed(4)},${event.lng.toFixed(4)}`)
+        .join('|'),
+    [events],
+  );
 
+  // 現在地／エリア中心を優先（アプリ版 applyArea のカメラ合わせに相当）
   useEffect(() => {
-    if (!map || events.length === 0) return;
+    if (!map || !preferCenter) return;
+    map.panTo(center);
+    map.setZoom(NEARBY_ZOOM);
+  }, [map, preferCenter, center.lat, center.lng]);
+
+  // preferCenter でないときのみイベント群にフィット
+  useEffect(() => {
+    if (!map || preferCenter) return;
+
+    if (events.length === 0) {
+      map.panTo(center);
+      map.setZoom(NEARBY_ZOOM);
+      return;
+    }
+
     if (events.length === 1) {
       map.setCenter({ lat: events[0].lat, lng: events[0].lng });
       map.setZoom(13);
       return;
     }
+
     const lats = events.map((event) => event.lat);
     const lngs = events.map((event) => event.lng);
     map.fitBounds(
@@ -58,9 +112,21 @@ function FitBounds({ events }: { events: MappableEvent[] }) {
       },
       72,
     );
-  }, [map, events]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventBoundsKey で範囲変化を検知
+  }, [map, preferCenter, eventBoundsKey, center.lat, center.lng]);
 
   return null;
+}
+
+function UserLocationDot({ coords }: { coords: LatLng }) {
+  return (
+    <AdvancedMarker position={toMapLatLng(coords)} title="現在地" zIndex={30}>
+      <div className="relative h-5 w-5" aria-hidden>
+        <span className="absolute inset-0 rounded-full bg-[#29D1E8]/40 animate-ping" />
+        <span className="absolute inset-[3px] rounded-full border-2 border-white bg-[#12B8D0] shadow" />
+      </div>
+    </AdvancedMarker>
+  );
 }
 
 function SportPin({
@@ -178,13 +244,18 @@ function MapPreviewCard({
   );
 }
 
-function GoogleEventMap({ events }: { events: PublicEvent[] }) {
+function GoogleEventMap({
+  events,
+  center,
+  userCoords,
+  locating,
+  onRecenter,
+  preferCenter,
+}: Required<Pick<EventMapProps, 'events' | 'center' | 'preferCenter'>> &
+  Pick<EventMapProps, 'userCoords' | 'locating' | 'onRecenter'>) {
   const mappable = useMemo(() => toMappable(events), [events]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = mappable.find((event) => event.id === selectedId) ?? null;
-  const center = mappable[0]
-    ? { lat: mappable[0].lat, lng: mappable[0].lng }
-    : DEFAULT_CENTER;
 
   useEffect(() => {
     if (selectedId && !mappable.some((event) => event.id === selectedId)) {
@@ -196,7 +267,7 @@ function GoogleEventMap({ events }: { events: PublicEvent[] }) {
     <div className="card-shadow relative h-[68vh] min-h-[480px] overflow-hidden">
       <Map
         defaultCenter={center}
-        defaultZoom={11}
+        defaultZoom={NEARBY_ZOOM}
         mapId={MAP_ID}
         gestureHandling="greedy"
         disableDefaultUI={false}
@@ -206,7 +277,8 @@ function GoogleEventMap({ events }: { events: PublicEvent[] }) {
         className="h-full w-full"
         onClick={() => setSelectedId(null)}
       >
-        <FitBounds events={mappable} />
+        <MapCamera center={center} preferCenter={preferCenter} events={mappable} />
+        {userCoords ? <UserLocationDot coords={userCoords} /> : null}
         {mappable.map((event) => (
           <AdvancedMarker
             key={event.id}
@@ -225,7 +297,20 @@ function GoogleEventMap({ events }: { events: PublicEvent[] }) {
         {events.length > mappable.length
           ? `（位置不明 ${events.length - mappable.length}件は非表示）`
           : ''}
+        {locating ? ' · 現在地を取得中…' : ''}
       </div>
+
+      {onRecenter ? (
+        <button
+          type="button"
+          aria-label="現在地へ移動"
+          disabled={locating}
+          onClick={onRecenter}
+          className="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-[#12B8D0] shadow-sm disabled:opacity-60"
+        >
+          <LocateFixed size={18} strokeWidth={2.4} className={locating ? 'animate-pulse' : ''} />
+        </button>
+      ) : null}
 
       {events.length === 0 ? (
         <p className="absolute inset-0 z-20 grid place-items-center bg-white/70 px-6 text-center text-sm font-bold text-[#5B6B75]">
@@ -244,8 +329,16 @@ function GoogleEventMap({ events }: { events: PublicEvent[] }) {
   );
 }
 
-export function EventMap({ events }: { events: PublicEvent[] }) {
+export function EventMap({
+  events,
+  center,
+  userCoords = null,
+  locating = false,
+  onRecenter,
+  preferCenter = true,
+}: EventMapProps) {
   const apiKey = googleMapsApiKey();
+  const resolvedCenter = center ?? DEFAULT_CENTER;
 
   if (!apiKey) {
     return (
@@ -257,7 +350,14 @@ export function EventMap({ events }: { events: PublicEvent[] }) {
 
   return (
     <APIProvider apiKey={apiKey} language="ja" region="JP">
-      <GoogleEventMap events={events} />
+      <GoogleEventMap
+        events={events}
+        center={resolvedCenter}
+        userCoords={userCoords}
+        locating={locating}
+        onRecenter={onRecenter}
+        preferCenter={preferCenter}
+      />
     </APIProvider>
   );
 }

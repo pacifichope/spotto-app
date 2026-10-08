@@ -1,16 +1,33 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { List, Map } from 'lucide-react';
 
 import { EventCard } from '@/components/EventCard';
 import { EventMap } from '@/components/EventMap';
-import { Header, type PriceFilterId } from '@/components/Header';
-import { eventMatchesCategory, type CategoryId } from '@/constants/theme';
+import { Header } from '@/components/Header';
+import {
+  DEFAULT_PRICE_RANGE,
+  matchesPriceRange,
+  type PriceRange,
+} from '@/components/PriceRangeSlider';
+import {
+  AREA_CENTERS,
+  eventMatchesCategory,
+  resolveEventCoords,
+  type CategoryId,
+} from '@/constants/theme';
+import { useUserLocation } from '@/hooks/useUserLocation';
 import type { PublicEvent } from '@/lib/types';
+import {
+  NEARBY_RADIUS_KM,
+  isWithinRadiusKm,
+  toMapLatLng,
+} from '@/lib/userLocation';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+const NEARBY_AREA = '現在地付近';
 
 function dateOptions() {
   const today = new Date();
@@ -29,12 +46,14 @@ function dateOptions() {
   });
 }
 
-function matchesPrice(priceYen: number, price: PriceFilterId) {
-  if (price === 'free') return priceYen <= 0;
-  if (price === 'lte1000') return priceYen <= 1000;
-  if (price === 'lte3000') return priceYen <= 3000;
-  if (price === 'gt3000') return priceYen > 3000;
-  return true;
+function areaMapCenter(area: string): { lat: number; lng: number } | null {
+  if (area === NEARBY_AREA) return null;
+  for (const item of AREA_CENTERS) {
+    if (area === item.match || area.includes(item.match)) {
+      return { lat: item.lat, lng: item.lng };
+    }
+  }
+  return null;
 }
 
 export function HomeScreen({
@@ -44,20 +63,75 @@ export function HomeScreen({
   events: PublicEvent[];
   error: string;
 }) {
+  const {
+    coords: userCoords,
+    center: locationCenter,
+    locating,
+    status,
+    refresh,
+  } = useUserLocation();
+
   const [query, setQuery] = useState('');
-  const [area, setArea] = useState<string>('現在地付近');
+  const [area, setArea] = useState<string>(NEARBY_AREA);
   const [category, setCategory] = useState<CategoryId>('all');
-  const [price, setPrice] = useState<PriceFilterId>('all');
+  const [priceRange, setPriceRange] = useState<PriceRange>(DEFAULT_PRICE_RANGE);
   const [date, setDate] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'map'>('list');
   const days = useMemo(() => dateOptions(), []);
   const leadBlanks = days[0]?.weekdayIndex ?? 0;
 
+  const isNearbyMode = area === NEARBY_AREA;
+  const browseOrigin = locationCenter;
+
+  const mapCenter = useMemo(() => {
+    if (isNearbyMode) return toMapLatLng(browseOrigin);
+    return areaMapCenter(area) ?? toMapLatLng(browseOrigin);
+  }, [area, browseOrigin, isNearbyMode]);
+
+  const areaLabel = locating
+    ? '現在地を取得中…'
+    : isNearbyMode && status === 'denied'
+      ? '現在地付近（位置情報オフ）'
+      : isNearbyMode && !userCoords && (status === 'unavailable' || status === 'unsupported')
+        ? '現在地付近（東京都）'
+        : area;
+
+  const handleArea = useCallback(
+    (next: string) => {
+      setArea(next);
+      if (next === NEARBY_AREA) {
+        void refresh();
+      }
+    },
+    [refresh],
+  );
+
+  const handleRecenter = useCallback(() => {
+    setArea(NEARBY_AREA);
+    void refresh();
+  }, [refresh]);
+
   const visible = events.filter((event) => {
     if (date && !event.eventDate.startsWith(date)) return false;
-    if (area !== '現在地付近' && !event.location.includes(area)) return false;
-    if (!matchesPrice(event.priceYen, price)) return false;
+    if (!matchesPriceRange(event.priceYen, priceRange)) return false;
     if (!eventMatchesCategory(event.sport, event.joinedCount, category)) return false;
+
+    if (isNearbyMode) {
+      const coords = resolveEventCoords(event);
+      if (!coords) return false;
+      if (
+        !isWithinRadiusKm(
+          browseOrigin,
+          { latitude: coords.lat, longitude: coords.lng },
+          NEARBY_RADIUS_KM,
+        )
+      ) {
+        return false;
+      }
+    } else if (!event.location.includes(area)) {
+      return false;
+    }
+
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
     return `${event.title} ${event.sport} ${event.location} ${event.level}`
@@ -71,13 +145,14 @@ export function HomeScreen({
         <div className="lg:card-shadow lg:p-4">
           <Header
             area={area}
+            areaLabel={areaLabel}
             query={query}
             category={category}
-            price={price}
-            onArea={setArea}
+            priceRange={priceRange}
+            onArea={handleArea}
             onQuery={setQuery}
             onCategory={setCategory}
-            onPrice={setPrice}
+            onPriceRange={setPriceRange}
           />
           <p className="mb-2 mt-5 text-xs font-extrabold text-[#5B6B75]">日付</p>
           <div className="grid grid-cols-7 gap-y-1 text-center">
@@ -146,8 +221,20 @@ export function HomeScreen({
           </div>
         </div>
         {error ? <p className="mb-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}
+        {isNearbyMode && status === 'denied' ? (
+          <p className="mb-3 text-sm font-bold text-[#5B6B75]">
+            位置情報がブロックされています。ブラウザの設定で許可するか、エリアを選んでください。マップは東京都心を中心に表示します。
+          </p>
+        ) : null}
         {view === 'map' ? (
-          <EventMap events={visible} />
+          <EventMap
+            events={visible}
+            center={mapCenter}
+            userCoords={userCoords}
+            locating={locating}
+            onRecenter={handleRecenter}
+            preferCenter
+          />
         ) : visible.length === 0 ? (
           <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
             条件に合うイベントはまだありません

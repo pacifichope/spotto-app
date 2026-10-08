@@ -3,38 +3,35 @@
 import { ChevronDown, Search } from 'lucide-react';
 import { useState } from 'react';
 
+import {
+  PriceRangeSlider,
+  type PriceRange,
+} from '@/components/PriceRangeSlider';
 import { AREAS, CATEGORIES, type CategoryId } from '@/constants/theme';
-
-export const PRICE_FILTERS = [
-  { id: 'all', label: '指定なし' },
-  { id: 'free', label: '無料' },
-  { id: 'lte1000', label: '1,000円以下' },
-  { id: 'lte3000', label: '3,000円以下' },
-  { id: 'gt3000', label: '3,000円超' },
-] as const;
-
-export type PriceFilterId = (typeof PRICE_FILTERS)[number]['id'];
 
 type HeaderProps = {
   area: string;
+  /** 表示用ラベル（取得中など）。未指定時は area を表示 */
+  areaLabel?: string;
   query: string;
   category: CategoryId;
-  price: PriceFilterId;
+  priceRange: PriceRange;
   onArea: (area: string) => void;
   onQuery: (query: string) => void;
   onCategory: (category: CategoryId) => void;
-  onPrice: (price: PriceFilterId) => void;
+  onPriceRange: (range: PriceRange) => void;
 };
 
 export function Header({
   area,
+  areaLabel,
   query,
   category,
-  price,
+  priceRange,
   onArea,
   onQuery,
   onCategory,
-  onPrice,
+  onPriceRange,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
 
@@ -48,7 +45,9 @@ export function Header({
           aria-haspopup="listbox"
           onClick={() => setOpen((value) => !value)}
         >
-          <span className="truncate text-base font-extrabold tracking-tight lg:text-lg">{area}</span>
+          <span className="truncate text-base font-extrabold tracking-tight lg:text-lg">
+            {areaLabel ?? area}
+          </span>
           <ChevronDown size={14} strokeWidth={2.5} />
         </button>
         {open ? (
@@ -107,24 +106,8 @@ export function Header({
         })}
       </div>
 
-      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">価格帯</p>
-      <div className="flex flex-wrap gap-2">
-        {PRICE_FILTERS.map((item) => {
-          const active = item.id === price;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={active}
-              className={`rounded-full px-3 py-1.5 text-sm font-extrabold ${
-                active ? 'brand-gradient' : 'bg-white/70 text-[#5B6B75]'
-              }`}
-              onClick={() => onPrice(item.id)}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+      <div className="mt-5">
+        <PriceRangeSlider value={priceRange} onChange={onPriceRange} />
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuth } from '@/lib/auth-context';
 import { deleteWebAccount } from '@/lib/account';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -21,24 +22,29 @@ type Row = {
   onClick?: () => void;
 };
 
+const DELETE_PHRASE = '削除する';
+
 export function SettingsScreen() {
   const router = useRouter();
   const { user, ready, busy, signOut } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
-  async function onLogout() {
+  async function confirmLogout() {
     setMessage('');
-    await signOut();
-    router.replace('/');
+    try {
+      await signOut();
+      setLogoutOpen(false);
+      router.replace('/');
+    } catch {
+      setLogoutOpen(false);
+    }
   }
 
-  async function onDelete() {
+  async function confirmDelete() {
     if (!user || deleting) return;
-    const ok = window.confirm(
-      'アカウントを削除しますか？\n\nアカウントと参加・主催データなどは削除されます。この操作は取り消せません。',
-    );
-    if (!ok) return;
     setDeleting(true);
     setMessage('');
     try {
@@ -47,13 +53,15 @@ export function SettingsScreen() {
       });
       if (!result.ok) {
         setMessage(result.error);
+        setDeleteOpen(false);
         return;
       }
       await signOut();
-      window.alert('アカウントを削除しました。');
+      setDeleteOpen(false);
       router.replace('/');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '削除に失敗しました');
+      setDeleteOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -118,7 +126,10 @@ export function SettingsScreen() {
       label: deleting ? '削除中…' : 'アカウントを削除',
       caption: 'すべてのデータが削除されます',
       danger: true,
-      onClick: () => void onDelete(),
+      onClick: () => {
+        setMessage('');
+        setDeleteOpen(true);
+      },
     });
   }
 
@@ -242,7 +253,10 @@ export function SettingsScreen() {
           <button
             type="button"
             disabled={busy || deleting}
-            onClick={() => void onLogout()}
+            onClick={() => {
+              setMessage('');
+              setLogoutOpen(true);
+            }}
             className="text-sm font-extrabold text-[#5B6B75] underline disabled:opacity-60"
           >
             {busy ? '処理中…' : 'ログアウト'}
@@ -253,6 +267,41 @@ export function SettingsScreen() {
           </Link>
         )}
       </div>
+
+      <ConfirmDialog
+        open={logoutOpen}
+        title="ログアウトしますか？"
+        description="現在のアカウントからログアウトします。いつでも再度ログインできます。"
+        confirmLabel="ログアウトする"
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setLogoutOpen(false);
+        }}
+        onConfirm={() => void confirmLogout()}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        title="アカウントを削除しますか？"
+        description={
+          <>
+            <p>
+              アカウントを削除すると、参加・主催イベント、お気に入り、チャットなどのデータが
+              <span className="font-extrabold text-[#EF4444]">完全に失われます</span>
+              。この操作は取り消せません。
+            </p>
+            <p className="mt-2">本当に削除しますか？</p>
+          </>
+        }
+        confirmLabel="アカウントを削除する"
+        tone="destructive"
+        busy={deleting}
+        confirmPhrase={DELETE_PHRASE}
+        onCancel={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
     </main>
   );
 }
