@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { TicketSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { formatPrice } from '@/lib/eventSeo';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -103,8 +104,8 @@ export function TicketScreen() {
 
   if (!ready || loading) {
     return (
-      <main className="page-main flex min-h-[50vh] flex-col items-center justify-center pt-8">
-        <p className="text-sm font-bold text-[#8A9199]">{t('ticket.loading')}</p>
+      <main className="page-main pt-4 md:pt-2">
+        <TicketSkeleton />
       </main>
     );
   }
@@ -186,7 +187,7 @@ export function TicketScreen() {
   const emoji = sportEmoji(event.sport);
 
   return (
-    <main className="page-main pb-10 pt-4 md:pt-2">
+    <main className="page-main content-fade-in pb-10 pt-4 md:pt-2">
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"

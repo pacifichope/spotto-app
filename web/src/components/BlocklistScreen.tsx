@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ListRowsSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import {
   fetchBlockedUsers,
@@ -87,7 +88,7 @@ function BlocklistBody() {
     return (
       <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
+        <ListRowsSkeleton count={4} />
       </main>
     );
   }
@@ -103,7 +104,7 @@ function BlocklistBody() {
       {!user ? (
         <LoginPromptCard title={t('blocklist.loginTitle')} />
       ) : loading && users.length === 0 ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
+        <ListRowsSkeleton count={4} />
       ) : error && users.length === 0 ? (
         <section className="card-shadow mt-5 px-5 py-6 text-center">
           <p className="text-sm font-bold text-[#EF4444]">{error}</p>
@@ -198,7 +199,7 @@ export function BlocklistScreen() {
       fallback={
         <main className="page-main pt-4 md:pt-2">
           <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
-          <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
+          <ListRowsSkeleton count={4} />
         </main>
       }
     >

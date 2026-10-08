@@ -6,7 +6,7 @@ import {
   Map,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { Clock, LocateFixed, MapPin, RefreshCw, X } from 'lucide-react';
+import { Clock, LocateFixed, MapPin, X } from 'lucide-react';
 import Link from 'next/link';
 import {
   useEffect,
@@ -33,7 +33,6 @@ import {
 } from '@/lib/types';
 import {
   FALLBACK_COORDS,
-  mapBoundsMovedSignificantly,
   toMapLatLng,
   type LatLng,
   type MapBoundsLiteral,
@@ -49,6 +48,7 @@ const DEFAULT_CENTER = toMapLatLng(FALLBACK_COORDS);
 const MAP_ID = 'DEMO_MAP_ID';
 /** nearby 用 delta ≈ 0.32 に相当するズーム目安 */
 const NEARBY_ZOOM = 11;
+const BOUNDS_IDLE_DEBOUNCE_MS = 280;
 
 export type EventMapProps = {
   events: PublicEvent[];
@@ -66,8 +66,12 @@ export type EventMapProps = {
   preferCenter?: boolean;
   /** 増やすたびに現在地（center）へ強制パン */
   recenterKey?: number;
-  /** 「このエリアで再検索」確定時 */
-  onSearchArea?: (bounds: MapBoundsLiteral) => void;
+  /** パン／ズーム完了（idle）時に現在の表示範囲を通知 */
+  onBoundsIdle?: (bounds: MapBoundsLiteral) => void;
+  /** 範囲取得中など */
+  fetching?: boolean;
+  /** expanded: マップタブ専用で画面いっぱいに近づける */
+  variant?: 'default' | 'expanded';
 };
 
 function toMappable(events: PublicEvent[]): MappableEvent[] {
@@ -104,7 +108,6 @@ function MapCamera({
 }) {
   const map = useMap();
 
-  // 現在地／エリア中心を優先（アプリ版 applyArea のカメラ合わせに相当）
   useEffect(() => {
     if (!map || !preferCenter) return;
     onProgrammaticMove?.();
@@ -112,7 +115,6 @@ function MapCamera({
     map.setZoom(NEARBY_ZOOM);
   }, [map, preferCenter, center.lat, center.lng, onProgrammaticMove]);
 
-  // 現在地ボタン：同じモードでも必ず中心へ戻す
   useEffect(() => {
     if (!map || recenterKey <= 0) return;
     onProgrammaticMove?.();
@@ -123,74 +125,58 @@ function MapCamera({
   return null;
 }
 
-/** Map 内で idle を監視し、再検索ボタンの表示状態を親へ渡す */
-function MapIdleBridge({
-  onPromptChange,
-  skipIdleRef,
+/** idle 後に Bounds を親へ通知（プログラム移動直後も最終位置は通知する） */
+function MapBoundsIdleReporter({
+  onBoundsIdle,
+  skipNextDebounceRef,
 }: {
-  onPromptChange: (next: {
-    show: boolean;
-    bounds: MapBoundsLiteral | null;
-    commit: () => void;
-  }) => void;
-  skipIdleRef: MutableRefObject<boolean>;
+  onBoundsIdle?: (bounds: MapBoundsLiteral) => void;
+  skipNextDebounceRef: MutableRefObject<boolean>;
 }) {
   const map = useMap();
-  const committedRef = useRef<MapBoundsLiteral | null>(null);
-  const idleBoundsRef = useRef<MapBoundsLiteral | null>(null);
-  const onPromptChangeRef = useRef(onPromptChange);
-  onPromptChangeRef.current = onPromptChange;
+  const onBoundsIdleRef = useRef(onBoundsIdle);
+  onBoundsIdleRef.current = onBoundsIdle;
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSentRef = useRef<string>('');
 
   useEffect(() => {
-    if (!map) return;
+    if (!map || !onBoundsIdle) return;
+
+    const emit = (bounds: MapBoundsLiteral, immediate: boolean) => {
+      const key = `${bounds.north.toFixed(5)},${bounds.south.toFixed(5)},${bounds.east.toFixed(5)},${bounds.west.toFixed(5)}`;
+      if (key === lastSentRef.current) return;
+      const run = () => {
+        lastSentRef.current = key;
+        onBoundsIdleRef.current?.(bounds);
+      };
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (immediate) {
+        run();
+        return;
+      }
+      timerRef.current = setTimeout(run, BOUNDS_IDLE_DEBOUNCE_MS);
+    };
 
     const handleIdle = () => {
       const bounds = boundsFromMap(map);
       if (!bounds) return;
-      idleBoundsRef.current = bounds;
-
-      if (skipIdleRef.current) {
-        skipIdleRef.current = false;
-        committedRef.current = bounds;
-        onPromptChangeRef.current({
-          show: false,
-          bounds,
-          commit: () => undefined,
-        });
-        return;
+      const immediate = skipNextDebounceRef.current;
+      if (skipNextDebounceRef.current) {
+        skipNextDebounceRef.current = false;
       }
-
-      if (!committedRef.current) {
-        committedRef.current = bounds;
-        onPromptChangeRef.current({
-          show: false,
-          bounds,
-          commit: () => undefined,
-        });
-        return;
-      }
-
-      const moved = mapBoundsMovedSignificantly(committedRef.current, bounds);
-      onPromptChangeRef.current({
-        show: moved,
-        bounds,
-        commit: () => {
-          committedRef.current = bounds;
-          onPromptChangeRef.current({
-            show: false,
-            bounds,
-            commit: () => undefined,
-          });
-        },
-      });
+      emit(bounds, immediate);
     };
 
     const listener = map.addListener('idle', handleIdle);
     handleIdle();
     return () => {
       google.maps.event.removeListener(listener);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [map, skipIdleRef]);
+  }, [map, onBoundsIdle, skipNextDebounceRef]);
 
   return null;
 }
@@ -344,27 +330,29 @@ function GoogleEventMap({
   onRecenter,
   preferCenter,
   recenterKey = 0,
-  onSearchArea,
+  onBoundsIdle,
+  fetching = false,
+  variant = 'default',
 }: Required<Pick<EventMapProps, 'events' | 'center' | 'preferCenter'>> &
   Pick<
     EventMapProps,
-    'userCoords' | 'locating' | 'onRecenter' | 'recenterKey' | 'onSearchArea'
+    | 'userCoords'
+    | 'locating'
+    | 'onRecenter'
+    | 'recenterKey'
+    | 'onBoundsIdle'
+    | 'fetching'
+    | 'variant'
   >) {
   const t = useT();
   const mappable = useMemo(() => toMappable(events), [events]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = mappable.find((event) => event.id === selectedId) ?? null;
-  const skipIdleRef = useRef(false);
-  const [searchPrompt, setSearchPrompt] = useState<{
-    show: boolean;
-    bounds: MapBoundsLiteral | null;
-    commit: () => void;
-  }>({ show: false, bounds: null, commit: () => undefined });
+  const skipNextDebounceRef = useRef(false);
 
   const markProgrammaticMove = useMemo(
     () => () => {
-      skipIdleRef.current = true;
-      setSearchPrompt((prev) => ({ ...prev, show: false }));
+      skipNextDebounceRef.current = true;
     },
     [],
   );
@@ -375,8 +363,13 @@ function GoogleEventMap({
     }
   }, [mappable, selectedId]);
 
+  const shellClass =
+    variant === 'expanded'
+      ? 'card-shadow relative h-[min(calc(100dvh-11rem),920px)] min-h-[560px] w-full overflow-hidden'
+      : 'card-shadow relative h-[min(72vh,820px)] min-h-[520px] w-full overflow-hidden';
+
   return (
-    <div className="card-shadow relative h-[min(72vh,820px)] min-h-[520px] w-full overflow-hidden">
+    <div className={shellClass}>
       <Map
         defaultCenter={center}
         defaultZoom={NEARBY_ZOOM}
@@ -395,10 +388,10 @@ function GoogleEventMap({
           recenterKey={recenterKey}
           onProgrammaticMove={markProgrammaticMove}
         />
-        {onSearchArea ? (
-          <MapIdleBridge
-            skipIdleRef={skipIdleRef}
-            onPromptChange={setSearchPrompt}
+        {onBoundsIdle ? (
+          <MapBoundsIdleReporter
+            onBoundsIdle={onBoundsIdle}
+            skipNextDebounceRef={skipNextDebounceRef}
           />
         ) : null}
         {userCoords ? <UserLocationDot coords={userCoords} /> : null}
@@ -415,27 +408,9 @@ function GoogleEventMap({
         ))}
       </Map>
 
-      {onSearchArea && searchPrompt.show && searchPrompt.bounds ? (
-        <div className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center px-3">
-          <button
-            type="button"
-            onClick={() => {
-              const bounds = searchPrompt.bounds;
-              if (!bounds) return;
-              searchPrompt.commit();
-              onSearchArea(bounds);
-            }}
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-sm font-extrabold text-[#12202A] shadow-[0_8px_24px_rgba(18,32,42,0.14)] ring-1 ring-[#E4EBEE] transition hover:bg-white"
-          >
-            <RefreshCw size={15} strokeWidth={2.4} className="text-[#12B8D0]" />
-            {t('map.searchThisArea')}
-          </button>
-        </div>
-      ) : null}
-
       <div className="absolute left-3 top-3 z-20 rounded-full bg-white/95 px-3 py-1 text-[11px] font-extrabold text-[#5B6B75] shadow-sm">
-        {t('map.mapCount', { count: mappable.length })}
-        {events.length > mappable.length
+        {fetching ? t('map.updating') : t('map.mapCount', { count: mappable.length })}
+        {!fetching && events.length > mappable.length
           ? t('map.unknownHidden', { count: events.length - mappable.length })
           : ''}
         {locating ? t('map.locatingSuffix') : ''}
@@ -453,11 +428,11 @@ function GoogleEventMap({
         </button>
       ) : null}
 
-      {events.length === 0 ? (
+      {!fetching && events.length === 0 ? (
         <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
           {t('map.emptyInArea')}
         </p>
-      ) : mappable.length === 0 ? (
+      ) : !fetching && mappable.length === 0 ? (
         <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
           {t('map.noCoords')}
         </p>
@@ -478,7 +453,9 @@ export function EventMap({
   onRecenter,
   preferCenter = true,
   recenterKey = 0,
-  onSearchArea,
+  onBoundsIdle,
+  fetching = false,
+  variant = 'default',
 }: EventMapProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -503,7 +480,9 @@ export function EventMap({
         onRecenter={onRecenter}
         preferCenter={preferCenter}
         recenterKey={recenterKey}
-        onSearchArea={onSearchArea}
+        onBoundsIdle={onBoundsIdle}
+        fetching={fetching}
+        variant={variant}
       />
     </APIProvider>
   );

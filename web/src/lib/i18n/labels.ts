@@ -1,5 +1,11 @@
 /** スポーツ・エリア・カテゴリなどデータ値 → 辞書キー */
 
+import {
+  getPrefectureByShortLabel,
+  NEARBY_AREA,
+} from '@/lib/areas';
+import type { Locale } from '@/lib/i18n/types';
+
 const SPORT_KEYS: Record<string, string> = {
   サッカー: 'sport.soccer',
   バスケットボール: 'sport.basketball',
@@ -15,19 +21,6 @@ const SPORT_KEYS: Record<string, string> = {
   hot: 'sport.hot',
 };
 
-const AREA_KEYS: Record<string, string> = {
-  現在地付近: 'area.nearby',
-  東京: 'area.tokyo',
-  神奈川: 'area.kanagawa',
-  埼玉: 'area.saitama',
-  千葉: 'area.chiba',
-  愛知: 'area.aichi',
-  大阪: 'area.osaka',
-  京都: 'area.kyoto',
-  福岡: 'area.fukuoka',
-  北海道: 'area.hokkaido',
-};
-
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
 export function sportLabel(sport: string, t: TFn): string {
@@ -36,10 +29,20 @@ export function sportLabel(sport: string, t: TFn): string {
   return sport.trim() || t('sport.generic');
 }
 
-export function areaLabel(area: string, t: TFn): string {
-  const key = AREA_KEYS[area.trim()];
-  if (key) return t(key);
-  return area;
+export function areaLabel(
+  area: string,
+  t: TFn,
+  locale: Locale = 'ja',
+): string {
+  const value = area.trim();
+  if (value === NEARBY_AREA || value === 'nearby') {
+    return t('area.nearby');
+  }
+  const prefecture = getPrefectureByShortLabel(value);
+  if (prefecture) {
+    return locale === 'en' ? prefecture.nameEn : prefecture.shortLabel;
+  }
+  return value;
 }
 
 export function categoryLabel(id: string, t: TFn): string {

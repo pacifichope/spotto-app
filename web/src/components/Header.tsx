@@ -1,18 +1,23 @@
 'use client';
 
 import { ChevronDown, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   PriceRangeSlider,
   type PriceRange,
 } from '@/components/PriceRangeSlider';
-import { AREAS, CATEGORIES, type CategoryId } from '@/constants/theme';
+import { CATEGORIES, type CategoryId } from '@/constants/theme';
+import {
+  NEARBY_AREA,
+  PREFECTURE_GROUPS,
+  getPrefectureById,
+} from '@/lib/areas';
 import {
   areaLabel as translateArea,
   categoryLabel as translateCategory,
 } from '@/lib/i18n/labels';
-import { useT } from '@/lib/i18n/locale-context';
+import { useLocale, useT } from '@/lib/i18n/locale-context';
 
 type HeaderProps = {
   area: string;
@@ -39,12 +44,32 @@ export function Header({
   onPriceRange,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const t = useT();
-  const displayArea = areaLabel || translateArea(area, t);
+  const { locale } = useLocale();
+  const displayArea = areaLabel || translateArea(area, t, locale);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
     <div>
-      <div className="relative">
+      <div className="relative" ref={rootRef}>
         <button
           type="button"
           className="flex items-center gap-1 py-1"
@@ -58,27 +83,56 @@ export function Header({
           <ChevronDown size={14} strokeWidth={2.5} />
         </button>
         {open ? (
-          <ul
+          <div
             role="listbox"
-            className="glass absolute left-0 top-10 z-30 max-h-64 w-44 overflow-auto rounded-2xl py-1"
+            className="glass absolute left-0 top-10 z-30 max-h-80 w-56 overflow-auto rounded-2xl py-1 shadow-lg"
           >
-            {AREAS.map((item) => (
-              <li key={item}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={item === area}
-                  className="block w-full px-3 py-2 text-left text-sm font-bold hover:bg-white/70"
-                  onClick={() => {
-                    onArea(item);
-                    setOpen(false);
-                  }}
-                >
-                  {translateArea(item, t)}
-                </button>
-              </li>
+            <button
+              type="button"
+              role="option"
+              aria-selected={area === NEARBY_AREA}
+              className={`block w-full px-3 py-2.5 text-left text-sm font-bold hover:bg-white/70 ${
+                area === NEARBY_AREA ? 'bg-white/80 text-[#12B8D0]' : ''
+              }`}
+              onClick={() => {
+                onArea(NEARBY_AREA);
+                setOpen(false);
+              }}
+            >
+              {t('area.nearby')}
+            </button>
+            {PREFECTURE_GROUPS.map((group) => (
+              <div key={group.titleJa}>
+                <p className="sticky top-0 bg-[#F4F7F8]/95 px-3 py-1.5 text-[10px] font-extrabold tracking-wide text-[#8A9199]">
+                  {locale === 'en' ? group.titleEn : group.titleJa}
+                </p>
+                {group.ids.map((id) => {
+                  const prefecture = getPrefectureById(id);
+                  if (!prefecture) return null;
+                  const selected = area === prefecture.shortLabel;
+                  const label =
+                    locale === 'en' ? prefecture.nameEn : prefecture.shortLabel;
+                  return (
+                    <button
+                      key={prefecture.id}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`block w-full px-3 py-2 text-left text-sm font-bold hover:bg-white/70 ${
+                        selected ? 'bg-white/80 text-[#12B8D0]' : ''
+                      }`}
+                      onClick={() => {
+                        onArea(prefecture.shortLabel);
+                        setOpen(false);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
-          </ul>
+          </div>
         ) : null}
       </div>
 
@@ -109,7 +163,9 @@ export function Header({
               className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-extrabold ${
                 active ? 'brand-gradient' : 'bg-white/70 text-[#5B6B75]'
               }`}
-              onClick={() => onCategory(active && item.id !== 'all' ? 'all' : item.id)}
+              onClick={() =>
+                onCategory(active && item.id !== 'all' ? 'all' : item.id)
+              }
             >
               {translateCategory(item.id as string, t)}
             </button>

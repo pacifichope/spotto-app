@@ -16,16 +16,76 @@ export type JoinedClub = {
   bio?: string;
 };
 
+export type ClubMember = {
+  id: string;
+  name: string;
+  imageUri?: string;
+  role?: 'host' | 'member';
+  self?: boolean;
+};
+
 export type ClubDetail = {
   id: string;
   name: string;
+  hostName: string;
   imageUri?: string;
   coverUri?: string;
   sport?: string;
   bio?: string;
   snsLinks: SnsLink[];
   events: PublicEvent[];
+  members: ClubMember[];
 };
+
+const JOINED_CLUBS_KEY_PREFIX = 'spotto:joined-clubs:';
+
+function joinedClubsStorageKey(userId: string) {
+  return `${JOINED_CLUBS_KEY_PREFIX}${userId.trim()}`;
+}
+
+export function readJoinedClubIds(userId: string): Set<string> {
+  const uid = userId.trim();
+  if (!uid || typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(joinedClubsStorageKey(uid));
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed
+        .filter((id): id is string => typeof id === 'string')
+        .map((id) => id.trim())
+        .filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeJoinedClubIds(userId: string, ids: Set<string>) {
+  const uid = userId.trim();
+  if (!uid || typeof window === 'undefined') return;
+  window.localStorage.setItem(
+    joinedClubsStorageKey(uid),
+    JSON.stringify([...ids]),
+  );
+}
+
+export function joinClubLocal(userId: string, clubId: string) {
+  const id = clubId.trim();
+  if (!userId.trim() || !id) return;
+  const next = readJoinedClubIds(userId);
+  next.add(id);
+  writeJoinedClubIds(userId, next);
+}
+
+export function leaveClubLocal(userId: string, clubId: string) {
+  const id = clubId.trim();
+  if (!userId.trim() || !id) return;
+  const next = readJoinedClubIds(userId);
+  next.delete(id);
+  writeJoinedClubIds(userId, next);
+}
 
 /** クラブ詳細へのパス（id = host_id / Firebase UID） */
 export function clubHref(clubId: string) {
@@ -170,8 +230,8 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
       '',
   ).trim();
   const clubName = String(clubRow?.name || '').trim();
-  const hostName = String(sample?.host_name ?? '').trim();
-  const name = clubName || profileName || hostName || 'クラブ';
+  const eventHostName = String(sample?.host_name ?? '').trim();
+  const name = clubName || profileName || eventHostName || 'クラブ';
 
   const clubImage = String(clubRow?.image_url || '').trim();
   const profileAvatar = String(
@@ -208,14 +268,171 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     return null;
   }
 
+  const hostName = clubName || eventHostName || profileName || name;
+  const members = await fetchClubMembers({
+    clubId: id,
+    hostName,
+    hostImageUri: imageUri,
+    eventIds: events.map((event) => event.id),
+  });
+
   return {
     id,
     name,
+    hostName,
     imageUri,
     coverUri,
     sport,
     bio,
     snsLinks,
     events,
+    members,
   };
+}
+
+function looksLikeFirebaseUid(id: string) {
+  return /^[A-Za-z0-9]{20,}$/.test(id);
+}
+
+/**
+ * クラブ主催イベントの参加者 + 主催者をメンバー一覧にする。
+ */
+export async function fetchClubMembers(input: {
+  clubId: string;
+  hostName: string;
+  hostImageUri?: string;
+  eventIds: string[];
+  currentUserId?: string | null;
+}): Promise<ClubMember[]> {
+  const hostId = input.clubId.trim();
+  if (!hostId) return [];
+
+  const byId = new Map<string, ClubMember>();
+  byId.set(hostId, {
+    id: hostId,
+    name: input.hostName || '主催者',
+    imageUri: input.hostImageUri,
+    role: 'host',
+  });
+
+  const eventIds = [
+    ...new Set(input.eventIds.map((id) => id.trim()).filter(Boolean)),
+  ].slice(0, 80);
+
+  const supabase = createPublicSupabase();
+
+  if (eventIds.length > 0) {
+    type ParticipantRow = {
+      event_id?: string;
+      user_id?: string;
+      status?: string;
+      display_name?: string | null;
+      avatar_url?: string | null;
+    };
+
+    let rows: ParticipantRow[] = [];
+    const withSnapshot = await supabase
+      .from('event_participants')
+      .select('event_id, user_id, status, display_name, avatar_url')
+      .in('event_id', eventIds)
+      .eq('status', 'joined');
+
+    if (
+      withSnapshot.error &&
+      (withSnapshot.error.message?.includes('display_name') ||
+        withSnapshot.error.message?.includes('avatar_url'))
+    ) {
+      const legacy = await supabase
+        .from('event_participants')
+        .select('event_id, user_id, status')
+        .in('event_id', eventIds)
+        .eq('status', 'joined');
+      if (!legacy.error) rows = (legacy.data ?? []) as ParticipantRow[];
+    } else if (!withSnapshot.error) {
+      rows = (withSnapshot.data ?? []) as ParticipantRow[];
+    }
+
+    const userIds = [
+      ...new Set(
+        rows
+          .map((row) => String(row.user_id || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (hostId && !userIds.includes(hostId) && looksLikeFirebaseUid(hostId)) {
+      userIds.push(hostId);
+    }
+
+    const profileById = new Map<
+      string,
+      {
+        display_name?: string | null;
+        nickname?: string | null;
+        avatar_url?: string | null;
+      }
+    >();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, nickname, avatar_url')
+        .in('id', userIds.slice(0, 200));
+      for (const profile of profiles ?? []) {
+        const pid = String((profile as { id?: string }).id ?? '').trim();
+        if (!pid) continue;
+        profileById.set(pid, profile as {
+          display_name?: string | null;
+          nickname?: string | null;
+          avatar_url?: string | null;
+        });
+      }
+    }
+
+    const hostProfile = profileById.get(hostId);
+    if (hostProfile) {
+      const hostDisplay =
+        String(hostProfile.display_name || hostProfile.nickname || '').trim() ||
+        input.hostName;
+      byId.set(hostId, {
+        id: hostId,
+        name: hostDisplay,
+        imageUri:
+          absoluteImageUrl(hostProfile.avatar_url ?? null) ||
+          input.hostImageUri,
+        role: 'host',
+      });
+    }
+
+    for (const row of rows) {
+      const userId = String(row.user_id || '').trim();
+      if (!userId || byId.has(userId)) continue;
+      const profile = profileById.get(userId);
+      const name =
+        String(
+          profile?.display_name ||
+            profile?.nickname ||
+            row.display_name ||
+            '',
+        ).trim() || 'メンバー';
+      byId.set(userId, {
+        id: userId,
+        name,
+        imageUri:
+          absoluteImageUrl(profile?.avatar_url ?? null) ||
+          absoluteImageUrl(row.avatar_url ?? null) ||
+          undefined,
+        role: userId === hostId ? 'host' : 'member',
+      });
+    }
+  }
+
+  const currentUserId = String(input.currentUserId || '').trim();
+  const list = [...byId.values()].map((member) => ({
+    ...member,
+    self: Boolean(currentUserId && member.id === currentUserId),
+  }));
+
+  const hosts = list.filter((m) => m.role === 'host' || m.id === hostId);
+  const others = list.filter((m) => !(m.role === 'host' || m.id === hostId));
+  const host = hosts[0] ? [{ ...hosts[0], role: 'host' as const }] : [];
+  return [...host, ...others];
 }

@@ -1,23 +1,34 @@
 import { cache } from 'react';
 
 import { createPublicSupabase } from '@/lib/supabase';
-import { eventColumns, mapEventRow, type EventRow, type PublicEvent } from '@/lib/types';
+import {
+  activeEventsOrFilter,
+  eventColumns,
+  filterActiveEvents,
+  mapEventRow,
+  type EventRow,
+  type PublicEvent,
+} from '@/lib/types';
 
+/** 公開ホーム／サイトマップ用。終了済みイベントは含めない。 */
 export const listPublicEvents = cache(async (): Promise<PublicEvent[]> => {
   const supabase = createPublicSupabase();
   const { data, error } = await supabase
     .from('events')
     .select(eventColumns())
     .is('cancelled_at', null)
+    .or(activeEventsOrFilter())
     .order('event_date', { ascending: true })
     .limit(100);
 
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as EventRow[];
-  return rows.flatMap((row) => {
-    const event = mapEventRow(row);
-    return event ? [event] : [];
-  });
+  return filterActiveEvents(
+    rows.flatMap((row) => {
+      const event = mapEventRow(row);
+      return event ? [event] : [];
+    }),
+  );
 });
 
 export const getPublicEvent = cache(async (id: string): Promise<PublicEvent | null> => {

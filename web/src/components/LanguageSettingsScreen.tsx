@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { SettingsSkeleton } from '@/components/skeletons';
 import {
   LOCALE_META,
   LOCALES,
@@ -84,7 +85,7 @@ export function LanguageSettingsScreen() {
           <h1 className="text-2xl font-extrabold tracking-tight">
             {t('settings.languageScreenTitle')}
           </h1>
-          <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+          <SettingsSkeleton rows={3} />
         </main>
       }
     >

@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
+import { PulseBlock } from '@/components/skeletons';
 import { completeLineLoginFromCallback } from '@/lib/firebase';
 import { useT } from '@/lib/i18n/locale-context';
 
@@ -58,8 +59,8 @@ export default function LineCallbackPage() {
   return (
     <Suspense
       fallback={
-        <main className="px-4 py-16 text-center text-sm font-bold text-[#5B6B75]">
-          {t('common.loading')}
+        <main className="px-4 py-16">
+          <PulseBlock className="mx-auto h-10 w-40" />
         </main>
       }
     >

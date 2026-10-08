@@ -4,6 +4,7 @@ import { ChevronLeft, Users, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import { SafetyActionsMenu } from '@/components/SafetyActionsMenu';
+import { AttendeesSkeleton } from '@/components/skeletons';
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -173,7 +174,7 @@ export function EventAttendeesSection({
         </div>
 
         {loading ? (
-          <p className="mt-3 text-sm font-bold text-[#8A9199]">{t('attendees.loading')}</p>
+          <AttendeesSkeleton />
         ) : count === 0 && visibleAttendees.length === 0 ? (
           <p className="mt-3 text-sm font-bold text-[#8A9199]">{t('attendees.empty')}</p>
         ) : (

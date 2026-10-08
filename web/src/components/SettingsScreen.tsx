@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
+import { SettingsSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { deleteWebAccount } from '@/lib/account';
 import { fetchBlockedUsers } from '@/lib/blocks';
@@ -223,7 +224,7 @@ export function SettingsScreen() {
         <h1 className="text-2xl font-extrabold tracking-tight">
           {t('settings.title')}
         </h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+        <SettingsSkeleton />
       </main>
     );
   }

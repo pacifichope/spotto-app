@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { SettingsSkeleton } from '@/components/skeletons';
 import { useT } from '@/lib/i18n/locale-context';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -156,7 +157,7 @@ function NotificationSettingsBody() {
     return (
       <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">{t('notifications.title')}</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+        <SettingsSkeleton rows={5} />
       </main>
     );
   }
@@ -229,7 +230,7 @@ export function NotificationSettingsScreen() {
       fallback={
         <main className="page-main pt-4 md:pt-2">
           <h1 className="text-2xl font-extrabold tracking-tight">{t('notifications.title')}</h1>
-          <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+          <SettingsSkeleton rows={5} />
         </main>
       }
     >

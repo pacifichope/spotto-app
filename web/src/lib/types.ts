@@ -86,6 +86,36 @@ export function isEventPast(event: PublicEvent, now = Date.now()) {
   return Number.isFinite(ms) ? ms < now : false;
 }
 
+/** 開催中・開催予定のみ（ホーム／マップ等の公開一覧用） */
+export function filterActiveEvents(
+  events: PublicEvent[],
+  now = Date.now(),
+): PublicEvent[] {
+  return events.filter((event) => !isEventPast(event, now));
+}
+
+/**
+ * Asia/Tokyo の今日（YYYY-MM-DD）。
+ * Supabase で明らかに終了した行を落とすための下限。
+ */
+export function tokyoDateStamp(now = Date.now()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(now));
+}
+
+/**
+ * 開催日または終了日が今日以降（進行中の複数日イベント含む）。
+ * 同日内に終了したものは filterActiveEvents / isEventPast で最終除外。
+ */
+export function activeEventsOrFilter(now = Date.now()): string {
+  const today = tokyoDateStamp(now);
+  return `event_date.gte.${today},end_date.gte.${today}`;
+}
+
 export type EventStatusKind = 'ended' | 'open' | 'full';
 
 /** カード／詳細用の募集ステータス */

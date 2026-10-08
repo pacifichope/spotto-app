@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { ChatBubblesSkeleton } from '@/components/skeletons';
 import {
   UserProfileModal,
   type ProfilePerson,
@@ -232,8 +233,13 @@ export function ChatRoomScreen() {
 
   if (!ready || loading) {
     return (
-      <main className="page-main pt-4 md:pt-2">
-        <p className="text-sm font-bold text-[#8A9199]">{t('chat.loading')}</p>
+      <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
+        <div className="space-y-2" aria-hidden>
+          <span className="skeleton-bone block h-3 w-28 rounded-full" />
+          <span className="skeleton-bone block h-5 w-48 rounded-full" />
+          <span className="skeleton-bone block h-3 w-20 rounded-full" />
+        </div>
+        <ChatBubblesSkeleton />
       </main>
     );
   }
@@ -256,7 +262,7 @@ export function ChatRoomScreen() {
   const subtitle = mode === 'host' ? t('chat.hostChat') : t('chat.groupChat');
 
   return (
-    <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
+    <main className="page-main content-fade-in flex min-h-[70vh] flex-col pt-4 md:pt-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">

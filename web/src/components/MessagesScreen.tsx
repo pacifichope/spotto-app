@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { FadeIn, MessageListSkeleton } from '@/components/skeletons';
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/locale-context';
@@ -117,7 +118,7 @@ export function MessagesScreen() {
         <h1 className="text-2xl font-extrabold tracking-tight">
           {t('messages.title')}
         </h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+        <MessageListSkeleton />
       </main>
     );
   }
@@ -167,22 +168,24 @@ export function MessagesScreen() {
       ) : null}
 
       {loading && visibleThreads.length === 0 ? (
-        <p className="mt-6 px-1 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+        <MessageListSkeleton />
       ) : visibleThreads.length === 0 ? (
-        <section className="card-shadow mt-4 px-5 py-10 text-center sm:px-6">
-          <p className="text-base font-extrabold">{t('messages.emptyTitle')}</p>
-          <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
-            {t('messages.emptyBody')}
-          </p>
-          <Link
-            href="/"
-            className="brand-gradient mt-5 inline-flex h-11 items-center rounded-full px-5 text-sm font-extrabold"
-          >
-            {t('messages.findEvents')}
-          </Link>
-        </section>
+        <FadeIn>
+          <section className="card-shadow mt-4 px-5 py-10 text-center sm:px-6">
+            <p className="text-base font-extrabold">{t('messages.emptyTitle')}</p>
+            <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
+              {t('messages.emptyBody')}
+            </p>
+            <Link
+              href="/"
+              className="brand-gradient mt-5 inline-flex h-11 items-center rounded-full px-5 text-sm font-extrabold"
+            >
+              {t('messages.findEvents')}
+            </Link>
+          </section>
+        </FadeIn>
       ) : (
-        <section className="card-shadow mt-4 overflow-hidden">
+        <section className="card-shadow content-fade-in mt-4 overflow-hidden">
           {visibleThreads.map((thread, index) => {
             const image =
               absoluteImageUrl(thread.eventImageUri) ||

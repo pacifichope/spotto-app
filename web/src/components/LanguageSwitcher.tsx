@@ -44,11 +44,11 @@ export function LanguageSwitcher({ placement = 'header' }: Props) {
 
   const buttonClass =
     placement === 'footer'
-      ? 'inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-2 text-xs font-extrabold text-[#12202A] shadow-sm ring-1 ring-[#E4EBEE]'
-      : 'inline-flex items-center gap-1.5 rounded-full bg-[#F4F7F8] px-2.5 py-1.5 text-[11px] font-extrabold text-[#5B6B75] transition hover:bg-[#E5F9FC] hover:text-[#12B8D0]';
+      ? 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/90 px-3 py-2 text-xs font-extrabold text-[#12202A] shadow-sm ring-1 ring-[#E4EBEE]'
+      : 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#F4F7F8] px-2.5 py-1.5 text-[11px] font-extrabold text-[#5B6B75] transition hover:bg-[#E5F9FC] hover:text-[#12B8D0]';
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative shrink-0" ref={rootRef}>
       <button
         type="button"
         aria-haspopup="listbox"

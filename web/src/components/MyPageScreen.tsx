@@ -19,6 +19,11 @@ import { CreateEventModal } from '@/components/CreateEventModal';
 import { MyEventList } from '@/components/MyEventList';
 import { OrganizerProfileModal } from '@/components/OrganizerProfileModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
+import {
+  EventCardsSkeleton,
+  FadeIn,
+  MyPageSkeleton,
+} from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/locale-context';
 import { fetchJoinedClubs } from '@/lib/clubs';
@@ -277,7 +282,7 @@ export function MyPageScreen() {
     return (
       <main className={`${shellClass} pt-4 md:pt-2`}>
         <h1 className="text-2xl font-extrabold tracking-tight">{t('mypage.title')}</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('mypage.loading')}</p>
+        <MyPageSkeleton />
       </main>
     );
   }
@@ -514,7 +519,7 @@ export function MyPageScreen() {
       ) : null}
 
       {loadingLists ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('mypage.loadingLists')}</p>
+        <EventCardsSkeleton count={4} />
       ) : isOrganizer && segment === 'drafts' ? (
         drafts.length === 0 ? (
           <MyEventList
@@ -570,25 +575,27 @@ export function MyPageScreen() {
           </ul>
         )
       ) : (
-        <MyEventList
-          events={listEvents}
-          emptyTitle={emptyCopy.title}
-          emptyBody={emptyCopy.body}
-          eventFrom={{ source: 'mypage', mode, segment }}
-          openTicket={!isOrganizer && (segment === 'joined' || segment === 'past')}
-          emptyAction={
-            isOrganizer && segment === 'hosted' ? (
-              <button
-                type="button"
-                onClick={() => openCreate()}
-                className="brand-gradient mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-extrabold"
-              >
-                <Plus size={16} />
-                {t('mypage.createEvent')}
-              </button>
-            ) : undefined
-          }
-        />
+        <FadeIn>
+          <MyEventList
+            events={listEvents}
+            emptyTitle={emptyCopy.title}
+            emptyBody={emptyCopy.body}
+            eventFrom={{ source: 'mypage', mode, segment }}
+            openTicket={!isOrganizer && (segment === 'joined' || segment === 'past')}
+            emptyAction={
+              isOrganizer && segment === 'hosted' ? (
+                <button
+                  type="button"
+                  onClick={() => openCreate()}
+                  className="brand-gradient mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-extrabold"
+                >
+                  <Plus size={16} />
+                  {t('mypage.createEvent')}
+                </button>
+              ) : undefined
+            }
+          />
+        </FadeIn>
       )}
 
       {showCreateFab ? (

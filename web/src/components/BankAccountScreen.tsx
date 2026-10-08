@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { DashboardSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { useT } from '@/lib/i18n/locale-context';
@@ -120,7 +121,7 @@ export function BankAccountScreen() {
     return (
       <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">{t('bank.title')}</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('bank.loading')}</p>
+        <DashboardSkeleton />
       </main>
     );
   }
@@ -148,10 +149,10 @@ export function BankAccountScreen() {
       {!user ? (
         <LoginPromptCard title={t('bank.loginTitle')} />
       ) : loading ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('bank.loading')}</p>
+        <DashboardSkeleton />
       ) : (
         <form
-          className="card-shadow mt-5 space-y-4 p-5"
+          className="card-shadow content-fade-in mt-5 space-y-4 p-5"
           onSubmit={(event) => {
             event.preventDefault();
             openConfirm();

@@ -1,5 +1,7 @@
 /** モバイルアプリ constants/theme.ts と同じブランドカラー。 */
 
+import { AREA_CENTERS } from '@/lib/areas';
+
 export const brand = {
   cyan: '#29D1E8',
   cyanDeep: '#12B8D0',
@@ -55,18 +57,11 @@ export const CATEGORIES = [
 
 export type CategoryId = (typeof CATEGORIES)[number]['id'];
 
-export const AREAS = [
-  '現在地付近',
-  '東京',
-  '神奈川',
-  '埼玉',
-  '千葉',
-  '愛知',
-  '大阪',
-  '京都',
-  '福岡',
-  '北海道',
-] as const;
+export {
+  AREA_CENTERS,
+  AREA_OPTIONS as AREAS,
+  NEARBY_AREA,
+} from '@/lib/areas';
 
 const PRIMARY_SPORTS = new Set<string>(
   CATEGORIES.map((category) => category.id).filter(
@@ -141,24 +136,6 @@ export function sportEmoji(sport: string) {
   return SPORT_EMOJIS[sport.trim()] || '🏅';
 }
 
-/** 座標が無いイベント用の都道府県フォールバック（概位置）。 */
-export const AREA_CENTERS: { match: string; lat: number; lng: number }[] = [
-  { match: '北海道', lat: 43.0618, lng: 141.3545 },
-  { match: '札幌', lat: 43.0618, lng: 141.3545 },
-  { match: '東京', lat: 35.6812, lng: 139.7671 },
-  { match: '渋谷', lat: 35.6595, lng: 139.7004 },
-  { match: '新宿', lat: 35.6938, lng: 139.7034 },
-  { match: '大阪', lat: 34.7024, lng: 135.4959 },
-  { match: '京都', lat: 35.0116, lng: 135.7681 },
-  { match: '愛知', lat: 35.1709, lng: 136.8815 },
-  { match: '名古屋', lat: 35.1709, lng: 136.8815 },
-  { match: '福岡', lat: 33.5902, lng: 130.4017 },
-  { match: '神奈川', lat: 35.4437, lng: 139.638 },
-  { match: '横浜', lat: 35.4437, lng: 139.638 },
-  { match: '埼玉', lat: 35.8617, lng: 139.6455 },
-  { match: '千葉', lat: 35.6074, lng: 140.1065 },
-];
-
 export function resolveEventCoords(event: {
   latitude: number | null;
   longitude: number | null;
@@ -168,7 +145,9 @@ export function resolveEventCoords(event: {
     return { lat: event.latitude, lng: event.longitude, approximate: false };
   }
   const place = event.location || '';
-  for (const area of AREA_CENTERS) {
+  // 長いマッチ（東京都）を短いマッチ（東京）より優先
+  const ranked = [...AREA_CENTERS].sort((a, b) => b.match.length - a.match.length);
+  for (const area of ranked) {
     if (place.includes(area.match)) {
       return { lat: area.lat, lng: area.lng, approximate: true };
     }

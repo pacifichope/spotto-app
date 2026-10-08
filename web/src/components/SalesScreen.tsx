@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { DashboardSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { useLocale } from '@/lib/i18n/locale-context';
@@ -110,7 +111,7 @@ export function SalesScreen() {
     return (
       <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+        <DashboardSkeleton />
       </main>
     );
   }
@@ -163,7 +164,7 @@ export function SalesScreen() {
           </div>
 
           {loading && !summary ? (
-            <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
+            <DashboardSkeleton />
           ) : error ? (
             <section className="card-shadow mt-5 px-5 py-6 text-center">
               <p className="text-sm font-bold text-[#EF4444]">{error}</p>
@@ -338,9 +339,9 @@ export function SalesScreen() {
               </section>
 
               {loading ? (
-                <p className="mt-3 text-center text-xs font-bold text-[#8A9199]">
-                  {t('common.updating')}
-                </p>
+                <div className="mt-3 flex justify-center" aria-busy="true">
+                  <span className="skeleton-bone h-2 w-24 rounded-full" />
+                </div>
               ) : null}
             </>
           ) : null}

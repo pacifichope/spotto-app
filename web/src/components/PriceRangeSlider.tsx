@@ -3,7 +3,7 @@
 import { useT } from '@/lib/i18n/locale-context';
 
 export const PRICE_RANGE_MIN = 0;
-export const PRICE_RANGE_MAX = 10_000;
+export const PRICE_RANGE_MAX = 3_000;
 export const PRICE_RANGE_STEP = 100;
 
 export type PriceRange = {
@@ -50,7 +50,7 @@ export function formatPriceRangeLabel(
   });
 }
 
-/** スライダー範囲にイベント価格が含まれるか（上限到達時は 10,000円超も通す） */
+/** スライダー範囲にイベント価格が含まれるか（上限到達時は 3,000円超も通す） */
 export function matchesPriceRange(priceYen: number, range: PriceRange) {
   const amount = Math.max(0, Math.floor(Number(priceYen) || 0));
   const min = clamp(range.min, PRICE_RANGE_MIN, PRICE_RANGE_MAX);
@@ -123,7 +123,7 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
 
       <div className="mt-1 flex justify-between text-[11px] font-bold text-[#8A9199]">
         <span>{t('price.zero')}</span>
-        <span>{t('price.tenThousand')}</span>
+        <span>{t('price.threeThousand')}</span>
       </div>
     </div>
   );

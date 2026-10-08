@@ -121,27 +121,6 @@ export function isWithinMapBounds(
   );
 }
 
-/** カメラが大きく動いたか（再検索ボタン表示用） */
-export function mapBoundsMovedSignificantly(
-  a: MapBoundsLiteral,
-  b: MapBoundsLiteral,
-  threshold = 0.12,
-): boolean {
-  if (!isValidMapBounds(a) || !isValidMapBounds(b)) return true;
-  const height = Math.max(Math.abs(a.north - a.south), 1e-6);
-  const width = Math.max(Math.abs(a.east - a.west), 1e-6);
-  const dLat = Math.abs((a.north + a.south) / 2 - (b.north + b.south) / 2);
-  const dLng = Math.abs((a.east + a.west) / 2 - (b.east + b.west) / 2);
-  const dH = Math.abs(height - Math.abs(b.north - b.south)) / height;
-  const dW = Math.abs(width - Math.abs(b.east - b.west)) / width;
-  return (
-    dLat / height > threshold ||
-    dLng / width > threshold ||
-    dH > threshold ||
-    dW > threshold
-  );
-}
-
 function reasonFromGeolocationError(
   error: GeolocationPositionError | null | undefined,
 ): GeolocationFailureReason {

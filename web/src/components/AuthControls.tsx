@@ -17,7 +17,7 @@ const loginButtonClass =
 
 /**
  * ヘッダー右のアカウント導線。
- * 未ログイン時は Google を自動起動せず、/mypage のプロバイダ選択へ誘導する。
+ * ゲスト時は Google を自動起動せず、/mypage のプロバイダ選択へ誘導する。
  */
 export function HeaderAccountButton() {
   const { ready } = useAuth();
@@ -26,15 +26,17 @@ export function HeaderAccountButton() {
 
   if (!ready) {
     return (
-      <span className="rounded-full px-3 py-2 text-xs font-bold text-[#8A9199]">…</span>
+      <span className="inline-flex shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-bold text-[#8A9199]">
+        …
+      </span>
     );
   }
 
-  // 未ログインでも Google 等を自動起動せず、/mypage のプロバイダ選択へ進む
+  // ゲストでも Google 等を自動起動せず、/mypage のプロバイダ選択へ進む
   return (
     <Link
       href="/mypage"
-      className={`brand-gradient rounded-full px-4 py-2 text-sm font-extrabold ${
+      className={`brand-gradient inline-flex shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-extrabold sm:px-4 ${
         pathname.startsWith('/mypage') ? 'ring-2 ring-[#12B8D0]/40' : ''
       }`}
     >
@@ -48,12 +50,15 @@ export function HeaderGuestHint() {
   const t = useT();
   if (!ready || user) return null;
   return (
-    <p className="hidden text-xs font-bold text-[#5B6B75] lg:block">
-      {t('auth.guestHintBefore')}
-      <Link href="/mypage" className="mx-1 font-extrabold text-[#12B8D0] underline">
+    <p className="min-w-0 truncate text-xs font-bold leading-none text-[#5B6B75]">
+      <span className="whitespace-nowrap">{t('auth.guestHintBefore')}</span>
+      <Link
+        href="/mypage"
+        className="mx-1 inline whitespace-nowrap font-extrabold text-[#12B8D0] underline"
+      >
         {t('nav.mypage')}
       </Link>
-      {t('auth.guestHintAfter')}
+      <span className="whitespace-nowrap">{t('auth.guestHintAfter')}</span>
     </p>
   );
 }

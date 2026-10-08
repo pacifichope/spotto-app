@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-
-import { getServerT } from '@/lib/i18n/server';
 import { Suspense } from 'react';
 
 import { ChatRoomScreen } from '@/components/ChatRoomScreen';
+import { ChatBubblesSkeleton } from '@/components/skeletons';
+import { getServerT } from '@/lib/i18n/server';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getServerT();
@@ -13,14 +13,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ChatPage() {
-  const t = await getServerT();
+function ChatFallback() {
   return (
-    <Suspense
-      fallback={
-        <main className="page-main pt-4 text-sm font-bold text-[#8A9199]">{t('chat.loading')}</main>
-      }
-    >
+    <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
+      <div className="space-y-2" aria-hidden>
+        <span className="skeleton-bone block h-3 w-28 rounded-full" />
+        <span className="skeleton-bone block h-5 w-48 rounded-full" />
+      </div>
+      <ChatBubblesSkeleton />
+    </main>
+  );
+}
+
+export default async function ChatPage() {
+  return (
+    <Suspense fallback={<ChatFallback />}>
       <ChatRoomScreen />
     </Suspense>
   );
