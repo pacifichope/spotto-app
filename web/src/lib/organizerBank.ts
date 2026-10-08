@@ -38,19 +38,20 @@ export const SUPPORTED_BANKS = [
   '福岡銀行',
 ] as const;
 
+/** Returns an i18n key under `bank.*`, or null when valid. */
 export function validateBank(account: OrganizerBankAccount): string | null {
-  if (!account.bankName.trim()) return '銀行名を選択してください';
-  if (!account.branchName.trim()) return '支店名を入力してください';
+  if (!account.bankName.trim()) return 'bank.errBankName';
+  if (!account.branchName.trim()) return 'bank.errBranchName';
   if (!/^\d{3}$/.test(account.branchNumber.trim()) && account.bankName !== 'ゆうちょ銀行') {
     // ゆうちょは形式が異なることがあるので支店番号は緩く
-    if (!account.branchNumber.trim()) return '支店番号を入力してください';
+    if (!account.branchNumber.trim()) return 'bank.errBranchCode';
   }
   if (!/^\d{4,8}$/.test(account.accountNumber.trim())) {
-    return '口座番号を正しく入力してください';
+    return 'bank.errAccountNumber';
   }
-  if (!account.accountHolderKana.trim()) return '口座名義（カナ）を入力してください';
+  if (!account.accountHolderKana.trim()) return 'bank.errHolderKana';
   if (account.notifyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account.notifyEmail)) {
-    return '通知用メールの形式が正しくありません';
+    return 'bank.errNotifyEmail';
   }
   return null;
 }

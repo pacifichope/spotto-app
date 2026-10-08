@@ -5,24 +5,29 @@ import { useMemo, useState, type FormEvent } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 import { apiBaseUrl } from '@/lib/env';
+import { useT } from '@/lib/i18n/locale-context';
 import { SUPPORT_EMAIL } from '@/lib/legal';
 
-const CATEGORIES = [
-  '不具合の報告',
-  'アカウントについて',
-  'イベント・決済について',
-  'その他',
+const CATEGORY_KEYS = [
+  'catBug',
+  'catAccount',
+  'catEvent',
+  'catOther',
 ] as const;
+
+type CategoryKey = (typeof CATEGORY_KEYS)[number];
 
 export function ContactScreen() {
   const { user } = useAuth();
+  const t = useT();
   const [name, setName] = useState(user?.displayName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [category, setCategory] =
-    useState<(typeof CATEGORIES)[number]>('その他');
+  const [categoryKey, setCategoryKey] = useState<CategoryKey>('catOther');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+
+  const categoryLabel = t(`contact.${categoryKey}`);
 
   const canSubmit = useMemo(() => {
     return (
@@ -41,7 +46,7 @@ export function ContactScreen() {
     const payload = {
       name: name.trim(),
       email: email.trim(),
-      category,
+      category: categoryLabel,
       message: message.trim(),
       userId: user?.uid,
       authenticated: Boolean(user),
@@ -56,7 +61,7 @@ export function ContactScreen() {
           body: JSON.stringify(payload),
         });
         if (response.ok) {
-          setStatus('送信しました。返信をお待ちください。');
+          setStatus(t('contact.sent'));
           setMessage('');
           setBusy(false);
           return;
@@ -66,35 +71,35 @@ export function ContactScreen() {
       }
     }
 
-    const subject = encodeURIComponent(`[spotto] ${category}`);
+    const subject = encodeURIComponent(`[spotto] ${categoryLabel}`);
     const body = encodeURIComponent(
       [
         payload.message,
         '',
         '---',
-        `お名前: ${payload.name}`,
-        `返信用メール: ${payload.email}`,
-        `ユーザーID: ${payload.userId || 'guest'}`,
+        `${t('contact.mailtoName')} ${payload.name}`,
+        `${t('contact.mailtoEmail')} ${payload.email}`,
+        `${t('contact.mailtoUserId')} ${payload.userId || 'guest'}`,
       ].join('\n'),
     );
     window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-    setStatus(`メールアプリが開かない場合は ${SUPPORT_EMAIL} へご連絡ください。`);
+    setStatus(t('contact.mailtoFallback', { email: SUPPORT_EMAIL }));
     setBusy(false);
   }
 
   return (
     <main className="page-main pt-4 md:pt-2">
       <Link href="/settings" className="text-sm font-extrabold text-[#12B8D0]">
-        ← 設定
+        {t('contact.backSettings')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">お問い合わせ</h1>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('contact.title')}</h1>
       <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
-        不具合やご質問はこちらからどうぞ。通常数営業日以内にご返信します。
+        {t('contact.subtitle')}
       </p>
 
       <form onSubmit={(e) => void onSubmit(e)} className="card-shadow mt-4 space-y-4 px-5 py-6">
         <label className="block">
-          <span className="text-xs font-extrabold text-[#5B6B75]">お名前</span>
+          <span className="text-xs font-extrabold text-[#5B6B75]">{t('contact.name')}</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -103,7 +108,7 @@ export function ContactScreen() {
           />
         </label>
         <label className="block">
-          <span className="text-xs font-extrabold text-[#5B6B75]">返信用メール</span>
+          <span className="text-xs font-extrabold text-[#5B6B75]">{t('contact.email')}</span>
           <input
             type="email"
             value={email}
@@ -113,23 +118,21 @@ export function ContactScreen() {
           />
         </label>
         <label className="block">
-          <span className="text-xs font-extrabold text-[#5B6B75]">種別</span>
+          <span className="text-xs font-extrabold text-[#5B6B75]">{t('contact.category')}</span>
           <select
-            value={category}
-            onChange={(e) =>
-              setCategory(e.target.value as (typeof CATEGORIES)[number])
-            }
+            value={categoryKey}
+            onChange={(e) => setCategoryKey(e.target.value as CategoryKey)}
             className="mt-1.5 h-11 w-full rounded-2xl bg-[#F4F7F8] px-4 text-sm font-bold outline-none ring-1 ring-[#E4EBEE]"
           >
-            {CATEGORIES.map((item) => (
-              <option key={item} value={item}>
-                {item}
+            {CATEGORY_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {t(`contact.${key}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="block">
-          <span className="text-xs font-extrabold text-[#5B6B75]">内容</span>
+          <span className="text-xs font-extrabold text-[#5B6B75]">{t('contact.body')}</span>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -144,7 +147,7 @@ export function ContactScreen() {
           disabled={!canSubmit || busy}
           className="brand-gradient h-12 w-full rounded-full text-sm font-extrabold disabled:opacity-60"
         >
-          {busy ? '送信中…' : '送信する'}
+          {busy ? t('contact.sending') : t('contact.send')}
         </button>
         {status ? (
           <p className="text-sm font-bold text-[#5B6B75]">{status}</p>

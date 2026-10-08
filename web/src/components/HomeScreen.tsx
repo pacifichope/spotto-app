@@ -20,6 +20,8 @@ import {
 } from '@/constants/theme';
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { areaLabel as translateArea } from '@/lib/i18n/labels';
+import { useLocale } from '@/lib/i18n/locale-context';
 import type { PublicEvent } from '@/lib/types';
 import {
   NEARBY_RADIUS_KM,
@@ -29,7 +31,8 @@ import {
   type MapBoundsLiteral,
 } from '@/lib/userLocation';
 
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
+const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const NEARBY_AREA = '現在地付近';
 
 function dateOptions() {
@@ -74,6 +77,8 @@ export function HomeScreen({
     refresh,
   } = useUserLocation();
   const { hiddenIds } = useHiddenUserIds();
+  const { locale, t } = useLocale();
+  const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_JA;
 
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<string>(NEARBY_AREA);
@@ -97,14 +102,14 @@ export function HomeScreen({
   }, [area, browseOrigin, isNearbyMode]);
 
   const areaLabel = mapAreaSearch
-    ? 'マップ表示範囲'
+    ? t('home.mapArea')
     : locating
-      ? '現在地を取得中…'
+      ? t('home.locating')
       : isNearbyMode && status === 'denied'
-        ? '現在地付近（位置情報オフ）'
+        ? t('home.nearbyDenied')
         : isNearbyMode && !userCoords && (status === 'unavailable' || status === 'unsupported')
-          ? '現在地付近（東京都）'
-          : area;
+          ? t('home.nearbyFallback')
+          : translateArea(area, t);
 
   const clearMapAreaSearch = useCallback(() => {
     setMapBounds(null);
@@ -168,9 +173,9 @@ export function HomeScreen({
   });
 
   return (
-    <div className="page-main lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start lg:gap-6">
+    <div className="page-main lg:grid lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:items-start lg:gap-6 xl:gap-8">
       <aside className="lg:sticky lg:top-24">
-        <div className="lg:card-shadow lg:p-3.5">
+        <div className="lg:card-shadow lg:p-4">
           <Header
             area={area}
             areaLabel={areaLabel}
@@ -182,9 +187,11 @@ export function HomeScreen({
             onCategory={setCategory}
             onPriceRange={setPriceRange}
           />
-          <p className="mb-2 mt-5 text-xs font-extrabold text-[#5B6B75]">日付</p>
+          <p className="mb-2 mt-5 text-xs font-extrabold text-[#5B6B75]">
+            {t('home.date')}
+          </p>
           <div className="grid grid-cols-7 gap-y-1 text-center">
-            {WEEKDAYS.map((label) => (
+            {weekdays.map((label) => (
               <span key={label} className="pb-1 text-[11px] font-extrabold text-[#8A9199]">
                 {label}
               </span>
@@ -199,7 +206,7 @@ export function HomeScreen({
                   key={option.stamp}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={`${option.stamp}${option.isToday ? ' 今日' : ''}`}
+                  aria-label={`${option.stamp}${option.isToday ? ` ${t('home.today')}` : ''}`}
                   className={`mx-auto grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold ${
                     selected
                       ? 'brand-gradient'
@@ -219,10 +226,18 @@ export function HomeScreen({
 
       <main>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-xl font-extrabold tracking-tight lg:text-2xl">開催中のイベント</h1>
+          <h1 className="text-xl font-extrabold tracking-tight lg:text-2xl">
+            {t('home.title')}
+          </h1>
           <div className="flex items-center gap-3">
-            <p className="text-sm font-bold text-[#5B6B75]">{visible.length}件</p>
-            <div className="flex rounded-full bg-white/80 p-1" role="group" aria-label="表示の切り替え">
+            <p className="text-sm font-bold text-[#5B6B75]">
+              {t('home.count', { count: visible.length })}
+            </p>
+            <div
+              className="flex rounded-full bg-white/80 p-1"
+              role="group"
+              aria-label={t('home.viewToggle')}
+            >
               <button
                 type="button"
                 aria-pressed={view === 'list'}
@@ -232,7 +247,7 @@ export function HomeScreen({
                 onClick={() => setView('list')}
               >
                 <List size={15} />
-                リスト
+                {t('home.list')}
               </button>
               <button
                 type="button"
@@ -243,7 +258,7 @@ export function HomeScreen({
                 onClick={() => setView('map')}
               >
                 <Map size={15} />
-                マップ
+                {t('home.map')}
               </button>
             </div>
           </div>
@@ -251,7 +266,7 @@ export function HomeScreen({
         {error ? <p className="mb-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}
         {isNearbyMode && status === 'denied' && !mapAreaSearch ? (
           <p className="mb-3 text-sm font-bold text-[#5B6B75]">
-            位置情報がブロックされています。ブラウザの設定で許可するか、エリアを選んでください。マップは東京都心を中心に表示します。
+            {t('home.locationDenied')}
           </p>
         ) : null}
         {view === 'map' ? (
@@ -268,10 +283,10 @@ export function HomeScreen({
             />
             {visible.length === 0 ? (
               <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
-                この範囲に条件に合うイベントはありません
+                {t('home.emptyInArea')}
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {visible.map((event) => (
                   <EventCard key={event.id} event={event} />
                 ))}
@@ -280,10 +295,10 @@ export function HomeScreen({
           </div>
         ) : visible.length === 0 ? (
           <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
-            条件に合うイベントはまだありません
+            {t('home.empty')}
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {visible.map((event) => (
               <EventCard key={event.id} event={event} />
             ))}

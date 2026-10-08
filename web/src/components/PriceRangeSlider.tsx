@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '@/lib/i18n/locale-context';
+
 export const PRICE_RANGE_MIN = 0;
 export const PRICE_RANGE_MAX = 10_000;
 export const PRICE_RANGE_STEP = 100;
@@ -22,21 +24,30 @@ function snap(value: number) {
   return Math.round(value / PRICE_RANGE_STEP) * PRICE_RANGE_STEP;
 }
 
-export function formatPriceYen(value: number) {
-  if (value <= 0) return '0円';
-  return `${value.toLocaleString('ja-JP')}円`;
+export function formatPriceYen(
+  value: number,
+  t: (key: string, params?: Record<string, string | number>) => string = (k) => k,
+) {
+  if (value <= 0) return t('price.zero');
+  return `${value.toLocaleString('ja-JP')}${t('common.yen')}`;
 }
 
-export function formatPriceRangeLabel(range: PriceRange) {
+export function formatPriceRangeLabel(
+  range: PriceRange,
+  t: (key: string, params?: Record<string, string | number>) => string,
+) {
   const min = clamp(range.min, PRICE_RANGE_MIN, PRICE_RANGE_MAX);
   const max = clamp(range.max, PRICE_RANGE_MIN, PRICE_RANGE_MAX);
   if (min <= PRICE_RANGE_MIN && max >= PRICE_RANGE_MAX) {
-    return '指定なし（0円 〜 10,000円以上）';
+    return t('price.anyRange');
   }
   if (max >= PRICE_RANGE_MAX) {
-    return `${formatPriceYen(min)} 〜 10,000円以上`;
+    return t('price.fromMinOpen', { min: formatPriceYen(min, t) });
   }
-  return `${formatPriceYen(min)} 〜 ${formatPriceYen(max)}`;
+  return t('price.range', {
+    min: formatPriceYen(min, t),
+    max: formatPriceYen(max, t),
+  });
 }
 
 /** スライダー範囲にイベント価格が含まれるか（上限到達時は 10,000円超も通す） */
@@ -55,6 +66,7 @@ type PriceRangeSliderProps = {
 };
 
 export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
+  const t = useT();
   const min = clamp(value.min, PRICE_RANGE_MIN, value.max);
   const max = clamp(value.max, value.min, PRICE_RANGE_MAX);
   const span = PRICE_RANGE_MAX - PRICE_RANGE_MIN || 1;
@@ -74,9 +86,9 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
   return (
     <div>
       <div className="flex items-end justify-between gap-3">
-        <p className="text-xs font-extrabold text-[#5B6B75]">価格帯</p>
+        <p className="text-xs font-extrabold text-[#5B6B75]">{t('price.title')}</p>
         <p className="text-sm font-extrabold tracking-tight text-[#12B8D0]">
-          {formatPriceRangeLabel({ min, max })}
+          {formatPriceRangeLabel({ min, max }, t)}
         </p>
       </div>
 
@@ -89,7 +101,7 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
 
         <input
           type="range"
-          aria-label="最低価格"
+          aria-label={t('price.minAria')}
           min={PRICE_RANGE_MIN}
           max={PRICE_RANGE_MAX}
           step={PRICE_RANGE_STEP}
@@ -99,7 +111,7 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
         />
         <input
           type="range"
-          aria-label="最高価格"
+          aria-label={t('price.maxAria')}
           min={PRICE_RANGE_MIN}
           max={PRICE_RANGE_MAX}
           step={PRICE_RANGE_STEP}
@@ -110,8 +122,8 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
       </div>
 
       <div className="mt-1 flex justify-between text-[11px] font-bold text-[#8A9199]">
-        <span>0円</span>
-        <span>10,000円</span>
+        <span>{t('price.zero')}</span>
+        <span>{t('price.tenThousand')}</span>
       </div>
     </div>
   );

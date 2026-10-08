@@ -7,17 +7,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { LoginPromptCard } from '@/components/AuthControls';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useLocale } from '@/lib/i18n/locale-context';
 import { mypageHref } from '@/lib/mypageNav';
 import {
-  PAYMENT_FEE_RATE,
   PAYOUT_FEE_YEN,
   PLATFORM_FEE_RATE,
   currentSalesYearMonth,
   fetchOrganizerSalesSummary,
   formatYen,
   parseSalesYearMonth,
-  payoutStatusHint,
-  payoutStatusLabel,
   shiftSalesYearMonth,
   type MonthPayoutDisplayStatus,
   type OrganizerSalesSummary,
@@ -43,6 +41,7 @@ function statusChipClass(status: MonthPayoutDisplayStatus) {
 
 export function SalesScreen() {
   const { user, ready } = useAuth();
+  const { locale, t } = useLocale();
   const [yearMonth, setYearMonth] = useState(currentSalesYearMonth);
   const [summary, setSummary] = useState<OrganizerSalesSummary | null>(null);
   const [error, setError] = useState('');
@@ -50,6 +49,34 @@ export function SalesScreen() {
 
   const latestYearMonth = currentSalesYearMonth();
   const canGoNext = yearMonth < latestYearMonth;
+  const platformPct = Math.round(PLATFORM_FEE_RATE * 100);
+  const feeLabel = formatYen(PAYOUT_FEE_YEN);
+
+  const statusLabel = (status: MonthPayoutDisplayStatus) => {
+    switch (status) {
+      case 'paid':
+        return t('sales.statusPaid');
+      case 'awaiting_payout':
+        return t('sales.statusAwaitingPayout');
+      case 'awaiting_event':
+        return t('sales.statusAwaitingEvent');
+      default:
+        return t('sales.statusNone');
+    }
+  };
+
+  const statusHint = (status: MonthPayoutDisplayStatus) => {
+    switch (status) {
+      case 'paid':
+        return t('sales.hintPaid');
+      case 'awaiting_payout':
+        return t('sales.hintAwaitingPayout');
+      case 'awaiting_event':
+        return t('sales.hintAwaitingEvent');
+      default:
+        return t('sales.hintNone');
+    }
+  };
 
   const load = useCallback(async () => {
     if (!user) {
@@ -66,12 +93,14 @@ export function SalesScreen() {
       });
       setSummary(next);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '売上の取得に失敗しました');
+      setError(
+        caught instanceof Error ? caught.message : t('sales.fetchFailed'),
+      );
       setSummary(null);
     } finally {
       setLoading(false);
     }
-  }, [user, yearMonth]);
+  }, [user, yearMonth, t]);
 
   useEffect(() => {
     void load();
@@ -80,8 +109,8 @@ export function SalesScreen() {
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">売上</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
       </main>
     );
   }
@@ -95,21 +124,19 @@ export function SalesScreen() {
         href={mypageHref({ mode: 'organizer' })}
         className="text-sm font-extrabold text-[#12B8D0]"
       >
-        ← マイページ
+        {t('sales.backMypage')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">売上</h1>
-      <p className="mt-1 text-sm font-bold text-[#5B6B75]">
-        開催日ベースの月次売上と振込見込みです。
-      </p>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
+      <p className="mt-1 text-sm font-bold text-[#5B6B75]">{t('sales.subtitle')}</p>
 
       {!user ? (
-        <LoginPromptCard title="ログインして売上を確認" />
+        <LoginPromptCard title={t('sales.loginTitle')} />
       ) : (
         <>
           <div className="card-shadow mt-5 flex items-center px-1 py-1.5">
             <button
               type="button"
-              aria-label="前の月"
+              aria-label={t('sales.prevMonth')}
               onClick={() => setYearMonth((ym) => shiftSalesYearMonth(ym, -1))}
               className="grid h-11 w-11 place-items-center text-2xl font-bold text-[#12B8D0]"
             >
@@ -117,11 +144,13 @@ export function SalesScreen() {
             </button>
             <div className="min-w-0 flex-1 text-center">
               <p className="text-base font-extrabold tracking-tight">{monthLabel}</p>
-              <p className="text-[11px] font-bold text-[#8A9199]">開催日で集計</p>
+              <p className="text-[11px] font-bold text-[#8A9199]">
+                {t('sales.byEventDate')}
+              </p>
             </div>
             <button
               type="button"
-              aria-label="次の月"
+              aria-label={t('sales.nextMonth')}
               disabled={!canGoNext}
               onClick={() => {
                 if (!canGoNext) return;
@@ -134,7 +163,7 @@ export function SalesScreen() {
           </div>
 
           {loading && !summary ? (
-            <p className="mt-6 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+            <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
           ) : error ? (
             <section className="card-shadow mt-5 px-5 py-6 text-center">
               <p className="text-sm font-bold text-[#EF4444]">{error}</p>
@@ -143,7 +172,7 @@ export function SalesScreen() {
                 onClick={() => void load()}
                 className="mt-3 text-sm font-extrabold text-[#12B8D0]"
               >
-                再読み込み
+                {t('common.reload')}
               </button>
             </section>
           ) : summary ? (
@@ -152,18 +181,22 @@ export function SalesScreen() {
                 <span
                   className={`rounded-full px-3 py-1 text-[11px] font-extrabold ${statusChipClass(status)}`}
                 >
-                  {payoutStatusLabel(status)}
+                  {statusLabel(status)}
                 </span>
               </div>
               <p className="mt-2 text-xs font-bold leading-5 text-[#5B6B75]">
                 {status === 'paid' && summary.payoutPaidAt
-                  ? `登録口座への振込が完了しています（${new Date(summary.payoutPaidAt).toLocaleDateString('ja-JP')}）。`
-                  : payoutStatusHint(status)}
+                  ? t('sales.paidHint', {
+                      date: new Date(summary.payoutPaidAt).toLocaleDateString(
+                        locale === 'en' ? 'en-US' : 'ja-JP',
+                      ),
+                    })
+                  : statusHint(status)}
               </p>
 
               <section className="card-shadow mt-4 p-5">
                 <p className="text-xs font-extrabold text-[#8A9199]">
-                  {status === 'paid' ? '振込額（Net）' : 'Expected amount (net)'}
+                  {status === 'paid' ? t('sales.netPaid') : t('sales.netExpected')}
                 </p>
                 <p className="mt-2 text-3xl font-extrabold tracking-tight text-[#12B8D0]">
                   {formatYen(summary.netYen)}
@@ -171,24 +204,14 @@ export function SalesScreen() {
 
                 <dl className="mt-5 space-y-2.5 border-t border-[#E4EBEE] pt-4">
                   <div className="flex items-start justify-between gap-3 text-sm">
-                    <dt className="font-bold text-[#5B6B75]">
-                      Sales eligible for payout (finished)
-                      <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                        対象売上（終了済み）
-                      </span>
-                    </dt>
+                    <dt className="font-bold text-[#5B6B75]">{t('sales.eligible')}</dt>
                     <dd className="shrink-0 font-extrabold">
                       {formatYen(summary.confirmedGrossYen)}
                     </dd>
                   </div>
                   {summary.pendingGrossYen > 0 ? (
                     <div className="flex items-start justify-between gap-3 text-sm">
-                      <dt className="font-bold text-[#5B6B75]">
-                        Sales awaiting events
-                        <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                          開催待ち（未確定）
-                        </span>
-                      </dt>
+                      <dt className="font-bold text-[#5B6B75]">{t('sales.pending')}</dt>
                       <dd className="shrink-0 font-extrabold text-[#8A9199]">
                         {formatYen(summary.pendingGrossYen)}
                       </dd>
@@ -196,22 +219,7 @@ export function SalesScreen() {
                   ) : null}
                   <div className="flex items-start justify-between gap-3 text-sm">
                     <dt className="font-bold text-[#5B6B75]">
-                      Payment processing fee (approx.{' '}
-                      {Math.round(PAYMENT_FEE_RATE * 1000) / 10}%)
-                      <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                        決済手数料
-                      </span>
-                    </dt>
-                    <dd className="shrink-0 font-extrabold text-[#8A9199]">
-                      −{formatYen(summary.paymentFeeYen)}
-                    </dd>
-                  </div>
-                  <div className="flex items-start justify-between gap-3 text-sm">
-                    <dt className="font-bold text-[#5B6B75]">
-                      Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)
-                      <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                        プラットフォーム利用料
-                      </span>
+                      {t('sales.platformFee', { rate: platformPct })}
                     </dt>
                     <dd className="shrink-0 font-extrabold text-[#8A9199]">
                       −{formatYen(summary.platformFeeYen)}
@@ -219,10 +227,7 @@ export function SalesScreen() {
                   </div>
                   <div className="flex items-start justify-between gap-3 text-sm">
                     <dt className="font-bold text-[#5B6B75]">
-                      Transfer fee (flat {formatYen(PAYOUT_FEE_YEN)})
-                      <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                        振込手数料
-                      </span>
+                      {t('sales.transferFee', { fee: feeLabel })}
                     </dt>
                     <dd className="shrink-0 font-extrabold text-[#8A9199]">
                       −{formatYen(summary.payoutFeeYen)}
@@ -231,32 +236,33 @@ export function SalesScreen() {
                 </dl>
 
                 <p className="mt-4 text-xs font-bold text-[#8A9199]">
-                  {summary.ticketCount}枚販売（確定 {summary.confirmedTicketCount}枚） ·{' '}
-                  {summary.events.length}イベント
+                  {t('sales.ticketsMeta', {
+                    count: summary.ticketCount,
+                    confirmed: summary.confirmedTicketCount,
+                    events: summary.events.length,
+                  })}
                 </p>
                 <p className="mt-2 text-[11px] font-bold leading-5 text-[#8A9199]">
-                  Net = confirmed sales − payment fee −{' '}
-                  {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee −{' '}
-                  {formatYen(PAYOUT_FEE_YEN)} transfer fee（月1回）
+                  {t('sales.formula', { rate: platformPct, fee: feeLabel })}
                 </p>
               </section>
 
               <div className="mt-6 px-0.5">
                 <h2 className="text-base font-extrabold tracking-tight">
-                  Breakdown by event
+                  {t('sales.breakdownTitle')}
                 </h2>
                 <p className="mt-1 text-xs font-bold leading-5 text-[#5B6B75]">
-                  イベント単位の明細です。決済・利用料はイベントごと、振込手数料は月次合計から控除します。
+                  {t('sales.breakdownHint')}
                 </p>
               </div>
 
               {summary.events.length === 0 ? (
                 <section className="card-shadow mt-3 px-5 py-8 text-center">
                   <p className="text-sm font-extrabold">
-                    {monthLabel} の売上はまだありません
+                    {t('sales.emptyTitle', { month: monthLabel })}
                   </p>
                   <p className="mt-2 text-xs font-bold leading-5 text-[#5B6B75]">
-                    参加者がチケットを支払うと、ここに内訳が表示されます。キャンセル・返金は自動で相殺されます。
+                    {t('sales.emptyBody')}
                   </p>
                 </section>
               ) : (
@@ -273,18 +279,22 @@ export function SalesScreen() {
                               {item.eventTitle}
                             </p>
                             <p className="mt-1 text-[11px] font-bold text-[#8A9199]">
-                              {item.eventDate || '日付未設定'} · {item.ticketCount}枚
+                              {item.eventDate || t('sales.dateUnset')} ·{' '}
+                              {t('sales.tickets', { count: item.ticketCount })}
                               {item.unitPriceYen > 0
                                 ? ` × ${formatYen(item.unitPriceYen)}`
                                 : ''}
                               {' · '}
-                              {item.confirmed ? '振込待ち（確定）' : '開催待ち'}
+                              {item.confirmed
+                                ? t('sales.awaitingPayout')
+                                : t('sales.awaitingEvent')}
                             </p>
                             <p className="mt-1 text-[11px] font-bold leading-4 text-[#8A9199]">
-                              売上 {formatYen(item.grossYen)} → 決済 −
-                              {formatYen(item.paymentFeeYen)} → 利用料 −
-                              {formatYen(item.platformFeeYen)} → 主催者分{' '}
-                              {formatYen(item.netAfterPlatformYen)}
+                              {t('sales.eventFlow', {
+                                gross: formatYen(item.grossYen),
+                                platform: formatYen(item.platformFeeYen),
+                                net: formatYen(item.netAfterPlatformYen),
+                              })}
                             </p>
                           </div>
                           <div className="shrink-0 text-right">
@@ -309,10 +319,7 @@ export function SalesScreen() {
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-extrabold">
-                      View or register payout account
-                    </span>
-                    <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                      振込口座の確認・登録
+                      {t('sales.bankTitle')}
                     </span>
                   </span>
                   <ChevronRight size={18} className="shrink-0 text-[#8A9199]" />
@@ -323,10 +330,7 @@ export function SalesScreen() {
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-extrabold">
-                      About fees and payouts
-                    </span>
-                    <span className="mt-0.5 block text-[11px] font-bold text-[#8A9199]">
-                      手数料と振込について
+                      {t('sales.feesTitle')}
                     </span>
                   </span>
                   <ChevronRight size={18} className="shrink-0 text-[#8A9199]" />
@@ -335,7 +339,7 @@ export function SalesScreen() {
 
               {loading ? (
                 <p className="mt-3 text-center text-xs font-bold text-[#8A9199]">
-                  更新中…
+                  {t('common.updating')}
                 </p>
               ) : null}
             </>

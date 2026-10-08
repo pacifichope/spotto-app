@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { useT } from '@/lib/i18n/locale-context';
+
 type ConfirmDialogProps = {
   open: boolean;
   title: string;
@@ -25,7 +27,7 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  cancelLabel = 'キャンセル',
+  cancelLabel,
   confirmLabel,
   tone = 'default',
   busy = false,
@@ -34,6 +36,8 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
+  const t = useT();
+  const resolvedCancel = cancelLabel ?? t('common.cancel');
   const titleId = useId();
   const descId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +79,7 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
-        aria-label="閉じる"
+        aria-label={t('common.close')}
         disabled={busy}
         className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md transition-opacity disabled:cursor-not-allowed"
         onClick={() => {
@@ -106,13 +110,7 @@ export function ConfirmDialog({
         {requiresPhrase && confirmPhrase ? (
           <label className="mt-4 block">
             <span className="text-xs font-extrabold text-[#5B6B75]">
-              {confirmPhraseHint ?? (
-                <>
-                  確認のため「
-                  <span className="text-[#EF4444]">{confirmPhrase}</span>
-                  」と入力してください
-                </>
-              )}
+              {confirmPhraseHint ?? t('common.phraseConfirmHint', { phrase: confirmPhrase })}
             </span>
             <input
               ref={inputRef}
@@ -134,7 +132,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="flex h-11 flex-1 items-center justify-center rounded-full bg-[#F4F7F8] text-sm font-extrabold text-[#5B6B75] disabled:opacity-60 sm:flex-none sm:px-5"
           >
-            {cancelLabel}
+            {resolvedCancel}
           </button>
           <button
             type="button"
@@ -142,7 +140,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             className={`flex h-11 flex-1 items-center justify-center rounded-full text-sm font-extrabold sm:flex-none sm:min-w-[9.5rem] sm:px-5 ${confirmClass}`}
           >
-            {busy ? '処理中…' : confirmLabel}
+            {busy ? t('common.processing') : confirmLabel}
           </button>
         </div>
       </div>

@@ -7,20 +7,22 @@ import {
   ORGANIZER_GUIDELINE_SECTIONS,
   ORGANIZER_GUIDELINE_UPDATED_AT,
 } from '@/lib/organizerGuidelines';
+import { useT } from '@/lib/i18n/locale-context';
 import { mypageHref } from '@/lib/mypageNav';
 
 export function OrganizerGuidelinesScreen() {
+  const t = useT();
   return (
     <main className="page-main pt-4 md:pt-2">
       <Link
         href={mypageHref({ mode: 'organizer' })}
         className="text-sm font-extrabold text-[#12B8D0]"
       >
-        ← マイページ
+        {t('guidelines.backMypage')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">主催ガイドライン</h1>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('guidelines.title')}</h1>
       <p className="mt-1 text-xs font-bold text-[#8A9199]">
-        更新日 {ORGANIZER_GUIDELINE_UPDATED_AT}
+        {t('guidelines.updated', { date: ORGANIZER_GUIDELINE_UPDATED_AT })}
       </p>
       <p className="mt-3 text-sm font-bold leading-6 text-[#5B6B75]">
         {ORGANIZER_GUIDELINE_INTRO}

@@ -3,15 +3,22 @@
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ProfileEditModal } from '@/components/ProfileEditModal';
 import { useAuth } from '@/lib/auth-context';
 import { deleteWebAccount } from '@/lib/account';
+import { fetchBlockedUsers } from '@/lib/blocks';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useLocale, useT } from '@/lib/i18n/locale-context';
 import { LEGAL_EXTERNAL_URLS } from '@/lib/legal';
 import { mypageHref, parseMyPageMode } from '@/lib/mypageNav';
+import {
+  fetchWebProfile,
+  profileFromFirebaseUser,
+  type WebUserProfile,
+} from '@/lib/profile';
 
 type Row = {
   key: string;
@@ -20,23 +27,62 @@ type Row = {
   href?: string;
   external?: boolean;
   danger?: boolean;
+  busy?: boolean;
+  disabled?: boolean;
   onClick?: () => void;
 };
-
-const DELETE_PHRASE = '削除する';
 
 export function SettingsScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, ready, busy, signOut } = useAuth();
+  const t = useT();
+  const { locale } = useLocale();
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState<WebUserProfile>(() =>
+    profileFromFirebaseUser(null),
+  );
+  const [blockedCount, setBlockedCount] = useState(0);
+
   const fromMode = searchParams.get('from') || searchParams.get('mode') || '';
   const mypageBackHref = mypageHref({
     mode: parseMyPageMode(new URLSearchParams(`mode=${fromMode}`)),
   });
+  const withFrom = (path: string) =>
+    fromMode ? `${path}?from=${encodeURIComponent(fromMode)}` : path;
+
+  useEffect(() => {
+    if (!user) {
+      setProfile(profileFromFirebaseUser(null));
+      setBlockedCount(0);
+      return;
+    }
+    let cancelled = false;
+    setProfile(profileFromFirebaseUser(user));
+    void fetchWebProfile({
+      userId: user.uid,
+      fallback: profileFromFirebaseUser(user),
+    }).then((next) => {
+      if (!cancelled) setProfile(next);
+    });
+    void fetchBlockedUsers({
+      userId: user.uid,
+      getIdToken: async () => idTokenWithAuthenticatedRole(user),
+    })
+      .then((list) => {
+        if (!cancelled) setBlockedCount(list.length);
+      })
+      .catch(() => {
+        if (!cancelled) setBlockedCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   async function confirmLogout() {
     setMessage('');
@@ -66,79 +112,120 @@ export function SettingsScreen() {
       setDeleteOpen(false);
       router.replace('/');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '削除に失敗しました');
+      setMessage(error instanceof Error ? error.message : t('settings.deleteFailed'));
       setDeleteOpen(false);
     } finally {
       setDeleting(false);
     }
   }
 
+  const languageCaption =
+    locale === 'en'
+      ? t('settings.languageEnglish')
+      : t('settings.languageJapanese');
+
+  const blocklistCaption = user
+    ? blockedCount > 0
+      ? t('settings.blocklistCaptionCount', { count: blockedCount })
+      : t('settings.blocklistCaptionEmpty')
+    : t('settings.blocklistCaptionEmpty');
+
+  const rows: Row[] = useMemo(
+    () => [
+      {
+        key: 'profile',
+        label: t('settings.profile'),
+        onClick: () => {
+          if (!user) {
+            router.push(mypageBackHref);
+            return;
+          }
+          setProfileOpen(true);
+        },
+      },
+      {
+        key: 'language',
+        label: t('settings.language'),
+        caption: languageCaption,
+        href: withFrom('/settings/language'),
+      },
+      {
+        key: 'notifications',
+        label: t('settings.notifications'),
+        caption: t('settings.notificationsCaption'),
+        href: withFrom('/settings/notifications'),
+      },
+      {
+        key: 'blocklist',
+        label: t('settings.blocklist'),
+        caption: blocklistCaption,
+        href: withFrom('/settings/blocklist'),
+      },
+      {
+        key: 'contact',
+        label: t('settings.contact'),
+        caption: t('settings.contactCaption'),
+        href: '/settings/contact',
+      },
+      {
+        key: 'terms',
+        label: t('settings.terms'),
+        caption: t('settings.termsCaption'),
+        href: LEGAL_EXTERNAL_URLS.terms,
+        external: true,
+      },
+      {
+        key: 'privacy',
+        label: t('settings.privacy'),
+        caption: t('settings.privacyCaption'),
+        href: LEGAL_EXTERNAL_URLS.privacy,
+        external: true,
+      },
+      {
+        key: 'tokushoho',
+        label: t('settings.tokushoho'),
+        caption: t('settings.tokushohoCaption'),
+        href: LEGAL_EXTERNAL_URLS.tokushoho,
+        external: true,
+      },
+      {
+        key: 'delete',
+        label: deleting ? t('settings.deleting') : t('settings.deleteAccount'),
+        caption: user
+          ? t('settings.deleteAccountCaptionLoggedIn')
+          : t('settings.deleteAccountCaptionGuest'),
+        danger: true,
+        busy: deleting,
+        disabled: deleting || !user,
+        onClick: () => {
+          if (!user || deleting) return;
+          setMessage('');
+          setDeleteOpen(true);
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- withFrom/fromMode captured via closure
+    [
+      t,
+      user,
+      languageCaption,
+      blocklistCaption,
+      deleting,
+      fromMode,
+      mypageBackHref,
+      router,
+    ],
+  );
+
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">設定</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t('settings.title')}
+        </h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
       </main>
     );
-  }
-
-  const rows: Row[] = [
-    {
-      key: 'contact',
-      label: 'お問い合わせ',
-      caption: '不具合報告やご質問',
-      href: '/settings/contact',
-    },
-    {
-      key: 'terms',
-      label: '利用規約',
-      caption: 'サービス利用条件',
-      href: LEGAL_EXTERNAL_URLS.terms,
-      external: true,
-    },
-    {
-      key: 'privacy',
-      label: 'プライバシーポリシー',
-      caption: '個人情報の取り扱い',
-      href: LEGAL_EXTERNAL_URLS.privacy,
-      external: true,
-    },
-    {
-      key: 'tokushoho',
-      label: '特定商取引法に基づく表記',
-      caption: '販売事業者情報',
-      href: LEGAL_EXTERNAL_URLS.tokushoho,
-      external: true,
-    },
-    {
-      key: 'notifications',
-      label: '通知設定',
-      caption: 'リマインダー・チャット・イベント更新',
-      href: fromMode
-        ? `/settings/notifications?from=${encodeURIComponent(fromMode)}`
-        : '/settings/notifications',
-    },
-    {
-      key: 'blocklist',
-      label: 'ブロックリスト',
-      caption: 'ブロック中のユーザーを確認・解除',
-      href: fromMode
-        ? `/settings/blocklist?from=${encodeURIComponent(fromMode)}`
-        : '/settings/blocklist',
-    },
-  ];
-
-  if (user) {
-    rows.push({
-      key: 'delete',
-      label: deleting ? '削除中…' : 'アカウントを削除',
-      caption: 'すべてのデータが削除されます',
-      danger: true,
-      onClick: () => {
-        setMessage('');
-        setDeleteOpen(true);
-      },
-    });
   }
 
   return (
@@ -148,48 +235,18 @@ export function SettingsScreen() {
           href={mypageBackHref}
           className="text-sm font-extrabold text-[#12B8D0]"
         >
-          ← マイページ
+          {t('settings.backMypage')}
         </Link>
       </div>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">設定</h1>
-
-      {!user ? (
-        <LoginPromptCard
-          title="ログインして設定を開く"
-          body="アカウント関連の設定にはログインが必要です。利用規約などは下からも開けます。"
-        />
-      ) : (
-        <section className="card-shadow mt-4 flex items-center gap-4 px-5 py-5">
-          {user.photoURL ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.photoURL}
-              alt=""
-              className="h-12 w-12 rounded-full object-cover"
-            />
-          ) : (
-            <span className="brand-gradient grid h-12 w-12 place-items-center rounded-full text-base font-extrabold">
-              {(user.displayName || 'U').slice(0, 1)}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-base font-extrabold">
-              {user.displayName || 'ユーザー'}
-            </p>
-            {user.email ? (
-              <p className="mt-1 truncate text-sm font-bold text-[#5B6B75]">
-                {user.email}
-              </p>
-            ) : null}
-          </div>
-        </section>
-      )}
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
+        {t('settings.title')}
+      </h1>
 
       <section className="card-shadow mt-4 overflow-hidden">
         {rows.map((row, index) => {
           const className = `flex w-full items-center gap-3 px-5 py-4 text-left ${
             index > 0 ? 'border-t border-[#E4EBEE]' : ''
-          } ${row.danger ? 'opacity-100' : ''}`;
+          } ${row.disabled ? 'opacity-55' : ''}`;
           const body = (
             <>
               <span className="min-w-0 flex-1">
@@ -210,11 +267,21 @@ export function SettingsScreen() {
                   </span>
                 ) : null}
               </span>
-              {row.external ? (
+              {row.busy ? (
+                <span
+                  className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#A35D5D]/30 border-t-[#A35D5D]"
+                  aria-hidden
+                />
+              ) : row.external ? (
                 <ExternalLink size={16} className="shrink-0 text-[#8A9199]" />
-              ) : row.href || row.onClick ? (
-                <ChevronRight size={18} className="shrink-0 text-[#8A9199]" />
-              ) : null}
+              ) : (
+                <ChevronRight
+                  size={18}
+                  className={`shrink-0 ${
+                    row.danger ? 'text-[#9A7A7A]' : 'text-[#8A9199]'
+                  }`}
+                />
+              )}
             </>
           );
 
@@ -242,9 +309,9 @@ export function SettingsScreen() {
             <button
               key={row.key}
               type="button"
-              disabled={row.danger && deleting}
+              disabled={row.disabled}
               onClick={row.onClick}
-              className={`${className} disabled:opacity-60`}
+              className={`${className} disabled:cursor-not-allowed`}
             >
               {body}
             </button>
@@ -256,7 +323,7 @@ export function SettingsScreen() {
         <p className="mt-3 text-sm font-bold text-[#EF4444]">{message}</p>
       ) : null}
 
-      <div className="mt-6 text-center">
+      <div className="mt-7 flex justify-center">
         {user ? (
           <button
             type="button"
@@ -265,25 +332,25 @@ export function SettingsScreen() {
               setMessage('');
               setLogoutOpen(true);
             }}
-            className="text-sm font-extrabold text-[#5B6B75] underline disabled:opacity-60"
+            className="px-3 py-2 text-base font-extrabold text-[#EF4444] disabled:opacity-60"
           >
-            {busy ? '処理中…' : 'ログアウト'}
+            {busy ? t('common.processing') : t('settings.logout')}
           </button>
         ) : (
           <Link
             href={mypageBackHref}
-            className="text-sm font-extrabold text-[#12B8D0]"
+            className="px-3 py-2 text-base font-extrabold text-[#12B8D0]"
           >
-            ログインへ
+            {t('settings.login')}
           </Link>
         )}
       </div>
 
       <ConfirmDialog
         open={logoutOpen}
-        title="ログアウトしますか？"
-        description="現在のアカウントからログアウトします。いつでも再度ログインできます。"
-        confirmLabel="ログアウトする"
+        title={t('settings.logoutTitle')}
+        description={t('settings.logoutBody')}
+        confirmLabel={t('settings.logoutConfirm')}
         busy={busy}
         onCancel={() => {
           if (!busy) setLogoutOpen(false);
@@ -293,26 +360,42 @@ export function SettingsScreen() {
 
       <ConfirmDialog
         open={deleteOpen}
-        title="アカウントを削除しますか？"
+        title={t('settings.deleteTitle')}
         description={
           <>
             <p>
-              アカウントを削除すると、参加・主催イベント、お気に入り、チャットなどのデータが
-              <span className="font-extrabold text-[#EF4444]">完全に失われます</span>
-              。この操作は取り消せません。
+              {t('settings.deleteBodyBefore')}
+              <span className="font-extrabold text-[#EF4444]">
+                {t('settings.deleteBodyStrong')}
+              </span>
+              {t('settings.deleteBodyAfter')}
             </p>
-            <p className="mt-2">本当に削除しますか？</p>
+            <p className="mt-2">{t('settings.deleteBodyAsk')}</p>
           </>
         }
-        confirmLabel="アカウントを削除する"
+        confirmLabel={t('settings.deleteConfirm')}
         tone="destructive"
         busy={deleting}
-        confirmPhrase={DELETE_PHRASE}
+        confirmPhrase={t('settings.deletePhrase')}
         onCancel={() => {
           if (!deleting) setDeleteOpen(false);
         }}
         onConfirm={() => void confirmDelete()}
       />
+
+      {user ? (
+        <ProfileEditModal
+          open={profileOpen}
+          user={user}
+          profile={profile}
+          getIdToken={async () => idTokenWithAuthenticatedRole(user)}
+          onClose={() => setProfileOpen(false)}
+          onSaved={(next) => {
+            setProfile(next);
+            setProfileOpen(false);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

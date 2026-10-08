@@ -5,12 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { useT } from '@/lib/i18n/locale-context';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NOTIFICATION_PREF_ROWS,
-  browserPermissionLabel,
+  browserPermissionMessageKey,
   ensureBrowserNotificationPermission,
   getBrowserNotificationPermission,
   loadNotificationSettings,
@@ -53,6 +54,7 @@ function ToggleSwitch({
 }
 
 function NotificationSettingsBody() {
+  const t = useT();
   const searchParams = useSearchParams();
   const from = searchParams.get('from') || searchParams.get('mode') || '';
   const settingsBackHref = from
@@ -115,7 +117,7 @@ function NotificationSettingsBody() {
       setError(result.error);
       return;
     }
-    setMessage('保存しました');
+    setMessage(t('notifications.saved'));
     window.setTimeout(() => setMessage(''), 1600);
   };
 
@@ -138,11 +140,11 @@ function NotificationSettingsBody() {
       await apply({ ...settings, [key]: true });
     } else if (result.reason === 'denied') {
       setError(
-        'ブラウザの通知が許可されていません。アドレスバー横のサイト設定から通知を許可してください。',
+        t('notifications.permDenied'),
       );
     } else {
       setError(
-        'このブラウザでは通知 API を利用できません。設定は保存できますが、プッシュ配信は対応ブラウザ／アプリで有効になります。',
+        t('notifications.permUnsupported'),
       );
       // 未対応でも設定自体は保存（アプリと共有）
       await apply({ ...settings, [key]: true });
@@ -153,8 +155,8 @@ function NotificationSettingsBody() {
   if (!authReady) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">通知設定</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('notifications.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
       </main>
     );
   }
@@ -165,19 +167,19 @@ function NotificationSettingsBody() {
         href={settingsBackHref}
         className="text-sm font-extrabold text-[#12B8D0]"
       >
-        ← 設定
+        {t('notifications.backSettings')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">通知設定</h1>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('notifications.title')}</h1>
       <p className="mt-1 text-sm font-bold text-[#5B6B75]">
-        種類ごとにオン／オフを切り替えられます。変更はすぐに保存されます。
+        {t('notifications.subtitle')}
       </p>
 
       {!user ? (
-        <LoginPromptCard title="ログインして通知設定を変更" />
+        <LoginPromptCard title={t('notifications.loginTitle')} />
       ) : (
         <>
           <p className="mt-4 text-xs font-bold text-[#8A9199]">
-            {browserPermissionLabel(permission)}
+            {t(browserPermissionMessageKey(permission))}
           </p>
 
           <section className="card-shadow mt-3 overflow-hidden">
@@ -189,15 +191,15 @@ function NotificationSettingsBody() {
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-extrabold">{row.label}</p>
+                  <p className="text-sm font-extrabold">{t(row.labelKey)}</p>
                   <p className="mt-0.5 text-xs font-bold text-[#8A9199]">
-                    {row.caption}
+                    {t(row.captionKey)}
                   </p>
                 </div>
                 <ToggleSwitch
                   checked={settings[row.key]}
                   disabled={!ready || pendingKey !== null}
-                  label={row.label}
+                  label={t(row.labelKey)}
                   onChange={(next) => void handleToggle(row.key, next)}
                 />
               </div>
@@ -205,7 +207,7 @@ function NotificationSettingsBody() {
           </section>
 
           <p className="mt-3 text-xs font-bold leading-5 text-[#8A9199]">
-            初めて通知をオンにすると、ブラウザの通知許可が求められます。許可後も種類ごとに切り替えられます。設定はアカウントに保存され、他の端末でも参照できます。
+            {t('notifications.footer')}
           </p>
 
           {message ? (
@@ -221,12 +223,13 @@ function NotificationSettingsBody() {
 }
 
 export function NotificationSettingsScreen() {
+  const t = useT();
   return (
     <Suspense
       fallback={
         <main className="page-main pt-4 md:pt-2">
-          <h1 className="text-2xl font-extrabold tracking-tight">通知設定</h1>
-          <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">{t('notifications.title')}</h1>
+          <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
         </main>
       }
     >

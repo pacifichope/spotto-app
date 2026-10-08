@@ -20,8 +20,15 @@ import {
   hasOrganizerProfileReady,
   type WebOrganizerProfile,
 } from '@/lib/organizerProfile';
+import { useT } from '@/lib/i18n/locale-context';
 
-const LEVELS = ['初心者歓迎', '初級', '中級', '上級', '指定なし'] as const;
+const LEVELS = [
+  { value: '初心者歓迎', key: 'createEvent.levelBeginner' },
+  { value: '初級', key: 'createEvent.levelElementary' },
+  { value: '中級', key: 'createEvent.levelIntermediate' },
+  { value: '上級', key: 'createEvent.levelAdvanced' },
+  { value: '指定なし', key: 'createEvent.levelAny' },
+] as const;
 const SPORTS = CATEGORIES.filter(
   (item) => item.id !== 'all' && item.id !== 'hot',
 ).map((item) => item.label);
@@ -47,6 +54,7 @@ export function CreateEventModal({
   onPublished,
   onDraftSaved,
 }: Props) {
+  const t = useT();
   const router = useRouter();
   const titleId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,7 +143,7 @@ export function CreateEventModal({
 
   async function publish() {
     if (!hasOrganizerProfileReady(organizer)) {
-      setError('先にサークル名を設定してください');
+      setError(t('profile.setClubNameFirst'));
       return;
     }
     setSaving(true);
@@ -169,7 +177,7 @@ export function CreateEventModal({
     <div className="fixed inset-0 z-[85] flex items-end justify-center p-3 sm:items-center sm:p-4">
       <button
         type="button"
-        aria-label="閉じる"
+        aria-label={t('common.close')}
         disabled={busy}
         className="absolute inset-0 bg-[#0B1A22]/5 backdrop-blur-md"
         onClick={() => {
@@ -184,10 +192,10 @@ export function CreateEventModal({
       >
         <div className="flex items-center justify-between border-b border-[#E4EBEE] px-5 py-4">
           <button type="button" disabled={busy} onClick={onClose} className="text-sm font-extrabold text-[#5B6B75]">
-            閉じる
+            {t('common.close')}
           </button>
           <h2 id={titleId} className="text-base font-extrabold">
-            {draftId ? '下書きを編集' : 'イベントを作成'}
+            {draftId ? t('createEvent.editDraft') : t('createEvent.title')}
           </h2>
           <button
             type="button"
@@ -198,7 +206,7 @@ export function CreateEventModal({
             }}
             className="text-sm font-extrabold text-[#12B8D0]"
           >
-            下書き
+            {t('createEvent.draft')}
           </button>
         </div>
 
@@ -215,7 +223,7 @@ export function CreateEventModal({
             ) : (
               <span className="flex flex-col items-center gap-2 text-sm font-extrabold text-[#12B8D0]">
                 <Camera size={28} />
-                {uploading ? 'アップロード中…' : '写真を追加（必須）'}
+                {uploading ? t('common.uploading') : t('createEvent.addPhoto')}
               </span>
             )}
             <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-[#12202A] text-white">
@@ -244,13 +252,13 @@ export function CreateEventModal({
           />
 
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">タイトル</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.fieldTitle')}</span>
             <input className={field} value={form.title} maxLength={80} onChange={(e) => patch('title', e.target.value)} />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">スポーツ</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.fieldSport')}</span>
               <select className={field} value={form.sport} onChange={(e) => patch('sport', e.target.value)}>
                 {SPORTS.map((sport) => (
                   <option key={sport} value={sport}>
@@ -260,11 +268,11 @@ export function CreateEventModal({
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">レベル</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.fieldLevel')}</span>
               <select className={field} value={form.level} onChange={(e) => patch('level', e.target.value)}>
                 {LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
+                  <option key={level.value} value={level.value}>
+                    {t(level.key)}
                   </option>
                 ))}
               </select>
@@ -273,35 +281,35 @@ export function CreateEventModal({
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">開始日</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.startDate')}</span>
               <input type="date" className={field} value={form.date} onChange={(e) => patch('date', e.target.value)} />
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">開始時刻</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.startTime')}</span>
               <input type="time" className={field} value={form.time} onChange={(e) => patch('time', e.target.value)} />
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">終了日</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.endDate')}</span>
               <input type="date" className={field} value={form.endDate} onChange={(e) => patch('endDate', e.target.value)} />
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">終了時刻</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.endTime')}</span>
               <input type="time" className={field} value={form.endTime} onChange={(e) => patch('endTime', e.target.value)} />
             </label>
           </div>
 
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">場所</span>
-            <input className={field} value={form.location} onChange={(e) => patch('location', e.target.value)} placeholder="例）代々木公園グラウンド" />
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.place')}</span>
+            <input className={field} value={form.location} onChange={(e) => patch('location', e.target.value)} placeholder={t('createEvent.placePlaceholder')} />
           </label>
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">場所メモ（任意）</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.placeMemo')}</span>
             <input className={field} value={form.locationNote || ''} onChange={(e) => patch('locationNote', e.target.value)} />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">定員</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.capacity')}</span>
               <input
                 type="number"
                 min={1}
@@ -311,7 +319,7 @@ export function CreateEventModal({
               />
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">参加費（円）</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.fee')}</span>
               <input
                 type="number"
                 min={0}
@@ -323,7 +331,7 @@ export function CreateEventModal({
           </div>
 
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">説明</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('createEvent.description')}</span>
             <textarea
               rows={4}
               className="mt-2 w-full resize-none rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-3.5 py-3 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
@@ -343,7 +351,7 @@ export function CreateEventModal({
             className="flex h-11 flex-1 items-center justify-center gap-1 rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
           >
             <X size={16} />
-            キャンセル
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -351,7 +359,7 @@ export function CreateEventModal({
             onClick={() => void publish()}
             className="brand-gradient flex h-11 flex-1 items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60"
           >
-            {saving ? '公開中…' : '公開する'}
+            {saving ? t('common.publishing') : t('common.publish')}
           </button>
         </div>
       </div>

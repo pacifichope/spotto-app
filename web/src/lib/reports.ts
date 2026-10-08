@@ -2,12 +2,12 @@ import { createAuthedSupabase } from '@/lib/supabase';
 
 export type ReportTargetType = 'user' | 'event' | 'message' | 'other';
 
-export const REPORT_REASON_PRESETS = [
-  '不適切な言動',
-  'スパム',
-  '迷惑行為',
-  'なりすまし',
-  'その他',
+export const REPORT_REASON_KEYS = [
+  'safety.reasonInappropriate',
+  'safety.reasonSpam',
+  'safety.reasonHarassment',
+  'safety.reasonImpersonation',
+  'safety.reasonOther',
 ] as const;
 
 export async function submitUserReport(input: {
@@ -22,14 +22,14 @@ export async function submitUserReport(input: {
   const reporterId = input.reporterId.trim();
   const targetId = input.targetUserId.trim();
   const reason = input.reason.trim();
-  if (!reporterId) return { ok: false, error: 'ログインが必要です' };
-  if (!targetId) return { ok: false, error: '通報対象が不正です' };
+  if (!reporterId) return { ok: false, error: 'errors.loginRequired' };
+  if (!targetId) return { ok: false, error: 'errors.invalidTarget' };
   if (targetId === reporterId) {
-    return { ok: false, error: '自分自身は通報できません' };
+    return { ok: false, error: 'errors.cannotReportSelf' };
   }
-  if (!reason) return { ok: false, error: '通報理由を入力してください' };
+  if (!reason) return { ok: false, error: 'errors.reportReasonRequired' };
   if (reason.length > 2000) {
-    return { ok: false, error: '通報理由が長すぎます' };
+    return { ok: false, error: 'errors.reportTooLong' };
   }
 
   try {
@@ -40,7 +40,7 @@ export async function submitUserReport(input: {
         reporter_id: reporterId,
         target_id: targetId,
         target_type: input.targetType ?? 'user',
-        target_name: input.targetName.trim() || 'ユーザー',
+        target_name: input.targetName.trim() || 'user',
         reason,
         status: 'open',
       })
@@ -56,10 +56,10 @@ export async function submitUserReport(input: {
       ) {
         return {
           ok: false,
-          error: '通報テーブルが未作成です。運営にお問い合わせください。',
+          error: 'errors.reportTableMissing',
         };
       }
-      return { ok: false, error: error.message || '通報の送信に失敗しました' };
+      return { ok: false, error: error.message || 'errors.reportFailed' };
     }
 
     return {
@@ -69,7 +69,7 @@ export async function submitUserReport(input: {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : '通報の送信に失敗しました',
+      error: error instanceof Error ? error.message : 'errors.reportFailed',
     };
   }
 }

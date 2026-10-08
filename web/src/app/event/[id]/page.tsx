@@ -16,7 +16,8 @@ import {
   formatPrice,
   formatWhen,
 } from '@/lib/eventSeo';
-import { eventStatusLabel, getEventStatus } from '@/lib/types';
+import { getServerT } from '@/lib/i18n/server';
+import { eventStatusMessageKey, getEventStatus } from '@/lib/types';
 
 /** 5分ごとにサーバーで HTML を作り直す。リクエストのたびに動的描画はしない。 */
 export const revalidate = 300;
@@ -39,9 +40,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   const event = await getPublicEvent(id);
+  const t = await getServerT();
   if (!event) {
     return {
-      title: 'イベントが見つかりません',
+      title: t('event.notFound'),
       robots: { index: false, follow: false },
     };
   }
@@ -51,19 +53,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function EventPage({ params }: PageProps) {
   const { id } = await params;
   const event = await getPublicEvent(id);
+  const t = await getServerT();
 
   if (!event) notFound();
 
   const jsonLd = JSON.stringify(eventJsonLd(event)).replace(/</g, '\\u003c');
   const photo = absoluteImageUrl(event.imageUri);
-  const gallery = photo ? [photo, sportCover(event.sport)].filter((src, index, all) => all.indexOf(src) === index) : [sportCover(event.sport)];
+  const gallery = photo
+    ? [photo, sportCover(event.sport)].filter(
+        (src, index, all) => all.indexOf(src) === index,
+      )
+    : [sportCover(event.sport)];
   const status = getEventStatus(event);
 
   return (
     <main className="page-main pb-36 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)] lg:items-start lg:gap-6 lg:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <article>
-        <nav aria-label="パンくず" className="mb-3">
+        <nav aria-label={t('event.breadcrumb')} className="mb-3">
           <EventBackLink />
         </nav>
 
@@ -82,7 +89,7 @@ export default async function EventPage({ params }: PageProps) {
         <div className="pt-4">
           <p className="text-xs font-extrabold text-[#12B8D0]">
             <Link href="/" className="hover:underline">
-              イベント一覧
+              {t('event.list')}
             </Link>
             {event.sport ? (
               <>
@@ -104,28 +111,28 @@ export default async function EventPage({ params }: PageProps) {
                     : 'bg-[#8A9199]'
               }`}
             >
-              {eventStatusLabel(status)}
+              {t(eventStatusMessageKey(status))}
             </span>
           </div>
 
-          <section aria-label="イベントの要点" className="card-shadow mt-4 p-4">
+          <section aria-label={t('event.highlights')} className="card-shadow mt-4 p-4">
             <p className="answer">{eventAnswer(event)}</p>
             <dl className="facts">
               <div>
-                <dt>日時</dt>
-                <dd>{formatWhen(event.eventDate, event.eventTime)}</dd>
+                <dt>{t('event.when')}</dt>
+                <dd>{formatWhen(event.eventDate, event.eventTime, t)}</dd>
               </div>
               <div>
-                <dt>場所</dt>
-                <dd>{event.location || '場所未定'}</dd>
+                <dt>{t('event.where')}</dt>
+                <dd>{event.location || t('event.placeUnknown')}</dd>
               </div>
               <div>
-                <dt>料金</dt>
-                <dd>{formatPrice(event.priceYen)}</dd>
+                <dt>{t('event.price')}</dt>
+                <dd>{formatPrice(event.priceYen, t)}</dd>
               </div>
               <div>
-                <dt>対象レベル</dt>
-                <dd>{event.level || '指定なし'}</dd>
+                <dt>{t('event.level')}</dt>
+                <dd>{event.level || t('event.levelAny')}</dd>
               </div>
             </dl>
           </section>

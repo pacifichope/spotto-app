@@ -20,7 +20,9 @@ import {
   signInWithGoogle,
 } from '@/lib/firebase';
 import { formatPrice } from '@/lib/eventSeo';
+import { useT } from '@/lib/i18n/locale-context';
 import { confirmHostedCheckout, createHostedCheckout } from '@/lib/payments';
+import { fetchMyParticipantTicket, ticketHref } from '@/lib/ticket';
 import { isEventPast, type PublicEvent } from '@/lib/types';
 
 const socialButtonClass =
@@ -59,13 +61,39 @@ function BookControls({
   checkoutSessionId = '',
 }: BookPanelProps) {
   const { user: authUser } = useAuth();
+  const t = useT();
   const [user, setUser] = useState<User | null>(null);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<'ok' | 'error'>('ok');
   const [busy, setBusy] = useState(false);
+  const [joined, setJoined] = useState(false);
 
   useEffect(() => {
     if (authUser) setUser(authUser);
+    else {
+      setUser(null);
+      setJoined(false);
+    }
   }, [authUser]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void fetchMyParticipantTicket({
+      eventId: event.id,
+      userId: user.uid,
+      getIdToken: async () => idTokenWithAuthenticatedRole(user),
+    })
+      .then((ticket) => {
+        if (!cancelled) setJoined(Boolean(ticket));
+      })
+      .catch(() => {
+        if (!cancelled) setJoined(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, event.id]);
 
   async function signIn(kind: 'google' | 'apple' | 'line') {
     setBusy(true);
@@ -78,9 +106,9 @@ function BookControls({
       const next = kind === 'google' ? await signInWithGoogle() : await signInWithApple();
       setUser(next);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'ログインに失敗しました');
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : t('auth.loginFailed'));
     } finally {
-      // キャンセル・エラー・LINE 画面遷移のいずれでもボタンを戻す
       setBusy(false);
     }
   }
@@ -99,7 +127,8 @@ function BookControls({
         if (returnStatus === 'success' && checkoutSessionId) {
           const confirmed = await confirmHostedCheckout(checkoutSessionId);
           if (!confirmed.paid) {
-            setMessage('決済が完了していません');
+            setMessageTone('error');
+            setMessage(t('event.paymentIncomplete'));
             return;
           }
         } else {
@@ -108,7 +137,7 @@ function BookControls({
             title: event.title,
             amountYen: event.priceYen,
           });
-          if (!session.checkoutUrl) throw new Error('決済 URL がありません');
+          if (!session.checkoutUrl) throw new Error(t('event.paymentUrlMissing'));
           window.location.assign(session.checkoutUrl);
           return;
         }
@@ -121,21 +150,24 @@ function BookControls({
         avatarUrl: user.photoURL,
         getIdToken,
       });
-      setMessage('参加を登録しました');
+      setJoined(true);
+      setMessageTone('ok');
+      setMessage(t('event.joinRegistered'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '予約に失敗しました');
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : t('event.bookFailed'));
     } finally {
       setBusy(false);
     }
   }
 
   const label = ended
-    ? 'イベント終了'
+    ? t('event.ended')
     : busy
-      ? '処理中…'
+      ? t('event.processing')
       : event.priceYen > 0
-        ? '支払って参加する'
-        : '参加する';
+        ? t('event.payToJoin')
+        : t('event.join');
 
   return (
     <div className="glass fixed inset-x-0 bottom-[72px] z-30 px-4 py-3 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:p-5">
@@ -144,37 +176,46 @@ function BookControls({
           ended ? 'text-[#8A9199]' : 'text-[#12B8D0]'
         }`}
       >
-        {ended ? '受付終了' : '参加する'}
+        {ended ? t('event.closed') : t('event.join')}
       </p>
       <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">
-        {formatPrice(event.priceYen)}
+        {formatPrice(event.priceYen, t)}
       </p>
       {user ? (
         <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={busy || ended}
-            onClick={() => void reserve()}
-            className={`h-12 w-full rounded-full text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-70 ${
-              ended
-                ? 'bg-[#94A3B8] text-white'
-                : 'brand-gradient disabled:opacity-60'
-            }`}
-          >
-            {label}
-          </button>
+          {joined ? (
+            <Link
+              href={ticketHref(event.id)}
+              className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold"
+            >
+              {t('ticket.viewTicket')}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || ended}
+              onClick={() => void reserve()}
+              className={`h-12 w-full rounded-full text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-70 ${
+                ended
+                  ? 'bg-[#94A3B8] text-white'
+                  : 'brand-gradient disabled:opacity-60'
+              }`}
+            >
+              {label}
+            </button>
+          )}
           <Link
             href={chatHref(event.id, 'group')}
             className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
           >
-            グループチャット
+            {t('event.groupChat')}
           </Link>
           {event.hostId && event.hostId !== user.uid ? (
             <Link
               href={chatHref(event.id, 'host', event.hostId)}
               className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
             >
-              主催者にメッセージ
+              {t('event.messageHost')}
             </Link>
           ) : null}
         </div>
@@ -184,7 +225,7 @@ function BookControls({
           disabled
           className="h-12 w-full cursor-not-allowed rounded-full bg-[#94A3B8] text-sm font-extrabold text-white opacity-70"
         >
-          イベント終了
+          {t('event.ended')}
         </button>
       ) : (
         <div className="flex flex-col gap-2">
@@ -195,7 +236,7 @@ function BookControls({
             className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
           >
             <GoogleGMark size={20} />
-            <span>Googleでログイン</span>
+            <span>{t('auth.google')}</span>
           </button>
           <button
             type="button"
@@ -204,7 +245,7 @@ function BookControls({
             className={`${socialButtonClass} bg-[#111111] text-white`}
           >
             <AppleLogoMark size={18} color="#FFFFFF" />
-            <span>Appleでサインイン</span>
+            <span>{t('auth.apple')}</span>
           </button>
           <button
             type="button"
@@ -213,14 +254,14 @@ function BookControls({
             className={`${socialButtonClass} bg-[#06C755] text-white`}
           >
             <LineSpeechMark size={22} color="#FFFFFF" />
-            <span>LINEでログイン</span>
+            <span>{t('auth.line')}</span>
           </button>
         </div>
       )}
       {message ? (
         <p
           className={`mt-2 text-center text-xs font-bold ${
-            message.includes('失敗') || message.includes('ません') ? 'text-[#EF4444]' : 'text-[#5B6B75]'
+            messageTone === 'error' ? 'text-[#EF4444]' : 'text-[#5B6B75]'
           }`}
         >
           {message}

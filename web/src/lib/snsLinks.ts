@@ -14,7 +14,7 @@ export const SNS_KIND_OPTIONS: {
   { kind: 'instagram', label: 'Instagram', color: '#E1306C' },
   { kind: 'x', label: 'X', color: '#000000' },
   { kind: 'line', label: 'LINE', color: '#06C755' },
-  { kind: 'web', label: '公式サイト', color: '#0EA5E9' },
+  { kind: 'web', label: 'Website', color: '#0EA5E9' },
 ];
 
 const LEGACY_SNS_KINDS = new Set(['youtube', 'facebook']);

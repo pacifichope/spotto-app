@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ClubDetailScreen } from '@/components/ClubDetailScreen';
+import { getServerT } from '@/lib/i18n/server';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -9,8 +10,9 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   const clubId = decodeURIComponent(id || '').trim();
+  const t = await getServerT();
   return {
-    title: clubId ? 'クラブ詳細' : 'クラブが見つかりません',
+    title: clubId ? t('meta.clubDetail') : t('clubs.notFound'),
     robots: { index: false, follow: false },
   };
 }

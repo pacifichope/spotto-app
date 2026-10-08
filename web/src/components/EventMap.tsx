@@ -24,8 +24,10 @@ import {
 } from '@/constants/theme';
 import { absoluteImageUrl, formatPrice, formatWhen } from '@/lib/eventSeo';
 import { googleMapsApiKey } from '@/lib/env';
+import { sportLabel } from '@/lib/i18n/labels';
+import { useLocale, useT } from '@/lib/i18n/locale-context';
 import {
-  eventStatusLabel,
+  eventStatusMessageKey,
   getEventStatus,
   type PublicEvent,
 } from '@/lib/types';
@@ -195,7 +197,7 @@ function MapIdleBridge({
 
 function UserLocationDot({ coords }: { coords: LatLng }) {
   return (
-    <AdvancedMarker position={toMapLatLng(coords)} title="現在地" zIndex={30}>
+    <AdvancedMarker position={toMapLatLng(coords)} title="current-location" zIndex={30}>
       <div className="relative h-5 w-5" aria-hidden>
         <span className="absolute inset-0 rounded-full bg-[#29D1E8]/40 animate-ping" />
         <span className="absolute inset-[3px] rounded-full border-2 border-white bg-[#12B8D0] shadow" />
@@ -265,9 +267,10 @@ function MapPreviewCard({
   event: MappableEvent;
   onClose: () => void;
 }) {
+  const t = useT();
   const image = absoluteImageUrl(event.imageUri) || sportCover(event.sport);
-  const when = formatWhen(event.eventDate, event.eventTime);
-  const where = event.location || '場所未定';
+  const when = formatWhen(event.eventDate, event.eventTime, t) || t('event.whenUnknown');
+  const where = event.location || t('map.placeUnknown');
   const status = getEventStatus(event);
   const ended = status === 'ended';
 
@@ -281,7 +284,7 @@ function MapPreviewCard({
         <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-[#E4EBEE]" />
         <button
           type="button"
-          aria-label="閉じる"
+          aria-label={t('map.close')}
           onClick={onClose}
           className="absolute right-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
         >
@@ -301,11 +304,13 @@ function MapPreviewCard({
               }`}
             >
               {ended
-                ? eventStatusLabel(status)
-                : [event.sport || 'スポーツ', event.level].filter(Boolean).join(' · ')}
+                ? t(eventStatusMessageKey(status))
+                : [sportLabel(event.sport, t) || t('sport.generic'), event.level]
+                    .filter(Boolean)
+                    .join(' · ')}
             </p>
             <h2 className="mt-0.5 line-clamp-2 text-base font-extrabold tracking-tight leading-5">
-              {event.title}
+              {event.title.trim() || t('event.untitled')}
             </h2>
             <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-[#5B6B75]">
               <Clock size={13} className="shrink-0" />
@@ -318,12 +323,12 @@ function MapPreviewCard({
           </div>
         </Link>
         <div className="mt-3.5 flex items-center justify-between gap-3">
-          <p className="text-lg font-extrabold tracking-tight">{formatPrice(event.priceYen)}</p>
+          <p className="text-lg font-extrabold tracking-tight">{formatPrice(event.priceYen, t)}</p>
           <Link
             href={`/event/${event.id}`}
             className="brand-gradient rounded-full px-4 py-2.5 text-[13px] font-extrabold"
           >
-            詳細を見る
+            {t('map.viewDetail')}
           </Link>
         </div>
       </div>
@@ -345,6 +350,7 @@ function GoogleEventMap({
     EventMapProps,
     'userCoords' | 'locating' | 'onRecenter' | 'recenterKey' | 'onSearchArea'
   >) {
+  const t = useT();
   const mappable = useMemo(() => toMappable(events), [events]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = mappable.find((event) => event.id === selectedId) ?? null;
@@ -370,7 +376,7 @@ function GoogleEventMap({
   }, [mappable, selectedId]);
 
   return (
-    <div className="card-shadow relative h-[68vh] min-h-[480px] overflow-hidden">
+    <div className="card-shadow relative h-[min(72vh,820px)] min-h-[520px] w-full overflow-hidden">
       <Map
         defaultCenter={center}
         defaultZoom={NEARBY_ZOOM}
@@ -422,23 +428,23 @@ function GoogleEventMap({
             className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-sm font-extrabold text-[#12202A] shadow-[0_8px_24px_rgba(18,32,42,0.14)] ring-1 ring-[#E4EBEE] transition hover:bg-white"
           >
             <RefreshCw size={15} strokeWidth={2.4} className="text-[#12B8D0]" />
-            このエリアで再検索
+            {t('map.searchThisArea')}
           </button>
         </div>
       ) : null}
 
       <div className="absolute left-3 top-3 z-20 rounded-full bg-white/95 px-3 py-1 text-[11px] font-extrabold text-[#5B6B75] shadow-sm">
-        マップ · {mappable.length}件
+        {t('map.mapCount', { count: mappable.length })}
         {events.length > mappable.length
-          ? `（位置不明 ${events.length - mappable.length}件は非表示）`
+          ? t('map.unknownHidden', { count: events.length - mappable.length })
           : ''}
-        {locating ? ' · 現在地を取得中…' : ''}
+        {locating ? t('map.locatingSuffix') : ''}
       </div>
 
       {onRecenter ? (
         <button
           type="button"
-          aria-label="現在地へ移動"
+          aria-label={t('map.recenterAria')}
           disabled={locating}
           onClick={onRecenter}
           className="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/95 text-[#12B8D0] shadow-sm disabled:opacity-60"
@@ -449,11 +455,11 @@ function GoogleEventMap({
 
       {events.length === 0 ? (
         <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
-          この範囲に条件に合うイベントはありません
+          {t('map.emptyInArea')}
         </p>
       ) : mappable.length === 0 ? (
         <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
-          表示できる位置情報のあるイベントがありません
+          {t('map.noCoords')}
         </p>
       ) : null}
 
@@ -474,19 +480,21 @@ export function EventMap({
   recenterKey = 0,
   onSearchArea,
 }: EventMapProps) {
+  const t = useT();
+  const { locale } = useLocale();
   const apiKey = googleMapsApiKey();
   const resolvedCenter = center ?? DEFAULT_CENTER;
 
   if (!apiKey) {
     return (
       <div className="card-shadow grid h-[420px] place-items-center px-6 text-center text-sm font-bold text-[#5B6B75]">
-        Google Maps を表示するには `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` を設定してください。
+        {t('map.missingKey')}
       </div>
     );
   }
 
   return (
-    <APIProvider apiKey={apiKey} language="ja" region="JP">
+    <APIProvider apiKey={apiKey} language={locale === 'en' ? 'en' : 'ja'} region="JP">
       <GoogleEventMap
         events={events}
         center={resolvedCenter}

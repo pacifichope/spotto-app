@@ -15,23 +15,23 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 
 export const NOTIFICATION_PREF_ROWS: {
   key: NotificationPreferenceKey;
-  label: string;
-  caption: string;
+  labelKey: string;
+  captionKey: string;
 }[] = [
   {
     key: 'eventReminders',
-    label: 'イベントのリマインダー',
-    caption: '前日・当日の開始をお知らせします',
+    labelKey: 'notifications.reminders',
+    captionKey: 'notifications.remindersCaption',
   },
   {
     key: 'chatMessages',
-    label: 'メッセージ・チャットの通知',
-    caption: '新しいメッセージを受け取ります',
+    labelKey: 'notifications.chat',
+    captionKey: 'notifications.chatCaption',
   },
   {
     key: 'eventUpdates',
-    label: 'イベントの更新・変更のお知らせ',
-    caption: '時間・場所などの変更をお知らせします',
+    labelKey: 'notifications.updates',
+    captionKey: 'notifications.updatesCaption',
   },
 ];
 
@@ -185,6 +185,23 @@ export async function ensureBrowserNotificationPermission(): Promise<
   }
 }
 
+/** i18n キー（notifications.perm*） */
+export function browserPermissionMessageKey(
+  permission: BrowserNotificationPermission,
+) {
+  switch (permission) {
+    case 'granted':
+      return 'notifications.permGranted';
+    case 'denied':
+      return 'notifications.permBlocked';
+    case 'default':
+      return 'notifications.permDefault';
+    default:
+      return 'notifications.permUnavailable';
+  }
+}
+
+/** @deprecated use browserPermissionMessageKey + t() */
 export function browserPermissionLabel(permission: BrowserNotificationPermission) {
   switch (permission) {
     case 'granted':

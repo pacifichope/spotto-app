@@ -13,8 +13,10 @@ import {
   type BlockedUser,
 } from '@/lib/blocks';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useT } from '@/lib/i18n/locale-context';
 
 function BlocklistBody() {
+  const t = useT();
   const searchParams = useSearchParams();
   const from = searchParams.get('from') || searchParams.get('mode') || '';
   const settingsBackHref = from
@@ -43,15 +45,13 @@ function BlocklistBody() {
       setUsers(next);
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'ブロックリストの取得に失敗しました',
+        caught instanceof Error ? caught.message : t('blocklist.fetchFailed'),
       );
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     void reload();
@@ -62,7 +62,6 @@ function BlocklistBody() {
     const target = pending;
     setBusy(true);
     setError('');
-    // 楽観的に一覧から外す
     setUsers((prev) => prev.filter((item) => item.id !== target.id));
     setPending(null);
     try {
@@ -77,9 +76,7 @@ function BlocklistBody() {
         return [...prev, target].sort((a, b) => b.blockedAt - a.blockedAt);
       });
       setError(
-        caught instanceof Error
-          ? caught.message
-          : 'ブロック解除に失敗しました',
+        caught instanceof Error ? caught.message : t('blocklist.unblockFailed'),
       );
     } finally {
       setBusy(false);
@@ -89,8 +86,8 @@ function BlocklistBody() {
   if (!authReady) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">ブロックリスト</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
       </main>
     );
   }
@@ -98,17 +95,15 @@ function BlocklistBody() {
   return (
     <main className="page-main pt-4 md:pt-2">
       <Link href={settingsBackHref} className="text-sm font-extrabold text-[#12B8D0]">
-        ← 設定
+        {t('blocklist.backSettings')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">ブロックリスト</h1>
-      <p className="mt-1 text-sm font-bold text-[#5B6B75]">
-        ブロック中のユーザーのイベントやメッセージは表示されません。
-      </p>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
+      <p className="mt-1 text-sm font-bold text-[#5B6B75]">{t('blocklist.subtitle')}</p>
 
       {!user ? (
-        <LoginPromptCard title="ログインしてブロックリストを確認" />
+        <LoginPromptCard title={t('blocklist.loginTitle')} />
       ) : loading && users.length === 0 ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
       ) : error && users.length === 0 ? (
         <section className="card-shadow mt-5 px-5 py-6 text-center">
           <p className="text-sm font-bold text-[#EF4444]">{error}</p>
@@ -117,16 +112,14 @@ function BlocklistBody() {
             onClick={() => void reload()}
             className="mt-3 text-sm font-extrabold text-[#12B8D0]"
           >
-            再読み込み
+            {t('common.reload')}
           </button>
         </section>
       ) : users.length === 0 ? (
         <section className="card-shadow mt-5 px-5 py-10 text-center">
-          <p className="text-base font-extrabold">
-            現在、ブロックしているユーザーはいません
-          </p>
+          <p className="text-base font-extrabold">{t('blocklist.emptyTitle')}</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
-            プロフィールやチャットからブロックすると、その人のイベントやメッセージが非表示になります。
+            {t('blocklist.emptyBody')}
           </p>
         </section>
       ) : (
@@ -157,17 +150,17 @@ function BlocklistBody() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold">{item.name}</p>
                   <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
-                    {item.bio?.trim() || 'ブロック中'}
+                    {item.bio?.trim() || t('blocklist.blocked')}
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={busy}
-                  aria-label={`${item.name}のブロックを解除`}
+                  aria-label={t('blocklist.unblockAria', { name: item.name })}
                   onClick={() => setPending(item)}
                   className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[13px] font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE] transition hover:bg-[#F7FBFC] disabled:opacity-60"
                 >
-                  ブロック解除
+                  {t('blocklist.unblock')}
                 </button>
               </div>
             ))}
@@ -179,11 +172,15 @@ function BlocklistBody() {
         open={pending != null}
         title={
           pending
-            ? `${pending.name} のブロックを解除しますか？`
-            : 'ブロックを解除しますか？'
+            ? t('blocklist.confirmTitleNamed', { name: pending.name })
+            : t('blocklist.confirmTitle')
         }
-        description="解除すると、この人のイベントやメッセージが再び表示されます。"
-        confirmLabel="解除する"
+        description={
+          pending
+            ? t('blocklist.confirmBody', { name: pending.name })
+            : t('blocklist.confirmTitle')
+        }
+        confirmLabel={t('blocklist.confirm')}
         busy={busy}
         onCancel={() => {
           if (!busy) setPending(null);
@@ -195,12 +192,13 @@ function BlocklistBody() {
 }
 
 export function BlocklistScreen() {
+  const t = useT();
   return (
     <Suspense
       fallback={
         <main className="page-main pt-4 md:pt-2">
-          <h1 className="text-2xl font-extrabold tracking-tight">ブロックリスト</h1>
-          <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
+          <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('blocklist.loading')}</p>
         </main>
       }
     >

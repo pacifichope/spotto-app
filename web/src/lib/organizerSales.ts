@@ -2,8 +2,6 @@ import { createAuthedSupabase } from '@/lib/supabase';
 
 /** ガイドライン: プラットフォーム利用料 一律 10% */
 export const PLATFORM_FEE_RATE = 0.1;
-/** 決済手数料（Stripe カード決済の目安 3.6%） */
-export const PAYMENT_FEE_RATE = 0.036;
 /** 振込手数料 一律 500円（税込）/ 振込回 */
 export const PAYOUT_FEE_YEN = 500;
 
@@ -23,7 +21,6 @@ export type EventSalesBreakdown = {
   confirmed: boolean;
   confirmedGrossYen: number;
   pendingGrossYen: number;
-  paymentFeeYen: number;
   platformFeeYen: number;
   netAfterPlatformYen: number;
 };
@@ -36,7 +33,6 @@ export type OrganizerSalesSummary = {
   grossYen: number;
   confirmedGrossYen: number;
   pendingGrossYen: number;
-  paymentFeeYen: number;
   platformFeeYen: number;
   payoutFeeYen: number;
   netYen: number;
@@ -110,25 +106,23 @@ export function currentSalesYearMonth() {
   return formatSalesYearMonth(now.getFullYear(), now.getMonth() + 1);
 }
 
+/** Net = confirmed sales − platform fee − transfer fee（月1回） */
 export function calcPayoutBreakdown(grossYen: number) {
   const gross = yen(grossYen);
-  const paymentFeeYen = yen(gross * PAYMENT_FEE_RATE);
   const platformFeeYen = yen(gross * PLATFORM_FEE_RATE);
-  const afterFees = Math.max(0, gross - paymentFeeYen - platformFeeYen);
-  const payoutFeeYen = afterFees > 0 ? PAYOUT_FEE_YEN : 0;
-  const netYen = Math.max(0, afterFees - payoutFeeYen);
-  return { grossYen: gross, paymentFeeYen, platformFeeYen, payoutFeeYen, netYen };
+  const afterPlatform = Math.max(0, gross - platformFeeYen);
+  const payoutFeeYen = afterPlatform > 0 ? PAYOUT_FEE_YEN : 0;
+  const netYen = Math.max(0, afterPlatform - payoutFeeYen);
+  return { grossYen: gross, platformFeeYen, payoutFeeYen, netYen };
 }
 
 export function calcEventPlatformFee(grossYen: number) {
   const gross = yen(grossYen);
-  const paymentFeeYen = yen(gross * PAYMENT_FEE_RATE);
   const platformFeeYen = yen(gross * PLATFORM_FEE_RATE);
   return {
     grossYen: gross,
-    paymentFeeYen,
     platformFeeYen,
-    netAfterPlatformYen: Math.max(0, gross - paymentFeeYen - platformFeeYen),
+    netAfterPlatformYen: Math.max(0, gross - platformFeeYen),
   };
 }
 
@@ -190,7 +184,6 @@ function buildBreakdown(
         confirmed,
         confirmedGrossYen: 0,
         pendingGrossYen: 0,
-        paymentFeeYen: 0,
         platformFeeYen: 0,
         netAfterPlatformYen: 0,
         _confirmedGross: confirmed ? sale.amountYen : 0,
@@ -212,7 +205,6 @@ function buildBreakdown(
         confirmed: row.confirmed,
         confirmedGrossYen: row._confirmedGross,
         pendingGrossYen: row._pendingGross,
-        paymentFeeYen: fee.paymentFeeYen,
         platformFeeYen: fee.platformFeeYen,
         netAfterPlatformYen: fee.netAfterPlatformYen,
       };
@@ -241,7 +233,6 @@ export async function fetchOrganizerSalesSummary(input: {
     grossYen: 0,
     confirmedGrossYen: 0,
     pendingGrossYen: 0,
-    paymentFeeYen: 0,
     platformFeeYen: 0,
     payoutFeeYen: 0,
     netYen: 0,
@@ -351,7 +342,6 @@ export async function fetchOrganizerSalesSummary(input: {
     grossYen: confirmedGrossYen + pendingGrossYen,
     confirmedGrossYen,
     pendingGrossYen,
-    paymentFeeYen: fees.paymentFeeYen,
     platformFeeYen: fees.platformFeeYen,
     payoutFeeYen: fees.payoutFeeYen,
     netYen: fees.netYen,

@@ -6,9 +6,11 @@ import { useEffect, useState } from 'react';
 import { EventCard } from '@/components/EventCard';
 import { SnsBrandIcon } from '@/components/SnsBrandIcon';
 import { fetchClubDetail, type ClubDetail } from '@/lib/clubs';
+import { useT } from '@/lib/i18n/locale-context';
 import { snsKindMeta } from '@/lib/snsLinks';
 
 export function ClubDetailScreen({ clubId }: { clubId: string }) {
+  const t = useT();
   const [club, setClub] = useState<ClubDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,7 +20,7 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
     if (!id) {
       setClub(null);
       setLoading(false);
-      setError('クラブが見つかりません');
+      setError(t('clubs.notFound'));
       return;
     }
     let cancelled = false;
@@ -28,13 +30,13 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
       .then((next) => {
         if (cancelled) return;
         setClub(next);
-        if (!next) setError('クラブが見つかりません');
+        if (!next) setError(t('clubs.notFound'));
       })
       .catch((caught) => {
         if (cancelled) return;
         setClub(null);
         setError(
-          caught instanceof Error ? caught.message : 'クラブの取得に失敗しました',
+          caught instanceof Error ? caught.message : t('clubs.fetchFailed'),
         );
       })
       .finally(() => {
@@ -43,27 +45,24 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [clubId]);
+  }, [clubId, t]);
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link
-        href="/clubs"
-        className="text-sm font-extrabold text-[#12B8D0]"
-      >
-        ← 参加したクラブ
+      <Link href="/clubs" className="text-sm font-extrabold text-[#12B8D0]">
+        {t('clubs.backList')}
       </Link>
 
       {loading ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('clubs.loading')}</p>
       ) : error || !club ? (
         <section className="card-shadow mt-5 px-5 py-10 text-center">
-          <p className="text-base font-extrabold">{error || 'クラブが見つかりません'}</p>
+          <p className="text-base font-extrabold">{error || t('clubs.notFound')}</p>
           <Link
             href="/clubs"
             className="brand-gradient mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-extrabold"
           >
-            一覧に戻る
+            {t('clubs.backToList')}
           </Link>
         </section>
       ) : (
@@ -109,14 +108,14 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
                   {club.bio}
                 </p>
               ) : (
-                <p className="mt-4 text-sm font-bold text-[#8A9199]">
-                  紹介文はまだありません
-                </p>
+                <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('clubs.noBio')}</p>
               )}
               {club.snsLinks.length > 0 ? (
                 <div className="mt-4 flex flex-wrap gap-3">
                   {club.snsLinks.map((link) => {
                     const meta = snsKindMeta(link.kind);
+                    const label =
+                      link.kind === 'web' ? t('sns.website') : meta.label;
                     return (
                       <a
                         key={link.id}
@@ -124,11 +123,11 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex w-[68px] flex-col items-center gap-1.5 transition hover:opacity-80"
-                        aria-label={`${meta.label}を開く`}
+                        aria-label={t('clubs.openSns', { label })}
                       >
                         <SnsBrandIcon kind={link.kind} size={44} />
                         <span className="w-full truncate text-center text-[11px] font-extrabold text-[#5B6B75]">
-                          {meta.label}
+                          {label}
                         </span>
                       </a>
                     );
@@ -139,15 +138,15 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
           </section>
 
           <div className="mt-6 flex items-end justify-between gap-3 px-1">
-            <h2 className="text-lg font-extrabold tracking-tight">開催イベント</h2>
-            <p className="text-sm font-bold text-[#5B6B75]">{club.events.length}件</p>
+            <h2 className="text-lg font-extrabold tracking-tight">{t('clubs.events')}</h2>
+            <p className="text-sm font-bold text-[#5B6B75]">
+              {t('clubs.count', { count: club.events.length })}
+            </p>
           </div>
 
           {club.events.length === 0 ? (
             <section className="card-shadow mt-3 px-5 py-8 text-center">
-              <p className="text-sm font-bold text-[#5B6B75]">
-                公開中のイベントはまだありません
-              </p>
+              <p className="text-sm font-bold text-[#5B6B75]">{t('clubs.noEvents')}</p>
             </section>
           ) : (
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -87,18 +87,18 @@ export function eventDetailHref(
 /** イベント詳細の「戻る」先（未知の from は一覧へ） */
 export function parseEventBackNav(
   searchParams: URLSearchParams | { get: (key: string) => string | null },
-): { href: string; label: string } {
+): { href: string; labelKey: 'mypage.backToMypage' | 'event.backToList' } {
   const from = (searchParams.get('from') || '').trim().toLowerCase();
   if (from === 'mypage') {
     const mode = parseMyPageMode(searchParams);
     const segment = parseMyPageSegment(searchParams, mode) ?? undefined;
     return {
       href: mypageHref({ mode, segment }),
-      label: 'マイページに戻る',
+      labelKey: 'mypage.backToMypage',
     };
   }
   return {
     href: '/',
-    label: 'イベント一覧に戻る',
+    labelKey: 'event.backToList',
   };
 }

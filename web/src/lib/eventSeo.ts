@@ -30,17 +30,26 @@ function dateParts(value: string) {
   return { year: match[1], month: Number(match[2]), day: Number(match[3]) };
 }
 
-export function formatWhen(date: string, time: string) {
+type TranslateFn = (key: string, params?: Record<string, string | number>) => string;
+
+export function formatWhen(date: string, time: string, t?: TranslateFn) {
   const parts = dateParts(date);
-  if (!parts) return '日時未定';
-  const label = `${parts.year}年${parts.month}月${parts.day}日`;
+  if (!parts) return t ? t('event.whenUnknown') : '日時未定';
+  const label = t
+    ? t('event.dateYmd', {
+        year: parts.year,
+        month: parts.month,
+        day: parts.day,
+      })
+    : `${parts.year}年${parts.month}月${parts.day}日`;
   const clock = time.trim();
   return clock ? `${label} ${clock}` : label;
 }
 
-export function formatPrice(priceYen: number) {
-  if (priceYen <= 0) return '無料';
-  return `${priceYen.toLocaleString('ja-JP')}円`;
+export function formatPrice(priceYen: number, t?: TranslateFn) {
+  if (priceYen <= 0) return t ? t('common.free') : '無料';
+  const amount = priceYen.toLocaleString('ja-JP');
+  return t ? t('event.priceYen', { amount }) : `${amount}円`;
 }
 
 /** AI が先頭だけで引用できる一文。 */

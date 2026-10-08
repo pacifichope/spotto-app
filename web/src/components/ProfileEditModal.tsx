@@ -10,6 +10,7 @@ import {
   type WebUserGender,
   type WebUserProfile,
 } from '@/lib/profile';
+import { useT } from '@/lib/i18n/locale-context';
 
 type ProfileEditModalProps = {
   open: boolean;
@@ -20,10 +21,7 @@ type ProfileEditModalProps = {
   onSaved: (profile: WebUserProfile) => void;
 };
 
-const GENDERS: { id: Exclude<WebUserGender, ''>; label: string }[] = [
-  { id: '男性', label: '男性' },
-  { id: '女性', label: '女性' },
-];
+const GENDER_IDS: Exclude<WebUserGender, ''>[] = ['男性', '女性'];
 
 export function ProfileEditModal({
   open,
@@ -33,6 +31,7 @@ export function ProfileEditModal({
   onClose,
   onSaved,
 }: ProfileEditModalProps) {
+  const t = useT();
   const titleId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<WebUserProfile>(profile);
@@ -65,7 +64,7 @@ export function ProfileEditModal({
   if (!open) return null;
 
   const busy = saving || uploading;
-  const previewName = draft.name.trim() || 'ユーザー';
+  const previewName = draft.name.trim() || t('common.user');
 
   async function onPickFile(file: File | undefined) {
     if (!file || uploading) return;
@@ -88,7 +87,7 @@ export function ProfileEditModal({
     if (busy) return;
     const name = draft.name.trim();
     if (!name) {
-      setError('名前を入力してください');
+      setError(t('profile.nameRequired'));
       return;
     }
     setSaving(true);
@@ -114,7 +113,7 @@ export function ProfileEditModal({
     <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
-        aria-label="閉じる"
+        aria-label={t('common.close')}
         disabled={busy}
         className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md disabled:cursor-not-allowed"
         onClick={() => {
@@ -134,10 +133,10 @@ export function ProfileEditModal({
             onClick={onClose}
             className="text-sm font-extrabold text-[#5B6B75] disabled:opacity-60"
           >
-            キャンセル
+            {t('common.cancel')}
           </button>
           <h2 id={titleId} className="text-base font-extrabold tracking-tight">
-            プロフィールを編集
+            {t('profile.editTitle')}
           </h2>
           <button
             type="button"
@@ -145,7 +144,7 @@ export function ProfileEditModal({
             onClick={() => void onSave()}
             className="text-sm font-extrabold text-[#12B8D0] disabled:opacity-60"
           >
-            {saving ? '保存中…' : '保存'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
 
@@ -156,7 +155,7 @@ export function ProfileEditModal({
               disabled={busy}
               onClick={() => fileRef.current?.click()}
               className="group relative"
-              aria-label="プロフィール写真を変更"
+              aria-label={t('profile.changePhoto')}
             >
               {draft.imageUri ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -184,7 +183,7 @@ export function ProfileEditModal({
               onClick={() => fileRef.current?.click()}
               className="mt-3 text-sm font-extrabold text-[#12B8D0] disabled:opacity-60"
             >
-              {uploading ? 'アップロード中…' : '写真を変更'}
+              {uploading ? t('common.uploading') : t('profile.changePhotoShort')}
             </button>
             <input
               ref={fileRef}
@@ -196,7 +195,7 @@ export function ProfileEditModal({
           </div>
 
           <label className="mt-8 block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">名前</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('profile.name')}</span>
             <input
               value={draft.name}
               onChange={(event) =>
@@ -204,24 +203,25 @@ export function ProfileEditModal({
               }
               disabled={busy}
               maxLength={40}
-              placeholder="表示名を入力"
+              placeholder={t('profile.namePlaceholder')}
               className="mt-2 h-12 w-full rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 text-sm font-bold text-[#12202A] outline-none ring-[#29D1E8]/35 placeholder:text-[#8A9199] focus:bg-white focus:ring-2 disabled:opacity-60"
             />
           </label>
 
           <fieldset className="mt-5">
-            <legend className="text-xs font-extrabold text-[#5B6B75]">性別</legend>
+            <legend className="text-xs font-extrabold text-[#5B6B75]">{t('profile.gender')}</legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              {GENDERS.map((item) => {
-                const active = draft.gender === item.id;
+              {GENDER_IDS.map((id) => {
+                const active = draft.gender === id;
+                const label = id === '男性' ? t('common.male') : t('common.female');
                 return (
                   <button
-                    key={item.id}
+                    key={id}
                     type="button"
                     disabled={busy}
                     aria-pressed={active}
                     onClick={() =>
-                      setDraft((prev) => ({ ...prev, gender: item.id }))
+                      setDraft((prev) => ({ ...prev, gender: id }))
                     }
                     className={`h-11 rounded-2xl text-sm font-extrabold transition disabled:opacity-60 ${
                       active
@@ -229,13 +229,13 @@ export function ProfileEditModal({
                         : 'bg-[#F4F7F8] text-[#5B6B75] ring-1 ring-[#E4EBEE]'
                     }`}
                   >
-                    {item.label}
+                    {label}
                   </button>
                 );
               })}
             </div>
             <p className="mt-2 text-[11px] font-bold leading-5 text-[#8A9199]">
-              アプリ版と同じ項目です。未選択のまま保存することもできます。
+              {t('profile.genderHint')}
             </p>
           </fieldset>
 
@@ -252,7 +252,7 @@ export function ProfileEditModal({
             className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE] disabled:opacity-60"
           >
             <X size={16} />
-            キャンセル
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -261,7 +261,7 @@ export function ProfileEditModal({
             className="brand-gradient flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-sm font-extrabold disabled:opacity-60"
           >
             <Pencil size={15} />
-            {saving ? '保存中…' : '保存する'}
+            {saving ? t('common.saving') : t('common.saveAction')}
           </button>
         </div>
       </div>

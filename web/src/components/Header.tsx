@@ -8,6 +8,11 @@ import {
   type PriceRange,
 } from '@/components/PriceRangeSlider';
 import { AREAS, CATEGORIES, type CategoryId } from '@/constants/theme';
+import {
+  areaLabel as translateArea,
+  categoryLabel as translateCategory,
+} from '@/lib/i18n/labels';
+import { useT } from '@/lib/i18n/locale-context';
 
 type HeaderProps = {
   area: string;
@@ -34,6 +39,8 @@ export function Header({
   onPriceRange,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
+  const t = useT();
+  const displayArea = areaLabel || translateArea(area, t);
 
   return (
     <div>
@@ -46,7 +53,7 @@ export function Header({
           onClick={() => setOpen((value) => !value)}
         >
           <span className="truncate text-base font-extrabold tracking-tight lg:text-lg">
-            {areaLabel ?? area}
+            {displayArea}
           </span>
           <ChevronDown size={14} strokeWidth={2.5} />
         </button>
@@ -67,7 +74,7 @@ export function Header({
                     setOpen(false);
                   }}
                 >
-                  {item}
+                  {translateArea(item, t)}
                 </button>
               </li>
             ))}
@@ -75,18 +82,22 @@ export function Header({
         ) : null}
       </div>
 
-      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">キーワード</p>
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">
+        {t('home.keyword')}
+      </p>
       <label className="glass flex h-11 items-center gap-2 rounded-full px-3.5">
         <Search size={16} className="shrink-0 text-[#8A9199]" />
         <input
           value={query}
           onChange={(event) => onQuery(event.target.value)}
-          placeholder="スポーツや場所を検索"
+          placeholder={t('home.searchPlaceholder')}
           className="min-w-0 flex-1 bg-transparent text-sm font-medium outline-none placeholder:text-[#8A9199]"
         />
       </label>
 
-      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">カテゴリー</p>
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">
+        {t('home.category')}
+      </p>
       <div className="flex flex-wrap gap-2">
         {CATEGORIES.map((item) => {
           const active = item.id === category;
@@ -100,7 +111,7 @@ export function Header({
               }`}
               onClick={() => onCategory(active && item.id !== 'all' ? 'all' : item.id)}
             >
-              {item.label}
+              {translateCategory(item.id as string, t)}
             </button>
           );
         })}

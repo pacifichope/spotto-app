@@ -8,10 +8,12 @@ import { LoginPromptCard } from '@/components/AuthControls';
 import { useAuth } from '@/lib/auth-context';
 import { clubHref, fetchJoinedClubs, type JoinedClub } from '@/lib/clubs';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useT } from '@/lib/i18n/locale-context';
 import { mypageHref } from '@/lib/mypageNav';
 
 export function ClubsScreen() {
   const { user, ready } = useAuth();
+  const t = useT();
   const [clubs, setClubs] = useState<JoinedClub[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +35,7 @@ export function ClubsScreen() {
       })
       .catch((caught) => {
         if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : 'クラブの取得に失敗しました');
+          setError(caught instanceof Error ? caught.message : t('clubs.fetchFailed'));
         }
       })
       .finally(() => {
@@ -42,13 +44,13 @@ export function ClubsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, t]);
 
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">参加したクラブ</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('clubs.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('clubs.loading')}</p>
       </main>
     );
   }
@@ -59,30 +61,26 @@ export function ClubsScreen() {
         href={mypageHref({ mode: 'participant' })}
         className="text-sm font-extrabold text-[#12B8D0]"
       >
-        ← マイページ
+        {t('clubs.backMypage')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">参加したクラブ</h1>
-      <p className="mt-1 text-sm font-bold text-[#5B6B75]">
-        参加したイベントの主催者サークルが一覧になります。
-      </p>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('clubs.title')}</h1>
+      <p className="mt-1 text-sm font-bold text-[#5B6B75]">{t('clubs.subtitle')}</p>
 
       {!user ? (
-        <LoginPromptCard title="ログインしてクラブを確認" />
+        <LoginPromptCard title={t('clubs.loginTitle')} />
       ) : loading ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('clubs.loading')}</p>
       ) : error ? (
         <p className="mt-6 text-sm font-bold text-[#EF4444]">{error}</p>
       ) : clubs.length === 0 ? (
         <section className="card-shadow mt-5 px-5 py-10 text-center">
-          <p className="text-base font-extrabold">まだ参加クラブはありません</p>
-          <p className="mt-2 text-sm font-bold text-[#5B6B75]">
-            イベントに参加すると、主催サークルがここに表示されます。
-          </p>
+          <p className="text-base font-extrabold">{t('clubs.emptyTitle')}</p>
+          <p className="mt-2 text-sm font-bold text-[#5B6B75]">{t('clubs.emptyBody')}</p>
           <Link
             href="/"
             className="brand-gradient mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-extrabold"
           >
-            イベントを探す
+            {t('clubs.findEvents')}
           </Link>
         </section>
       ) : (
@@ -108,7 +106,7 @@ export function ClubsScreen() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold">{club.name}</p>
                   <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
-                    {[club.sport, club.bio].filter(Boolean).join(' · ') || 'サークル'}
+                    {[club.sport, club.bio].filter(Boolean).join(' · ') || t('clubs.fallback')}
                   </p>
                 </div>
                 <ChevronRight

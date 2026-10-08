@@ -57,7 +57,7 @@ export function mapEventRow(row: EventRow): PublicEvent | null {
   if (!row.id || row.cancelled_at) return null;
   return {
     id: row.id,
-    title: row.title?.trim() || '無題のイベント',
+    title: row.title?.trim() || '',
     sport: row.sport?.trim() || '',
     location: row.location?.trim() || '',
     eventDate: row.event_date || '',
@@ -101,6 +101,14 @@ export function getEventStatus(
   return 'open';
 }
 
+/** i18n キー（event.status*） */
+export function eventStatusMessageKey(status: EventStatusKind) {
+  if (status === 'ended') return 'event.statusEnded';
+  if (status === 'full') return 'event.statusFull';
+  return 'event.statusOpen';
+}
+
+/** @deprecated use eventStatusMessageKey + t() */
 export function eventStatusLabel(status: EventStatusKind) {
   if (status === 'ended') return 'イベント終了';
   if (status === 'full') return '満員';

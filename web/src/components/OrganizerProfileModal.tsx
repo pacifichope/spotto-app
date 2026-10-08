@@ -20,6 +20,7 @@ import {
   type SnsKind,
   type SnsLink,
 } from '@/lib/snsLinks';
+import { useT } from '@/lib/i18n/locale-context';
 
 type Props = {
   open: boolean;
@@ -42,6 +43,7 @@ export function OrganizerProfileModal({
   onClose,
   onSaved,
 }: Props) {
+  const t = useT();
   const titleId = useId();
   const avatarRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
@@ -76,7 +78,7 @@ export function OrganizerProfileModal({
   if (!open) return null;
 
   const busy = saving || uploadingAvatar || uploadingCover;
-  const preview = draft.name.trim() || 'サークル';
+  const preview = draft.name.trim() || t('profile.clubFallback');
 
   const updateLink = (id: string, patch: Partial<SnsLink>) => {
     setSnsDrafts((prev) =>
@@ -104,7 +106,7 @@ export function OrganizerProfileModal({
     const invalid = links.find((item) => !isValidHttpUrl(item.url));
     if (invalid) {
       setSaving(false);
-      setError('URL の形式を確認してください（https://...）');
+      setError(t('profile.invalidUrl'));
       return;
     }
     const result = await persistOrganizerProfile({
@@ -125,7 +127,7 @@ export function OrganizerProfileModal({
     <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
-        aria-label="閉じる"
+        aria-label={t('common.close')}
         disabled={busy}
         className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md"
         onClick={() => {
@@ -145,10 +147,10 @@ export function OrganizerProfileModal({
             onClick={onClose}
             className="text-sm font-extrabold text-[#5B6B75]"
           >
-            キャンセル
+            {t('common.cancel')}
           </button>
           <h2 id={titleId} className="text-base font-extrabold">
-            サークル情報
+            {t('profile.clubTitle')}
           </h2>
           <button
             type="button"
@@ -156,12 +158,12 @@ export function OrganizerProfileModal({
             className="text-sm font-extrabold text-[#12B8D0] disabled:opacity-60"
             onClick={() => void handleSave()}
           >
-            保存
+            {t('common.save')}
           </button>
         </div>
 
         <div className="overflow-y-auto px-5 py-5">
-          <p className="text-xs font-extrabold text-[#5B6B75]">カバー写真</p>
+          <p className="text-xs font-extrabold text-[#5B6B75]">{t('profile.cover')}</p>
           <button
             type="button"
             disabled={busy}
@@ -178,15 +180,15 @@ export function OrganizerProfileModal({
             ) : (
               <span className="flex h-36 w-full flex-col items-center justify-center gap-2 text-[#12B8D0] sm:h-40">
                 <ImagePlus size={28} strokeWidth={2.2} />
-                <span className="text-sm font-extrabold">Add cover photo</span>
+                <span className="text-sm font-extrabold">{t('profile.addCover')}</span>
               </span>
             )}
             <span className="absolute inset-x-0 bottom-0 bg-[#0B1A22]/45 px-3 py-2 text-center text-xs font-extrabold text-white">
               {uploadingCover
-                ? 'アップロード中…'
+                ? t('common.uploading')
                 : draft.coverUri
-                  ? 'Set cover photo'
-                  : 'Add cover photo'}
+                  ? t('profile.setCover')
+                  : t('profile.addCover')}
             </span>
           </button>
           <input
@@ -211,7 +213,7 @@ export function OrganizerProfileModal({
             }}
           />
           <p className="mt-1.5 text-[11px] font-bold text-[#8A9199]">
-            クラブ詳細ページのヘッダーに表示されます
+            {t('profile.coverHint')}
           </p>
 
           <div className="mt-5 flex flex-col items-center">
@@ -259,12 +261,12 @@ export function OrganizerProfileModal({
               }}
             />
             <p className="mt-2 text-xs font-bold text-[#8A9199]">
-              {uploadingAvatar ? 'アップロード中…' : 'アイコンを変更'}
+              {uploadingAvatar ? t('common.uploading') : t('profile.changeIcon')}
             </p>
           </div>
 
           <label className="mt-5 block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">サークル名</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('profile.clubName')}</span>
             <input
               value={draft.name}
               maxLength={30}
@@ -272,13 +274,13 @@ export function OrganizerProfileModal({
               onChange={(event) =>
                 setDraft((prev) => ({ ...prev, name: event.target.value }))
               }
-              placeholder="3〜30文字"
+              placeholder={t('profile.clubNamePlaceholder')}
               className="mt-2 h-12 w-full rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
             />
           </label>
 
           <label className="mt-4 block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">紹介文</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('profile.bio')}</span>
             <textarea
               value={draft.bio}
               maxLength={500}
@@ -287,17 +289,17 @@ export function OrganizerProfileModal({
               onChange={(event) =>
                 setDraft((prev) => ({ ...prev, bio: event.target.value }))
               }
-              placeholder="活動内容や雰囲気を書いてみましょう"
+              placeholder={t('profile.bioPlaceholder')}
               className="mt-2 w-full resize-none rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 py-3 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
             />
           </label>
 
           <div className="mt-5">
             <p className="text-xs font-extrabold text-[#5B6B75]">
-              SNS / Web (optional, multiple allowed)
+              {t('profile.snsOptional')}
             </p>
             <p className="mt-1 text-[11px] font-bold text-[#8A9199]">
-              Instagram・X・LINE・公式サイトなどを追加できます
+              {t('profile.snsHint')}
             </p>
 
             <div className="mt-3 space-y-3">
@@ -308,12 +310,12 @@ export function OrganizerProfileModal({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-extrabold text-[#5B6B75]">
-                      リンク {index + 1}
+                      {t('profile.linkN', { n: index + 1 })}
                     </p>
                     <button
                       type="button"
                       disabled={busy}
-                      aria-label="リンクを削除"
+                      aria-label={t('profile.removeLink')}
                       onClick={() =>
                         setSnsDrafts((prev) =>
                           prev.filter((item) => item.id !== link.id),
@@ -340,7 +342,7 @@ export function OrganizerProfileModal({
                           }`}
                         >
                           <SnsBrandIcon kind={option.kind} size={22} />
-                          {option.label}
+                          {option.kind === 'web' ? t('sns.website') : option.label}
                         </button>
                       );
                     })}
@@ -366,14 +368,14 @@ export function OrganizerProfileModal({
                 className="mt-3 inline-flex h-10 items-center gap-1.5 rounded-full bg-white px-4 text-sm font-extrabold text-[#12B8D0] ring-1 ring-[#E4EBEE]"
               >
                 <Plus size={16} strokeWidth={2.4} />
-                Add link
+                {t('profile.addLink')}
               </button>
             ) : null}
           </div>
 
           {!hasOrganizerProfileReady(draft) ? (
             <p className="mt-3 text-xs font-bold text-[#8A9199]">
-              イベント作成にはサークル名（3文字以上）の設定が必要です。
+              {t('profile.clubNameRequired')}
             </p>
           ) : null}
           {error ? (
@@ -389,7 +391,7 @@ export function OrganizerProfileModal({
             className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
           >
             <X size={16} />
-            キャンセル
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -398,7 +400,7 @@ export function OrganizerProfileModal({
             className="brand-gradient flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full text-sm font-extrabold disabled:opacity-60"
           >
             <Pencil size={15} />
-            {saving ? '保存中…' : '保存する'}
+            {saving ? t('common.saving') : t('common.saveAction')}
           </button>
         </div>
       </div>

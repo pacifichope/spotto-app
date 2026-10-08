@@ -8,6 +8,7 @@ import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/i18n/locale-context';
 import {
   chatHref,
   fetchInboxThreads,
@@ -24,6 +25,7 @@ const shellClass = 'page-main';
 export function MessagesScreen() {
   const { user, ready } = useAuth();
   const { hiddenIds } = useHiddenUserIds();
+  const t = useT();
   const [threads, setThreads] = useState<InboxThread[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +49,7 @@ export function MessagesScreen() {
       });
       setThreads(next);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '取得に失敗しました');
+      setError(caught instanceof Error ? caught.message : t('messages.fetchFailed'));
       setThreads([]);
     } finally {
       loadingRef.current = false;
@@ -102,7 +104,7 @@ export function MessagesScreen() {
         return [...prev, target].sort((a, b) => b.lastAt - a.lastAt);
       });
       setError(
-        caught instanceof Error ? caught.message : 'チャットの削除に失敗しました',
+        caught instanceof Error ? caught.message : t('messages.hideFailed'),
       );
     } finally {
       setHiding(false);
@@ -112,8 +114,10 @@ export function MessagesScreen() {
   if (!ready) {
     return (
       <main className={`${shellClass} pt-4 md:pt-2`}>
-        <h1 className="text-2xl font-extrabold tracking-tight">メッセージ</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t('messages.title')}
+        </h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
       </main>
     );
   }
@@ -121,11 +125,15 @@ export function MessagesScreen() {
   if (!user) {
     return (
       <main className={`${shellClass} pt-4 md:pt-2`}>
-        <h1 className="text-2xl font-extrabold tracking-tight">メッセージ</h1>
-        <p className="mt-2 text-sm font-bold text-[#8A9199]">現在：未ログイン</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t('messages.title')}
+        </h1>
+        <p className="mt-2 text-sm font-bold text-[#8A9199]">
+          {t('messages.notLoggedIn')}
+        </p>
         <LoginPromptCard
-          title="ログインしてメッセージを開く"
-          body="参加・主催しているイベントのチャットは、ログイン後にここに表示されます。"
+          title={t('messages.loginTitle')}
+          body={t('messages.loginBody')}
         />
       </main>
     );
@@ -134,11 +142,13 @@ export function MessagesScreen() {
   return (
     <main className={`${shellClass} pt-4 md:pt-2`}>
       <div className="flex items-center justify-between gap-3 px-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">メッセージ</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          {t('messages.title')}
+        </h1>
         <button
           type="button"
-          aria-label="チャット一覧を更新"
-          title="更新"
+          aria-label={t('messages.refresh')}
+          title={t('messages.refresh')}
           disabled={loading}
           onClick={() => void reload()}
           className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#5B6B75] shadow-sm transition-colors hover:bg-[#E5F9FC] hover:text-[#0284C7] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-white disabled:hover:text-[#5B6B75]"
@@ -157,18 +167,18 @@ export function MessagesScreen() {
       ) : null}
 
       {loading && visibleThreads.length === 0 ? (
-        <p className="mt-6 px-1 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="mt-6 px-1 text-sm font-bold text-[#8A9199]">{t('common.loading')}</p>
       ) : visibleThreads.length === 0 ? (
         <section className="card-shadow mt-4 px-5 py-10 text-center sm:px-6">
-          <p className="text-base font-extrabold">まだチャットはありません</p>
+          <p className="text-base font-extrabold">{t('messages.emptyTitle')}</p>
           <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
-            イベントに参加するとグループチャットが使えます。主催者との個別チャットもここに表示されます。
+            {t('messages.emptyBody')}
           </p>
           <Link
             href="/"
             className="brand-gradient mt-5 inline-flex h-11 items-center rounded-full px-5 text-sm font-extrabold"
           >
-            イベントを探す
+            {t('messages.findEvents')}
           </Link>
         </section>
       ) : (
@@ -179,7 +189,9 @@ export function MessagesScreen() {
               sportCover(thread.eventSport);
             const href = chatHref(thread.eventId, thread.mode, thread.dmUserId);
             const subtitle =
-              thread.mode === 'host' ? '主催者チャット' : 'グループチャット';
+              thread.mode === 'host'
+                ? t('messages.hostChat')
+                : t('messages.groupChat');
             return (
               <div
                 key={thread.threadId}
@@ -221,8 +233,8 @@ export function MessagesScreen() {
                 </Link>
                 <button
                   type="button"
-                  aria-label={`${thread.eventTitle}のチャットを削除`}
-                  title="削除"
+                  aria-label={t('messages.deleteChat')}
+                  title={t('messages.deleteChat')}
                   disabled={hiding}
                   onClick={(event) => {
                     event.preventDefault();
@@ -241,9 +253,9 @@ export function MessagesScreen() {
 
       <ConfirmDialog
         open={pendingHide != null}
-        title="このチャットを削除しますか？"
-        description="一覧から削除します。この操作は元に戻せません。相手側の履歴には影響しません。"
-        confirmLabel="削除する"
+        title={t('messages.deleteTitle')}
+        description={t('messages.deleteBody')}
+        confirmLabel={t('messages.deleteConfirm')}
         tone="destructive"
         busy={hiding}
         onCancel={() => {

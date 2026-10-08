@@ -20,6 +20,7 @@ import { MyEventList } from '@/components/MyEventList';
 import { OrganizerProfileModal } from '@/components/OrganizerProfileModal';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
 import { useAuth } from '@/lib/auth-context';
+import { useT } from '@/lib/i18n/locale-context';
 import { fetchJoinedClubs } from '@/lib/clubs';
 import { loadEventDrafts, type WebEventDraft } from '@/lib/eventDrafts';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -62,6 +63,7 @@ const shellClass = 'page-main';
 
 export function MyPageScreen() {
   const { user, ready, busy, signOut } = useAuth();
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -139,7 +141,7 @@ export function MyPageScreen() {
         if (!cancelled) {
           setBundle(emptyBundle);
           setListError(
-            error instanceof Error ? error.message : '一覧の取得に失敗しました',
+            error instanceof Error ? error.message : t('mypage.listFailed'),
           );
         }
       })
@@ -196,17 +198,17 @@ export function MyPageScreen() {
   const segments = useMemo(() => {
     if (isOrganizer) {
       return [
-        { id: 'hosted' as const, label: '主催', count: bundle.hostedUpcoming.length },
-        { id: 'past' as const, label: '履歴', count: bundle.hostedPast.length },
-        { id: 'drafts' as const, label: '下書き', count: drafts.length },
+        { id: 'hosted' as const, label: t('mypage.tabHosted'), count: bundle.hostedUpcoming.length },
+        { id: 'past' as const, label: t('mypage.tabHistory'), count: bundle.hostedPast.length },
+        { id: 'drafts' as const, label: t('mypage.tabDrafts'), count: drafts.length },
       ];
     }
     return [
-      { id: 'joined' as const, label: '参加予定', count: bundle.joinedUpcoming.length },
-      { id: 'past' as const, label: '履歴', count: bundle.joinedPast.length },
-      { id: 'favorites' as const, label: 'お気に入り', count: bundle.favorites.length },
+      { id: 'joined' as const, label: t('mypage.tabUpcoming'), count: bundle.joinedUpcoming.length },
+      { id: 'past' as const, label: t('mypage.tabHistory'), count: bundle.joinedPast.length },
+      { id: 'favorites' as const, label: t('mypage.tabFavorites'), count: bundle.favorites.length },
     ];
-  }, [isOrganizer, bundle, drafts.length]);
+  }, [isOrganizer, bundle, drafts.length, t]);
 
   const listEvents = useMemo(() => {
     if (isOrganizer) {
@@ -223,38 +225,38 @@ export function MyPageScreen() {
     if (isOrganizer) {
       if (segment === 'past') {
         return {
-          title: '過去の主催イベントはありません',
-          body: 'これまでに主催したイベントがここに表示されます。',
+          title: t('mypage.emptyHistoryTitle'),
+          body: t('mypage.emptyHistoryBody'),
         };
       }
       if (segment === 'drafts') {
         return {
-          title: '下書きはありません',
-          body: '作成途中のイベントを下書き保存すると、ここに表示されます。',
+          title: t('mypage.emptyDraftsTitle'),
+          body: t('mypage.emptyDraftsBody'),
         };
       }
       return {
-        title: '主催中のイベントはありません',
-        body: '最初のイベントを作成して、参加者を集めましょう。',
+        title: t('mypage.emptyHostedTitle'),
+        body: t('mypage.emptyHostedBody'),
       };
     }
     if (segment === 'favorites') {
       return {
-        title: 'お気に入りはまだありません',
-        body: '気になるイベントをお気に入り登録すると、ここに集まります。',
+        title: t('mypage.emptyFavoritesTitle'),
+        body: t('mypage.emptyFavoritesBody'),
       };
     }
     if (segment === 'past') {
       return {
-        title: '参加履歴はまだありません',
-        body: '参加したイベントの履歴がここに表示されます。',
+        title: t('mypage.emptyHistoryTitle'),
+        body: t('mypage.emptyHistoryBody'),
       };
     }
     return {
-      title: '参加予定はありません',
-      body: 'イベント詳細から予約すると、ここに参加予定が表示されます。',
+      title: t('mypage.emptyUpcomingTitle'),
+      body: t('mypage.emptyUpcomingBody'),
     };
-  }, [isOrganizer, segment]);
+  }, [isOrganizer, segment, t]);
 
   const showCreateFab =
     !!user &&
@@ -274,8 +276,8 @@ export function MyPageScreen() {
   if (!ready) {
     return (
       <main className={`${shellClass} pt-4 md:pt-2`}>
-        <h1 className="text-2xl font-extrabold tracking-tight">マイページ</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('mypage.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('mypage.loading')}</p>
       </main>
     );
   }
@@ -285,26 +287,26 @@ export function MyPageScreen() {
       <main className={`${shellClass} pt-4 md:pt-2`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">マイページ</h1>
-            <p className="mt-2 text-sm font-bold text-[#8A9199]">現在：未ログイン</p>
+            <h1 className="text-2xl font-extrabold tracking-tight">{t('mypage.title')}</h1>
+            <p className="mt-2 text-sm font-bold text-[#8A9199]">{t('mypage.notLoggedIn')}</p>
           </div>
           <Link
             href="/settings?from=participant"
             className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#12202A] shadow-sm"
-            aria-label="設定"
+            aria-label={t('mypage.settingsAria')}
           >
             <Settings size={20} />
           </Link>
         </div>
         <LoginPromptCard
-          title="ログインしてマイページを開く"
-          body="参加予定やプロフィールは、ログイン後にこの画面で確認できます。Google・Apple・LINE のいずれかでサインインしてください。"
+          title={t('mypage.loginTitle')}
+          body={t('mypage.loginBody')}
         />
       </main>
     );
   }
 
-  const name = profile.name.trim() || user.displayName?.trim() || 'ユーザー';
+  const name = profile.name.trim() || user.displayName?.trim() || t('common.user');
   const email = user.email || '';
   const avatarUrl = profile.imageUri || user.photoURL || undefined;
   const organizerName = organizer.name.trim();
@@ -314,15 +316,15 @@ export function MyPageScreen() {
     <main className={`relative ${shellClass} pb-24 pt-4 md:pt-2`}>
       <div className="flex flex-wrap items-start justify-between gap-3 px-0.5">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">マイページ</h1>
-          <p className="mt-2 text-sm font-extrabold text-[#12B8D0]">ログイン中</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">{t('mypage.title')}</h1>
+          <p className="mt-2 text-sm font-extrabold text-[#12B8D0]">{t('mypage.loggedIn')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href={settingsHref}
             className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#12202A] shadow-sm"
-            aria-label="アプリ設定"
-            title="設定"
+            aria-label={t('mypage.settingsTitle')}
+            title={t('mypage.settingsAria')}
           >
             <Settings size={20} />
           </Link>
@@ -332,7 +334,7 @@ export function MyPageScreen() {
             onClick={() => setLogoutOpen(true)}
             className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-[#5B6B75] shadow-sm disabled:opacity-60"
           >
-            {busy ? '処理中…' : 'ログアウト'}
+            {busy ? t('common.processing') : t('mypage.logout')}
           </button>
         </div>
       </div>
@@ -340,12 +342,12 @@ export function MyPageScreen() {
       <div
         className="mt-4 flex gap-1 rounded-full bg-white/80 p-1 shadow-sm ring-1 ring-white/80"
         role="tablist"
-        aria-label="マイページモード"
+        aria-label={t('mypage.modeAria')}
       >
         {(
           [
-            { id: 'participant' as const, label: '参加者' },
-            { id: 'organizer' as const, label: '主催者' },
+            { id: 'participant' as const, label: t('mypage.modeParticipant') },
+            { id: 'organizer' as const, label: t('mypage.modeOrganizer') },
           ] as const
         ).map((item) => {
           const active = mode === item.id;
@@ -386,10 +388,10 @@ export function MyPageScreen() {
           )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-base font-extrabold tracking-tight">
-              {organizerName || 'サークル情報'}
+              {organizerName || t('mypage.clubInfo')}
             </span>
             <span className="mt-0.5 block text-sm font-bold text-[#5B6B75]">
-              {organizerReady ? 'サークル情報を編集' : 'サークル名を設定'}
+              {organizerReady ? t('mypage.editClubInfo') : t('mypage.setClubName')}
             </span>
           </span>
           <ChevronRight size={18} className="shrink-0 text-[#8A9199]" />
@@ -417,7 +419,7 @@ export function MyPageScreen() {
               {name}
             </span>
             <span className="mt-0.5 block truncate text-sm font-bold text-[#5B6B75]">
-              {email || 'プロフィールを編集'}
+              {email || t('mypage.editProfile')}
             </span>
           </span>
           <ChevronRight size={18} className="shrink-0 text-[#8A9199]" />
@@ -430,17 +432,17 @@ export function MyPageScreen() {
             [
               {
                 href: '/settings/sales',
-                label: '売上',
+                label: t('mypage.sales'),
                 icon: Wallet,
               },
               {
                 href: '/settings/bank-account',
-                label: '振込口座',
+                label: t('mypage.bankAccount'),
                 icon: Building2,
               },
               {
                 href: '/settings/organizer-guidelines',
-                label: '主催ガイドライン',
+                label: t('mypage.guidelines'),
                 icon: BookOpen,
               },
             ] as const
@@ -471,7 +473,7 @@ export function MyPageScreen() {
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[#E5F9FC] text-[#12B8D0]">
             <Users size={18} />
           </span>
-          <span className="text-sm font-extrabold">参加したクラブ</span>
+          <span className="text-sm font-extrabold">{t('mypage.joinedClubs')}</span>
           <span className="text-[#8A9199]">·</span>
           <span className="text-sm font-extrabold text-[#12B8D0]">{clubCount}</span>
           <ChevronRight size={18} className="ml-auto text-[#8A9199]" />
@@ -512,7 +514,7 @@ export function MyPageScreen() {
       ) : null}
 
       {loadingLists ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">一覧を読み込み中…</p>
+        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('mypage.loadingLists')}</p>
       ) : isOrganizer && segment === 'drafts' ? (
         drafts.length === 0 ? (
           <MyEventList
@@ -527,7 +529,7 @@ export function MyPageScreen() {
                 className="brand-gradient mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-extrabold"
               >
                 <Plus size={16} />
-                イベントを作成
+                {t('mypage.createEvent')}
               </button>
             }
           />
@@ -554,11 +556,11 @@ export function MyPageScreen() {
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-extrabold">
-                      {item.title.trim() || '無題の下書き'}
+                      {item.title.trim() || t('mypage.untitledDraft')}
                     </span>
                     <span className="mt-1 block text-xs font-bold text-[#5B6B75]">
                       {[item.sport, item.date, item.location].filter(Boolean).join(' · ') ||
-                        '続きから編集'}
+                        t('mypage.continueEdit')}
                     </span>
                   </span>
                   <ChevronRight size={16} className="mt-1 shrink-0 text-[#8A9199]" />
@@ -573,6 +575,7 @@ export function MyPageScreen() {
           emptyTitle={emptyCopy.title}
           emptyBody={emptyCopy.body}
           eventFrom={{ source: 'mypage', mode, segment }}
+          openTicket={!isOrganizer && (segment === 'joined' || segment === 'past')}
           emptyAction={
             isOrganizer && segment === 'hosted' ? (
               <button
@@ -581,7 +584,7 @@ export function MyPageScreen() {
                 className="brand-gradient mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-5 text-sm font-extrabold"
               >
                 <Plus size={16} />
-                イベントを作成
+                {t('mypage.createEvent')}
               </button>
             ) : undefined
           }
@@ -595,15 +598,15 @@ export function MyPageScreen() {
           className="brand-gradient fixed bottom-24 right-4 z-30 flex h-14 items-center gap-2 rounded-full px-5 text-sm font-extrabold shadow-[0_12px_28px_rgba(18,184,208,0.35)] md:bottom-8 md:right-8"
         >
           <Plus size={18} strokeWidth={2.5} />
-          作成
+          {t('mypage.createShort')}
         </button>
       ) : null}
 
       <ConfirmDialog
         open={logoutOpen}
-        title="ログアウトしますか？"
-        description="現在のアカウントからログアウトします。いつでも再度ログインできます。"
-        confirmLabel="ログアウトする"
+        title={t('settings.logoutTitle')}
+        description={t('settings.logoutBody')}
+        confirmLabel={t('settings.logoutConfirm')}
         busy={busy}
         onCancel={() => {
           if (!busy) setLogoutOpen(false);

@@ -8,8 +8,9 @@ import {
   blockUserRemote,
   unblockUserRemote,
 } from '@/lib/blocks';
+import { useT } from '@/lib/i18n/locale-context';
 import {
-  REPORT_REASON_PRESETS,
+  REPORT_REASON_KEYS,
   submitUserReport,
 } from '@/lib/reports';
 
@@ -41,9 +42,10 @@ export function SafetyActionsMenu({
   onBlockedChange,
   onBlocked,
 }: Props) {
+  const t = useT();
   const menuId = useId();
   const [step, setStep] = useState<SheetStep>('closed');
-  const [preset, setPreset] = useState<string>(REPORT_REASON_PRESETS[0]);
+  const [preset, setPreset] = useState<string>(REPORT_REASON_KEYS[0]);
   const [detail, setDetail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -64,19 +66,20 @@ export function SafetyActionsMenu({
 
   if (target.id === currentUserId) return null;
 
+  const presetLabel = t(preset);
   const reason =
-    preset === 'その他'
+    preset === 'safety.reasonOther'
       ? detail.trim()
       : detail.trim()
-        ? `${preset}：${detail.trim()}`
-        : preset;
+        ? `${presetLabel}: ${detail.trim()}`
+        : presetLabel;
 
   const closeAll = () => {
     if (busy) return;
     setStep('closed');
     setError('');
     setDetail('');
-    setPreset(REPORT_REASON_PRESETS[0]);
+    setPreset(REPORT_REASON_KEYS[0]);
     setBlockConfirmOpen(false);
   };
 
@@ -94,7 +97,11 @@ export function SafetyActionsMenu({
     });
     setBusy(false);
     if (!result.ok) {
-      setError(result.error);
+      setError(
+        result.error.startsWith('errors.') || result.error.startsWith('safety.')
+          ? t(result.error)
+          : result.error,
+      );
       return;
     }
     setStep('reportDone');
@@ -128,8 +135,8 @@ export function SafetyActionsMenu({
         caught instanceof Error
           ? caught.message
           : isBlocked
-            ? 'ブロック解除に失敗しました'
-            : 'ブロックに失敗しました',
+            ? t('safety.unblockFailed')
+            : t('safety.blockFailed'),
       );
     } finally {
       setBusy(false);
@@ -140,7 +147,7 @@ export function SafetyActionsMenu({
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        aria-label="ブロック・通報メニュー"
+        aria-label={t('safety.menuAria')}
         aria-haspopup="menu"
         aria-expanded={step !== 'closed'}
         aria-controls={menuId}
@@ -154,7 +161,7 @@ export function SafetyActionsMenu({
         <div className="fixed inset-0 z-[90] flex items-end justify-center p-4 sm:items-center">
           <button
             type="button"
-            aria-label="閉じる"
+            aria-label={t('common.close')}
             className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md"
             onClick={closeAll}
           />
@@ -183,7 +190,7 @@ export function SafetyActionsMenu({
                 isBlocked ? 'text-[#12202A]' : 'text-[#EF4444]'
               }`}
             >
-              {isBlocked ? 'ブロックを解除する' : 'このユーザーをブロックする'}
+              {isBlocked ? t('safety.unblock') : t('safety.block')}
             </button>
             <div className="border-t border-[#E4EBEE]" />
             <button
@@ -196,7 +203,7 @@ export function SafetyActionsMenu({
               }}
               className="flex w-full items-center justify-center px-5 py-4 text-sm font-extrabold text-[#EF4444]"
             >
-              通報する
+              {t('safety.report')}
             </button>
             <div className="border-t border-[#E4EBEE]" />
             <button
@@ -204,7 +211,7 @@ export function SafetyActionsMenu({
               onClick={closeAll}
               className="flex w-full items-center justify-center px-5 py-4 text-sm font-extrabold text-[#5B6B75]"
             >
-              キャンセル
+              {t('common.cancel')}
             </button>
             {error ? (
               <p className="border-t border-[#E4EBEE] px-5 py-3 text-center text-xs font-bold text-[#EF4444]">
@@ -219,7 +226,7 @@ export function SafetyActionsMenu({
         <div className="fixed inset-0 z-[90] flex items-end justify-center p-4 sm:items-center">
           <button
             type="button"
-            aria-label="閉じる"
+            aria-label={t('common.close')}
             disabled={busy}
             className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md"
             onClick={closeAll}
@@ -227,12 +234,12 @@ export function SafetyActionsMenu({
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white p-5 shadow-[0_24px_64px_rgba(11,26,34,0.28)] sm:p-6">
             {step === 'report' ? (
               <>
-                <h3 className="text-lg font-extrabold tracking-tight">通報する</h3>
+                <h3 className="text-lg font-extrabold tracking-tight">{t('safety.reportTitle')}</h3>
                 <p className="mt-1 text-sm font-bold text-[#5B6B75]">
-                  {target.name} さんについて、理由を選んで送信してください。
+                  {t('safety.reportHint', { name: target.name })}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {REPORT_REASON_PRESETS.map((item) => {
+                  {REPORT_REASON_KEYS.map((item) => {
                     const active = preset === item;
                     return (
                       <button
@@ -246,7 +253,7 @@ export function SafetyActionsMenu({
                             : 'bg-white text-[#5B6B75] ring-[#E4EBEE]'
                         }`}
                       >
-                        {item}
+                        {t(item)}
                       </button>
                     );
                   })}
@@ -258,9 +265,9 @@ export function SafetyActionsMenu({
                   rows={4}
                   onChange={(event) => setDetail(event.target.value)}
                   placeholder={
-                    preset === 'その他'
-                      ? '具体的な内容を入力してください'
-                      : '補足があれば入力（任意）'
+                    preset === 'safety.reasonOther'
+                      ? t('safety.detailRequired')
+                      : t('safety.detailOptional')
                   }
                   className="mt-4 w-full resize-none rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 py-3 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
                 />
@@ -280,7 +287,7 @@ export function SafetyActionsMenu({
                     }}
                     className="flex h-11 flex-1 items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
                   >
-                    戻る
+                    {t('safety.back')}
                   </button>
                   <button
                     type="button"
@@ -288,22 +295,22 @@ export function SafetyActionsMenu({
                     onClick={() => void submitReport()}
                     className="brand-gradient flex h-11 flex-1 items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60"
                   >
-                    {busy ? '送信中…' : '送信する'}
+                    {busy ? t('safety.submitting') : t('safety.submit')}
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <h3 className="text-lg font-extrabold tracking-tight">受け付けました</h3>
+                <h3 className="text-lg font-extrabold tracking-tight">{t('safety.doneTitle')}</h3>
                 <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
-                  ご報告ありがとうございます。内容を確認のうえ、必要に応じて対応します。
+                  {t('safety.doneBody')}
                 </p>
                 <button
                   type="button"
                   onClick={closeAll}
                   className="brand-gradient mt-5 flex h-11 w-full items-center justify-center rounded-full text-sm font-extrabold"
                 >
-                  閉じる
+                  {t('safety.close')}
                 </button>
               </>
             )}
@@ -313,9 +320,9 @@ export function SafetyActionsMenu({
 
       <ConfirmDialog
         open={blockConfirmOpen}
-        title="このユーザーをブロックしますか？"
-        description="今後お互いのコンテンツやメッセージが表示されなくなります。"
-        confirmLabel="ブロックする"
+        title={t('safety.blockTitle')}
+        description={t('safety.blockBody')}
+        confirmLabel={t('safety.blockConfirm')}
         tone="destructive"
         busy={busy}
         onCancel={() => {

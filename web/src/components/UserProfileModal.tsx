@@ -7,6 +7,7 @@ import { SafetyActionsMenu } from '@/components/SafetyActionsMenu';
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useT } from '@/lib/i18n/locale-context';
 
 export type ProfilePerson = {
   id: string;
@@ -67,6 +68,7 @@ function Avatar({
 }
 
 export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
+  const t = useT();
   const { user } = useAuth();
   const { blockedIds, markBlocked, markUnblocked } = useHiddenUserIds();
   const titleId = useId();
@@ -93,7 +95,7 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
     <div className="fixed inset-0 z-[90] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
-        aria-label="閉じる"
+        aria-label={t('common.close')}
         className="absolute inset-0 bg-[#0B1A22]/45 backdrop-blur-md"
         onClick={onClose}
       />
@@ -106,7 +108,7 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
         <div className="flex items-center justify-between border-b border-[#E4EBEE] px-4 py-3.5">
           <span className="inline-block w-8" aria-hidden />
           <h2 id={titleId} className="text-sm font-extrabold">
-            プロフィール
+            {t('profile.title')}
           </h2>
           <div className="flex items-center gap-1.5">
             {user && !isSelf ? (
@@ -136,7 +138,7 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
             )}
             <button
               type="button"
-              aria-label="閉じる"
+              aria-label={t('common.close')}
               onClick={onClose}
               className="grid h-8 w-8 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
             >
@@ -154,17 +156,21 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
               {person.isHost ? (
                 <span className="rounded-full bg-[#E5F9FC] px-2.5 py-1 text-[11px] font-extrabold text-[#12B8D0]">
-                  主催者
+                  {t('common.host')}
                 </span>
               ) : null}
               {person.gender ? (
                 <span className="rounded-full bg-[#F4F7F8] px-2.5 py-1 text-[11px] font-extrabold text-[#5B6B75]">
-                  {person.gender}
+                  {person.gender === '男性'
+                    ? t('common.male')
+                    : person.gender === '女性'
+                      ? t('common.female')
+                      : person.gender}
                 </span>
               ) : null}
               {isSelf ? (
                 <span className="rounded-full bg-[#FFF4E8] px-2.5 py-1 text-[11px] font-extrabold text-[#E8742A]">
-                  あなた
+                  {t('common.me')}
                 </span>
               ) : null}
             </div>
@@ -174,7 +180,7 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
               </p>
             ) : (
               <p className="mt-4 text-sm font-bold text-[#8A9199]">
-                自己紹介はまだありません
+                {t('profile.noBio')}
               </p>
             )}
           </div>

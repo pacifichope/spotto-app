@@ -28,6 +28,7 @@ import {
 } from '@/lib/chatsWeb';
 import { absoluteImageUrl } from '@/lib/eventSeo';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useT } from '@/lib/i18n/locale-context';
 import { fetchWebProfile, profileFromFirebaseUser } from '@/lib/profile';
 import type { PublicEvent } from '@/lib/types';
 
@@ -72,6 +73,7 @@ export function ChatRoomScreen() {
   const params = useParams<{ eventId: string; mode: string }>();
   const query = useSearchParams();
   const { user, ready } = useAuth();
+  const t = useT();
   const { hiddenIds, markBlocked } = useHiddenUserIds();
 
   const eventId = String(params.eventId || '');
@@ -103,11 +105,11 @@ export function ChatRoomScreen() {
       setMessages(next.messages);
       setError('');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '読み込みに失敗しました');
+      setError(caught instanceof Error ? caught.message : t('chat.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [user, eventId, mode, dmFromQuery]);
+  }, [user, eventId, mode, dmFromQuery, t]);
 
   useEffect(() => {
     if (!ready) return;
@@ -154,8 +156,8 @@ export function ChatRoomScreen() {
 
       const isSelf = senderId === user.uid;
       const fallbackName = isSelf
-        ? user.displayName?.trim() || message.senderName || 'あなた'
-        : message.senderName.trim() || 'ユーザー';
+        ? user.displayName?.trim() || message.senderName || t('chat.me')
+        : message.senderName.trim() || t('chat.user');
       const fallbackImage =
         (isSelf ? user.photoURL : null) ||
         absoluteImageUrl(message.senderImageUri) ||
@@ -197,7 +199,7 @@ export function ChatRoomScreen() {
         });
       })();
     },
-    [user, event?.hostId],
+    [user, event?.hostId, t],
   );
 
   async function onSend(e: FormEvent) {
@@ -210,7 +212,7 @@ export function ChatRoomScreen() {
     try {
       const message = await sendRoomMessage({
         userId: user.uid,
-        displayName: user.displayName || 'ユーザー',
+        displayName: user.displayName || t('chat.user'),
         photoURL: user.photoURL,
         getIdToken: async () => idTokenWithAuthenticatedRole(user),
         eventId,
@@ -222,7 +224,7 @@ export function ChatRoomScreen() {
       setMessages((prev) => [...prev, message]);
     } catch (caught) {
       setDraft(text);
-      setError(caught instanceof Error ? caught.message : '送信に失敗しました');
+      setError(caught instanceof Error ? caught.message : t('chat.sendFailed'));
     } finally {
       setSending(false);
     }
@@ -231,7 +233,7 @@ export function ChatRoomScreen() {
   if (!ready || loading) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <p className="text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="text-sm font-bold text-[#8A9199]">{t('chat.loading')}</p>
       </main>
     );
   }
@@ -240,25 +242,25 @@ export function ChatRoomScreen() {
     return (
       <main className="page-main pt-4 md:pt-2">
         <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
-          ← メッセージ
+          {t('chat.backMessages')}
         </Link>
         <LoginPromptCard
-          title="ログインしてチャットを開く"
-          body="イベントのチャットはログイン後に利用できます。"
+          title={t('chat.loginTitle')}
+          body={t('chat.loginBody')}
         />
       </main>
     );
   }
 
-  const title = event?.title || 'チャット';
-  const subtitle = mode === 'host' ? '主催者チャット' : 'グループチャット';
+  const title = event?.title || t('chat.titleFallback');
+  const subtitle = mode === 'host' ? t('chat.hostChat') : t('chat.groupChat');
 
   return (
     <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
-            ← メッセージ
+            {t('chat.backMessages')}
           </Link>
           <h1 className="mt-2 truncate text-xl font-extrabold tracking-tight">
             {title}
@@ -270,7 +272,7 @@ export function ChatRoomScreen() {
             href={`/event/${event.id}`}
             className="shrink-0 rounded-full bg-white px-3 py-2 text-xs font-extrabold text-[#5B6B75] shadow-sm"
           >
-            イベント
+            {t('chat.event')}
           </Link>
         ) : null}
       </div>
@@ -284,11 +286,11 @@ export function ChatRoomScreen() {
         >
           {peerBlocked ? (
             <p className="py-10 text-center text-sm font-bold text-[#8A9199]">
-              ブロックしているユーザーとのチャットは表示されません。
+              {t('chat.blocked')}
             </p>
           ) : visibleMessages.length === 0 ? (
             <p className="py-10 text-center text-sm font-bold text-[#8A9199]">
-              まだメッセージはありません。最初のひとことを送ってみましょう。
+              {t('chat.empty')}
             </p>
           ) : (
             visibleMessages.map((message, index) => {
@@ -298,8 +300,8 @@ export function ChatRoomScreen() {
                 (!prev || prev.mine || prev.senderId !== message.senderId);
               const timeLabel = formatBubbleTime(message.at);
               const displayName = message.mine
-                ? user.displayName?.trim() || message.senderName || 'あなた'
-                : message.senderName.trim() || 'ユーザー';
+                ? user.displayName?.trim() || message.senderName || t('chat.me')
+                : message.senderName.trim() || t('chat.user');
               const avatarUri = message.mine
                 ? user.photoURL || message.senderImageUri
                 : message.senderImageUri;
@@ -314,7 +316,7 @@ export function ChatRoomScreen() {
                       {timeLabel ? (
                         <span
                           className="mb-0.5 shrink-0 text-[10px] font-bold tabular-nums text-[#8A9199]"
-                          aria-label={`送信時刻 ${timeLabel}`}
+                          aria-label={t('chat.sentAt', { time: timeLabel })}
                         >
                           {timeLabel}
                         </span>
@@ -328,7 +330,7 @@ export function ChatRoomScreen() {
                         type="button"
                         onClick={() => openSenderProfile(message)}
                         className="mb-0.5 shrink-0 rounded-full transition hover:opacity-80"
-                        aria-label="自分のプロフィールを開く"
+                        aria-label={t('chat.openOwnProfile')}
                       >
                         <ChatAvatar name={displayName} imageUri={avatarUri} />
                       </button>
@@ -341,7 +343,7 @@ export function ChatRoomScreen() {
                         className={`mb-0.5 shrink-0 rounded-full transition hover:opacity-80 ${
                           showSenderMeta ? '' : 'invisible'
                         }`}
-                        aria-label={`${displayName}のプロフィールを開く`}
+                        aria-label={t('chat.openProfile', { name: displayName })}
                         tabIndex={showSenderMeta ? 0 : -1}
                       >
                         <ChatAvatar name={displayName} imageUri={avatarUri} />
@@ -365,7 +367,7 @@ export function ChatRoomScreen() {
                           {timeLabel ? (
                             <span
                               className="mb-0.5 shrink-0 text-[10px] font-bold tabular-nums text-[#8A9199]"
-                              aria-label={`送信時刻 ${timeLabel}`}
+                              aria-label={t('chat.sentAt', { time: timeLabel })}
                             >
                               {timeLabel}
                             </span>
@@ -389,7 +391,7 @@ export function ChatRoomScreen() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={
-              peerBlocked ? 'ブロック中のため送信できません' : 'メッセージを入力'
+              peerBlocked ? t('chat.placeholderBlocked') : t('chat.placeholder')
             }
             disabled={peerBlocked}
             className="h-11 min-w-0 flex-1 rounded-full bg-[#F4F7F8] px-4 text-sm font-bold outline-none ring-1 ring-[#E4EBEE] focus:ring-[#12B8D0] disabled:opacity-60"
@@ -400,7 +402,7 @@ export function ChatRoomScreen() {
             disabled={peerBlocked || sending || !draft.trim()}
             className="brand-gradient h-11 shrink-0 rounded-full px-5 text-sm font-extrabold disabled:opacity-60"
           >
-            {sending ? '…' : '送信'}
+            {sending ? '…' : t('chat.send')}
           </button>
         </form>
       </section>

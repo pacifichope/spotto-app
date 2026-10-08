@@ -7,6 +7,7 @@ import {
   setRuntimeFirebaseConfig,
   type FirebasePublicConfig,
 } from '@/lib/env';
+import { LocaleProvider } from '@/lib/i18n/locale-context';
 
 export function Providers({
   children,
@@ -19,5 +20,9 @@ export function Providers({
   // レンダー時に注入（AuthProvider より先に同じツリーで評価される）
   setRuntimeFirebaseConfig(firebaseConfig);
 
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <LocaleProvider>
+      <AuthProvider>{children}</AuthProvider>
+    </LocaleProvider>
+  );
 }

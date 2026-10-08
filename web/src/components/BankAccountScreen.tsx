@@ -7,6 +7,7 @@ import { LoginPromptCard } from '@/components/AuthControls';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { useT } from '@/lib/i18n/locale-context';
 import { mypageHref } from '@/lib/mypageNav';
 import {
   EMPTY_BANK,
@@ -16,10 +17,6 @@ import {
   validateBank,
   type OrganizerBankAccount,
 } from '@/lib/organizerBank';
-
-function accountTypeLabel(type: OrganizerBankAccount['accountType']) {
-  return type === 'checking' ? '当座' : '普通';
-}
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
@@ -34,6 +31,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 export function BankAccountScreen() {
   const { user, ready } = useAuth();
+  const t = useT();
   const [account, setAccount] = useState<OrganizerBankAccount>(EMPTY_BANK);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,7 +57,7 @@ export function BankAccountScreen() {
       })
       .catch((caught) => {
         if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : '口座情報の取得に失敗しました');
+          setError(caught instanceof Error ? caught.message : t('bank.fetchFailed'));
         }
       })
       .finally(() => {
@@ -68,7 +66,7 @@ export function BankAccountScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     if (!toast) return;
@@ -79,12 +77,16 @@ export function BankAccountScreen() {
   const field =
     'mt-2 h-11 w-full rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-3.5 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35';
 
+  function accountTypeLabel(type: OrganizerBankAccount['accountType']) {
+    return type === 'checking' ? t('bank.typeChecking') : t('bank.typeOrdinary');
+  }
+
   function openConfirm() {
     setMessage('');
     setError('');
     const invalid = validateBank(account);
     if (invalid) {
-      setError(invalid);
+      setError(t(invalid));
       return;
     }
     setConfirmOpen(true);
@@ -107,8 +109,8 @@ export function BankAccountScreen() {
         return;
       }
       setConfirmOpen(false);
-      setMessage('口座情報を登録しました');
-      setToast('口座情報を登録しました');
+      setMessage(t('bank.saved'));
+      setToast(t('bank.saved'));
     } finally {
       setSaving(false);
     }
@@ -117,8 +119,8 @@ export function BankAccountScreen() {
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">振込口座</h1>
-        <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('bank.title')}</h1>
+        <p className="mt-4 text-sm font-bold text-[#8A9199]">{t('bank.loading')}</p>
       </main>
     );
   }
@@ -138,17 +140,15 @@ export function BankAccountScreen() {
         href={mypageHref({ mode: 'organizer' })}
         className="text-sm font-extrabold text-[#12B8D0]"
       >
-        ← マイページ
+        {t('bank.backMypage')}
       </Link>
-      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">振込口座</h1>
-      <p className="mt-1 text-sm font-bold leading-6 text-[#5B6B75]">
-        売上振込先はご本人名義の口座のみ登録できます。
-      </p>
+      <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('bank.title')}</h1>
+      <p className="mt-1 text-sm font-bold leading-6 text-[#5B6B75]">{t('bank.subtitle')}</p>
 
       {!user ? (
-        <LoginPromptCard title="ログインして口座を登録" />
+        <LoginPromptCard title={t('bank.loginTitle')} />
       ) : loading ? (
-        <p className="mt-6 text-sm font-bold text-[#8A9199]">読み込み中…</p>
+        <p className="mt-6 text-sm font-bold text-[#8A9199]">{t('bank.loading')}</p>
       ) : (
         <form
           className="card-shadow mt-5 space-y-4 p-5"
@@ -158,13 +158,13 @@ export function BankAccountScreen() {
           }}
         >
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">銀行名</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.bankName')}</span>
             <select
               className={field}
               value={account.bankName}
               onChange={(e) => setAccount((prev) => ({ ...prev, bankName: e.target.value }))}
             >
-              <option value="">選択してください</option>
+              <option value="">{t('bank.selectPlaceholder')}</option>
               {SUPPORTED_BANKS.map((bank) => (
                 <option key={bank} value={bank}>
                   {bank}
@@ -174,7 +174,7 @@ export function BankAccountScreen() {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">支店名</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.branchName')}</span>
               <input
                 className={field}
                 value={account.branchName}
@@ -182,7 +182,7 @@ export function BankAccountScreen() {
               />
             </label>
             <label className="block">
-              <span className="text-xs font-extrabold text-[#5B6B75]">支店番号</span>
+              <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.branchCode')}</span>
               <input
                 className={field}
                 value={account.branchNumber}
@@ -191,12 +191,12 @@ export function BankAccountScreen() {
             </label>
           </div>
           <fieldset>
-            <legend className="text-xs font-extrabold text-[#5B6B75]">口座種別</legend>
+            <legend className="text-xs font-extrabold text-[#5B6B75]">{t('bank.accountType')}</legend>
             <div className="mt-2 flex gap-2">
               {(
                 [
-                  { id: 'ordinary' as const, label: '普通' },
-                  { id: 'checking' as const, label: '当座' },
+                  { id: 'ordinary' as const, label: t('bank.typeOrdinary') },
+                  { id: 'checking' as const, label: t('bank.typeChecking') },
                 ] as const
               ).map((item) => (
                 <button
@@ -215,7 +215,7 @@ export function BankAccountScreen() {
             </div>
           </fieldset>
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">口座番号</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.accountNumber')}</span>
             <input
               className={field}
               value={account.accountNumber}
@@ -223,18 +223,18 @@ export function BankAccountScreen() {
             />
           </label>
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">口座名義（カナ）</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.holderKana')}</span>
             <input
               className={field}
               value={account.accountHolderKana}
               onChange={(e) =>
                 setAccount((prev) => ({ ...prev, accountHolderKana: e.target.value }))
               }
-              placeholder="ヤマダ タロウ"
+              placeholder={t('bank.holderKanaPlaceholder')}
             />
           </label>
           <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">通知用メール（任意）</span>
+            <span className="text-xs font-extrabold text-[#5B6B75]">{t('bank.notifyEmail')}</span>
             <input
               type="email"
               className={field}
@@ -251,37 +251,35 @@ export function BankAccountScreen() {
             disabled={saving}
             className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60"
           >
-            保存する
+            {t('bank.save')}
           </button>
         </form>
       )}
 
       <ConfirmDialog
         open={confirmOpen}
-        title="口座情報の確認"
+        title={t('bank.confirmTitle')}
         description={
           <>
-            <p className="mb-3">
-              この内容で口座情報を登録します。よろしいですか？
-            </p>
+            <p className="mb-3">{t('bank.confirmBody')}</p>
             <dl className="rounded-2xl bg-[#F4F7F8] px-3.5 py-1">
-              <SummaryRow label="銀行名" value={account.bankName} />
-              <SummaryRow label="支店名" value={account.branchName} />
-              <SummaryRow label="支店番号" value={account.branchNumber} />
+              <SummaryRow label={t('bank.bankName')} value={account.bankName} />
+              <SummaryRow label={t('bank.branchName')} value={account.branchName} />
+              <SummaryRow label={t('bank.branchCode')} value={account.branchNumber} />
               <SummaryRow
-                label="口座種別"
+                label={t('bank.accountType')}
                 value={accountTypeLabel(account.accountType)}
               />
-              <SummaryRow label="口座番号" value={account.accountNumber} />
-              <SummaryRow label="口座名義" value={account.accountHolderKana} />
+              <SummaryRow label={t('bank.accountNumber')} value={account.accountNumber} />
+              <SummaryRow label={t('bank.holderName')} value={account.accountHolderKana} />
               {account.notifyEmail.trim() ? (
-                <SummaryRow label="通知メール" value={account.notifyEmail} />
+                <SummaryRow label={t('bank.notifyMail')} value={account.notifyEmail} />
               ) : null}
             </dl>
           </>
         }
-        cancelLabel="キャンセル"
-        confirmLabel={saving ? '登録中…' : '登録する'}
+        cancelLabel={t('common.cancel')}
+        confirmLabel={saving ? t('bank.registering') : t('bank.confirm')}
         busy={saving}
         onCancel={() => {
           if (!saving) setConfirmOpen(false);
