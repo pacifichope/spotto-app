@@ -18,12 +18,15 @@ import {
   resolveEventCoords,
   type CategoryId,
 } from '@/constants/theme';
+import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import type { PublicEvent } from '@/lib/types';
 import {
   NEARBY_RADIUS_KM,
+  isWithinMapBounds,
   isWithinRadiusKm,
   toMapLatLng,
+  type MapBoundsLiteral,
 } from '@/lib/userLocation';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'] as const;
@@ -70,6 +73,7 @@ export function HomeScreen({
     status,
     refresh,
   } = useUserLocation();
+  const { hiddenIds } = useHiddenUserIds();
 
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<string>(NEARBY_AREA);
@@ -77,46 +81,70 @@ export function HomeScreen({
   const [priceRange, setPriceRange] = useState<PriceRange>(DEFAULT_PRICE_RANGE);
   const [date, setDate] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'map'>('list');
+  /** マップ「このエリアで再検索」で確定した表示範囲 */
+  const [mapBounds, setMapBounds] = useState<MapBoundsLiteral | null>(null);
+  const [recenterKey, setRecenterKey] = useState(0);
   const days = useMemo(() => dateOptions(), []);
   const leadBlanks = days[0]?.weekdayIndex ?? 0;
 
   const isNearbyMode = area === NEARBY_AREA;
   const browseOrigin = locationCenter;
+  const mapAreaSearch = view === 'map' && mapBounds != null;
 
   const mapCenter = useMemo(() => {
     if (isNearbyMode) return toMapLatLng(browseOrigin);
     return areaMapCenter(area) ?? toMapLatLng(browseOrigin);
   }, [area, browseOrigin, isNearbyMode]);
 
-  const areaLabel = locating
-    ? '現在地を取得中…'
-    : isNearbyMode && status === 'denied'
-      ? '現在地付近（位置情報オフ）'
-      : isNearbyMode && !userCoords && (status === 'unavailable' || status === 'unsupported')
-        ? '現在地付近（東京都）'
-        : area;
+  const areaLabel = mapAreaSearch
+    ? 'マップ表示範囲'
+    : locating
+      ? '現在地を取得中…'
+      : isNearbyMode && status === 'denied'
+        ? '現在地付近（位置情報オフ）'
+        : isNearbyMode && !userCoords && (status === 'unavailable' || status === 'unsupported')
+          ? '現在地付近（東京都）'
+          : area;
+
+  const clearMapAreaSearch = useCallback(() => {
+    setMapBounds(null);
+  }, []);
 
   const handleArea = useCallback(
     (next: string) => {
       setArea(next);
+      clearMapAreaSearch();
       if (next === NEARBY_AREA) {
         void refresh();
       }
     },
-    [refresh],
+    [clearMapAreaSearch, refresh],
   );
 
   const handleRecenter = useCallback(() => {
     setArea(NEARBY_AREA);
+    clearMapAreaSearch();
+    setRecenterKey((key) => key + 1);
     void refresh();
-  }, [refresh]);
+  }, [clearMapAreaSearch, refresh]);
+
+  const handleSearchArea = useCallback((bounds: MapBoundsLiteral) => {
+    setMapBounds(bounds);
+  }, []);
 
   const visible = events.filter((event) => {
+    if (event.hostId && hiddenIds.has(event.hostId)) return false;
     if (date && !event.eventDate.startsWith(date)) return false;
     if (!matchesPriceRange(event.priceYen, priceRange)) return false;
     if (!eventMatchesCategory(event.sport, event.joinedCount, category)) return false;
 
-    if (isNearbyMode) {
+    if (mapAreaSearch && mapBounds) {
+      const coords = resolveEventCoords(event);
+      if (!coords) return false;
+      if (!isWithinMapBounds({ lat: coords.lat, lng: coords.lng }, mapBounds)) {
+        return false;
+      }
+    } else if (isNearbyMode) {
       const coords = resolveEventCoords(event);
       if (!coords) return false;
       if (
@@ -140,9 +168,9 @@ export function HomeScreen({
   });
 
   return (
-    <div className="lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-8">
+    <div className="page-main lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start lg:gap-6">
       <aside className="lg:sticky lg:top-24">
-        <div className="lg:card-shadow lg:p-4">
+        <div className="lg:card-shadow lg:p-3.5">
           <Header
             area={area}
             areaLabel={areaLabel}
@@ -221,20 +249,35 @@ export function HomeScreen({
           </div>
         </div>
         {error ? <p className="mb-3 text-sm font-bold text-[#EF4444]">{error}</p> : null}
-        {isNearbyMode && status === 'denied' ? (
+        {isNearbyMode && status === 'denied' && !mapAreaSearch ? (
           <p className="mb-3 text-sm font-bold text-[#5B6B75]">
             位置情報がブロックされています。ブラウザの設定で許可するか、エリアを選んでください。マップは東京都心を中心に表示します。
           </p>
         ) : null}
         {view === 'map' ? (
-          <EventMap
-            events={visible}
-            center={mapCenter}
-            userCoords={userCoords}
-            locating={locating}
-            onRecenter={handleRecenter}
-            preferCenter
-          />
+          <div className="space-y-4">
+            <EventMap
+              events={visible}
+              center={mapCenter}
+              userCoords={userCoords}
+              locating={locating}
+              onRecenter={handleRecenter}
+              preferCenter={!mapAreaSearch}
+              recenterKey={recenterKey}
+              onSearchArea={handleSearchArea}
+            />
+            {visible.length === 0 ? (
+              <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
+                この範囲に条件に合うイベントはありません
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visible.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            )}
+          </div>
         ) : visible.length === 0 ? (
           <p className="card-shadow px-4 py-8 text-center text-sm font-bold text-[#5B6B75]">
             条件に合うイベントはまだありません

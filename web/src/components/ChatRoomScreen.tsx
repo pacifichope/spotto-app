@@ -2,9 +2,21 @@
 
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import {
+  UserProfileModal,
+  type ProfilePerson,
+} from '@/components/UserProfileModal';
+import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import {
   fetchRoomMessages,
@@ -14,13 +26,53 @@ import {
   type ChatMode,
   type WebChatMessage,
 } from '@/lib/chatsWeb';
+import { absoluteImageUrl } from '@/lib/eventSeo';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { fetchWebProfile, profileFromFirebaseUser } from '@/lib/profile';
 import type { PublicEvent } from '@/lib/types';
+
+function ChatAvatar({
+  name,
+  imageUri,
+  size = 36,
+}: {
+  name: string;
+  imageUri?: string | null;
+  size?: number;
+}) {
+  const resolved = absoluteImageUrl(imageUri ?? null) || imageUri || undefined;
+  const initial = (name.trim() || '?').slice(0, 1);
+
+  if (resolved) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={resolved}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover ring-2 ring-white"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
+  return (
+    <span
+      className="brand-gradient grid shrink-0 place-items-center rounded-full text-xs font-extrabold ring-2 ring-white"
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {initial}
+    </span>
+  );
+}
 
 export function ChatRoomScreen() {
   const params = useParams<{ eventId: string; mode: string }>();
   const query = useSearchParams();
   const { user, ready } = useAuth();
+  const { hiddenIds, markBlocked } = useHiddenUserIds();
 
   const eventId = String(params.eventId || '');
   const mode: ChatMode = parseChatMode(params.mode);
@@ -33,6 +85,7 @@ export function ChatRoomScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [profileTarget, setProfileTarget] = useState<ProfilePerson | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const reload = useCallback(async () => {
@@ -72,13 +125,84 @@ export function ChatRoomScreen() {
     return () => window.clearInterval(id);
   }, [user, reload]);
 
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (message) => message.mine || !hiddenIds.has(message.senderId),
+      ),
+    [messages, hiddenIds],
+  );
+
+  const peerBlocked =
+    mode === 'host' &&
+    Boolean(
+      (resolvedDm && hiddenIds.has(resolvedDm)) ||
+        (event?.hostId &&
+          event.hostId !== user?.uid &&
+          hiddenIds.has(event.hostId)),
+    );
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length]);
+  }, [visibleMessages.length]);
+
+  const openSenderProfile = useCallback(
+    (message: WebChatMessage) => {
+      if (!user) return;
+      const senderId = message.senderId.trim();
+      if (!senderId) return;
+
+      const isSelf = senderId === user.uid;
+      const fallbackName = isSelf
+        ? user.displayName?.trim() || message.senderName || 'あなた'
+        : message.senderName.trim() || 'ユーザー';
+      const fallbackImage =
+        (isSelf ? user.photoURL : null) ||
+        absoluteImageUrl(message.senderImageUri) ||
+        message.senderImageUri ||
+        undefined;
+
+      const optimistic: ProfilePerson = {
+        id: senderId,
+        name: fallbackName,
+        imageUri: fallbackImage || undefined,
+        self: isSelf,
+        isHost: Boolean(event?.hostId && senderId === event.hostId),
+      };
+      setProfileTarget(optimistic);
+
+      void (async () => {
+        const remote = await fetchWebProfile({
+          userId: senderId,
+          fallback: isSelf
+            ? profileFromFirebaseUser(user)
+            : {
+                name: fallbackName,
+                imageUri: fallbackImage || undefined,
+                gender: '',
+              },
+        });
+        setProfileTarget((prev) => {
+          if (!prev || prev.id !== senderId) return prev;
+          return {
+            ...prev,
+            name: remote.name.trim() || prev.name,
+            imageUri: remote.imageUri || prev.imageUri,
+            gender: remote.gender === '男性' || remote.gender === '女性'
+              ? remote.gender
+              : prev.gender,
+            self: isSelf,
+            isHost: Boolean(event?.hostId && senderId === event.hostId),
+          };
+        });
+      })();
+    },
+    [user, event?.hostId],
+  );
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
-    if (!user || sending || !draft.trim()) return;
+    if (!user || sending || !draft.trim() || peerBlocked) return;
     setSending(true);
     setError('');
     const text = draft;
@@ -106,7 +230,7 @@ export function ChatRoomScreen() {
 
   if (!ready || loading) {
     return (
-      <main className="pt-4 md:pt-2">
+      <main className="page-main pt-4 md:pt-2">
         <p className="text-sm font-bold text-[#8A9199]">読み込み中…</p>
       </main>
     );
@@ -114,7 +238,7 @@ export function ChatRoomScreen() {
 
   if (!user) {
     return (
-      <main className="pt-4 md:pt-2">
+      <main className="page-main pt-4 md:pt-2">
         <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
           ← メッセージ
         </Link>
@@ -130,7 +254,7 @@ export function ChatRoomScreen() {
   const subtitle = mode === 'host' ? '主催者チャット' : 'グループチャット';
 
   return (
-    <main className="flex min-h-[70vh] flex-col pt-4 md:pt-2">
+    <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
@@ -155,44 +279,104 @@ export function ChatRoomScreen() {
 
       <section className="card-shadow mt-4 flex flex-1 flex-col overflow-hidden">
         <div
-          className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+          className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-4"
           style={{ maxHeight: '55vh' }}
         >
-          {messages.length === 0 ? (
+          {peerBlocked ? (
+            <p className="py-10 text-center text-sm font-bold text-[#8A9199]">
+              ブロックしているユーザーとのチャットは表示されません。
+            </p>
+          ) : visibleMessages.length === 0 ? (
             <p className="py-10 text-center text-sm font-bold text-[#8A9199]">
               まだメッセージはありません。最初のひとことを送ってみましょう。
             </p>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.mine ? 'justify-end' : 'justify-start'}`}
-              >
+            visibleMessages.map((message, index) => {
+              const prev = visibleMessages[index - 1];
+              const showSenderMeta =
+                !message.mine &&
+                (!prev || prev.mine || prev.senderId !== message.senderId);
+              const timeLabel = formatBubbleTime(message.at);
+              const displayName = message.mine
+                ? user.displayName?.trim() || message.senderName || 'あなた'
+                : message.senderName.trim() || 'ユーザー';
+              const avatarUri = message.mine
+                ? user.photoURL || message.senderImageUri
+                : message.senderImageUri;
+
+              return (
                 <div
-                  className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
-                    message.mine
-                      ? 'brand-gradient'
-                      : 'bg-[#F4F7F8] text-[#12202A]'
-                  }`}
+                  key={message.id}
+                  className={`flex ${message.mine ? 'justify-end' : 'justify-start'}`}
                 >
-                  {!message.mine ? (
-                    <p className="text-[11px] font-extrabold opacity-70">
-                      {message.senderName}
-                    </p>
-                  ) : null}
-                  <p className="whitespace-pre-wrap text-sm font-bold leading-5">
-                    {message.body}
-                  </p>
-                  <p
-                    className={`mt-1 text-right text-[10px] font-bold ${
-                      message.mine ? 'text-white/80' : 'text-[#8A9199]'
-                    }`}
-                  >
-                    {formatBubbleTime(message.at)}
-                  </p>
+                  {message.mine ? (
+                    <div className="flex max-w-[min(100%,22rem)] items-end gap-2">
+                      {timeLabel ? (
+                        <span
+                          className="mb-0.5 shrink-0 text-[10px] font-bold tabular-nums text-[#8A9199]"
+                          aria-label={`送信時刻 ${timeLabel}`}
+                        >
+                          {timeLabel}
+                        </span>
+                      ) : null}
+                      <div className="brand-gradient max-w-full rounded-2xl rounded-br-md px-3.5 py-2.5">
+                        <p className="whitespace-pre-wrap text-sm font-bold leading-5">
+                          {message.body}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openSenderProfile(message)}
+                        className="mb-0.5 shrink-0 rounded-full transition hover:opacity-80"
+                        aria-label="自分のプロフィールを開く"
+                      >
+                        <ChatAvatar name={displayName} imageUri={avatarUri} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex max-w-[min(100%,22rem)] items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openSenderProfile(message)}
+                        className={`mb-0.5 shrink-0 rounded-full transition hover:opacity-80 ${
+                          showSenderMeta ? '' : 'invisible'
+                        }`}
+                        aria-label={`${displayName}のプロフィールを開く`}
+                        tabIndex={showSenderMeta ? 0 : -1}
+                      >
+                        <ChatAvatar name={displayName} imageUri={avatarUri} />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        {showSenderMeta ? (
+                          <button
+                            type="button"
+                            onClick={() => openSenderProfile(message)}
+                            className="mb-1 block truncate text-left text-[11px] font-extrabold text-[#5B6B75] transition hover:text-[#12B8D0]"
+                          >
+                            {displayName}
+                          </button>
+                        ) : null}
+                        <div className="flex items-end gap-2">
+                          <div className="max-w-full rounded-2xl rounded-bl-md bg-[#F4F7F8] px-3.5 py-2.5 text-[#12202A]">
+                            <p className="whitespace-pre-wrap text-sm font-bold leading-5">
+                              {message.body}
+                            </p>
+                          </div>
+                          {timeLabel ? (
+                            <span
+                              className="mb-0.5 shrink-0 text-[10px] font-bold tabular-nums text-[#8A9199]"
+                              aria-label={`送信時刻 ${timeLabel}`}
+                            >
+                              {timeLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={bottomRef} />
         </div>
@@ -204,19 +388,32 @@ export function ChatRoomScreen() {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="メッセージを入力"
-            className="h-11 min-w-0 flex-1 rounded-full bg-[#F4F7F8] px-4 text-sm font-bold outline-none ring-1 ring-[#E4EBEE] focus:ring-[#12B8D0]"
+            placeholder={
+              peerBlocked ? 'ブロック中のため送信できません' : 'メッセージを入力'
+            }
+            disabled={peerBlocked}
+            className="h-11 min-w-0 flex-1 rounded-full bg-[#F4F7F8] px-4 text-sm font-bold outline-none ring-1 ring-[#E4EBEE] focus:ring-[#12B8D0] disabled:opacity-60"
             maxLength={2000}
           />
           <button
             type="submit"
-            disabled={sending || !draft.trim()}
+            disabled={peerBlocked || sending || !draft.trim()}
             className="brand-gradient h-11 shrink-0 rounded-full px-5 text-sm font-extrabold disabled:opacity-60"
           >
             {sending ? '…' : '送信'}
           </button>
         </form>
       </section>
+
+      <UserProfileModal
+        open={profileTarget != null}
+        person={profileTarget}
+        onClose={() => setProfileTarget(null)}
+        onBlocked={(userId) => {
+          markBlocked(userId);
+          setProfileTarget(null);
+        }}
+      />
     </main>
   );
 }

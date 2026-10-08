@@ -1,8 +1,10 @@
 'use client';
 
 import { ChevronLeft, Users, X } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
+import { SafetyActionsMenu } from '@/components/SafetyActionsMenu';
+import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import {
   fetchEventAttendees,
@@ -68,6 +70,8 @@ export function EventAttendeesSection({
   joinedCountFallback,
 }: Props) {
   const { user } = useAuth();
+  const { hiddenIds, blockedIds, markBlocked, markUnblocked } =
+    useHiddenUserIds();
   const titleId = useId();
   const [attendees, setAttendees] = useState<EventAttendee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,8 +120,25 @@ export function EventAttendeesSection({
     };
   }, [listOpen, selected]);
 
-  const preview = attendees.slice(0, 6);
-  const count = Math.max(attendees.length, joinedCountFallback);
+  const visibleAttendees = useMemo(
+    () =>
+      attendees.filter(
+        (person) => person.self || !hiddenIds.has(person.id),
+      ),
+    [attendees, hiddenIds],
+  );
+
+  useEffect(() => {
+    if (selected && !selected.self && hiddenIds.has(selected.id)) {
+      setSelected(null);
+    }
+  }, [selected, hiddenIds]);
+
+  const preview = visibleAttendees.slice(0, 6);
+  const count =
+    !loading && attendees.length > 0
+      ? visibleAttendees.length
+      : Math.max(visibleAttendees.length, joinedCountFallback);
   const capacityLabel =
     capacity > 0 ? `${count}人参加 / ${capacity}人` : `${count}人参加`;
 
@@ -149,7 +170,7 @@ export function EventAttendeesSection({
 
         {loading ? (
           <p className="mt-3 text-sm font-bold text-[#8A9199]">参加者を読み込み中…</p>
-        ) : count === 0 && attendees.length === 0 ? (
+        ) : count === 0 && visibleAttendees.length === 0 ? (
           <p className="mt-3 text-sm font-bold text-[#8A9199]">まだ参加者はいません</p>
         ) : (
           <button
@@ -160,12 +181,12 @@ export function EventAttendeesSection({
           >
             <div className="flex shrink-0 pl-1">
               {preview.length > 0 ? (
-                preview.map((person, index) => (
+                preview.map((person) => (
                   <AvatarBubble
                     key={person.id}
                     person={person}
                     size={36}
-                    className={`-ml-2 first:ml-0 ${index === 0 ? '' : ''}`}
+                    className="-ml-2 first:ml-0"
                   />
                 ))
               ) : (
@@ -212,14 +233,39 @@ export function EventAttendeesSection({
                   <h2 id={titleId} className="text-sm font-extrabold">
                     プロフィール
                   </h2>
-                  <button
-                    type="button"
-                    aria-label="閉じる"
-                    onClick={closeAll}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
-                  >
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {user && !selected.self ? (
+                      <SafetyActionsMenu
+                        target={{
+                          id: selected.id,
+                          name: selected.name,
+                          imageUri: selected.imageUri,
+                        }}
+                        currentUserId={user.uid}
+                        getIdToken={async () =>
+                          idTokenWithAuthenticatedRole(user)
+                        }
+                        isBlocked={blockedIds.has(selected.id)}
+                        onBlockedChange={(blocked) => {
+                          if (blocked) markBlocked(selected.id);
+                          else markUnblocked(selected.id);
+                        }}
+                        onBlocked={() => {
+                          setSelected(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="inline-block w-8" aria-hidden />
+                    )}
+                    <button
+                      type="button"
+                      aria-label="閉じる"
+                      onClick={closeAll}
+                      className="grid h-8 w-8 place-items-center rounded-full bg-[#F4F7F8] text-[#5B6B75]"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-y-auto px-5 py-8">
                   <div className="flex flex-col items-center text-center">
@@ -282,12 +328,12 @@ export function EventAttendeesSection({
                   </button>
                 </div>
                 <ul className="overflow-y-auto">
-                  {attendees.length === 0 ? (
+                  {visibleAttendees.length === 0 ? (
                     <li className="px-5 py-10 text-center text-sm font-bold text-[#8A9199]">
                       まだ参加者はいません
                     </li>
                   ) : (
-                    attendees.map((person, index) => (
+                    visibleAttendees.map((person, index) => (
                       <li key={person.id}>
                         <button
                           type="button"

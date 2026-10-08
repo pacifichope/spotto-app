@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { EventCard } from '@/components/EventCard';
+import { eventDetailHref, type EventNavFrom } from '@/lib/mypageNav';
 import type { PublicEvent } from '@/lib/types';
 
 export function MyEventList({
@@ -9,11 +10,14 @@ export function MyEventList({
   emptyTitle,
   emptyBody,
   emptyAction,
+  eventFrom,
 }: {
   events: PublicEvent[];
   emptyTitle: string;
   emptyBody: string;
   emptyAction?: ReactNode;
+  /** 詳細→戻るでマイページの mode/segment を復元するとき渡す */
+  eventFrom?: EventNavFrom;
 }) {
   if (events.length === 0) {
     return (
@@ -35,7 +39,11 @@ export function MyEventList({
   return (
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {events.map((event) => (
-        <EventCard key={event.id} event={event} />
+        <EventCard
+          key={event.id}
+          event={event}
+          href={eventDetailHref(event.id, eventFrom)}
+        />
       ))}
     </div>
   );

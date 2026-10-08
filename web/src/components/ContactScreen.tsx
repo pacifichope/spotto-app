@@ -83,7 +83,7 @@ export function ContactScreen() {
   }
 
   return (
-    <main className="pt-4 md:pt-2">
+    <main className="page-main pt-4 md:pt-2">
       <Link href="/settings" className="text-sm font-extrabold text-[#12B8D0]">
         ← 設定
       </Link>

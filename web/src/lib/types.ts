@@ -86,6 +86,27 @@ export function isEventPast(event: PublicEvent, now = Date.now()) {
   return Number.isFinite(ms) ? ms < now : false;
 }
 
+export type EventStatusKind = 'ended' | 'open' | 'full';
+
+/** カード／詳細用の募集ステータス */
+export function getEventStatus(
+  event: Pick<
+    PublicEvent,
+    'eventDate' | 'eventTime' | 'endDate' | 'endTime' | 'capacity' | 'joinedCount'
+  >,
+  now = Date.now(),
+): EventStatusKind {
+  if (isEventPast(event as PublicEvent, now)) return 'ended';
+  if (event.capacity > 0 && event.joinedCount >= event.capacity) return 'full';
+  return 'open';
+}
+
+export function eventStatusLabel(status: EventStatusKind) {
+  if (status === 'ended') return 'イベント終了';
+  if (status === 'full') return '満員';
+  return '募集中';
+}
+
 function normalizeClock(time: string) {
   const t = time.trim();
   if (/^\d{1,2}:\d{2}:\d{2}$/.test(t)) return t;

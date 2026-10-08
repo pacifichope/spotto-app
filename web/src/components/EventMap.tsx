@@ -6,9 +6,15 @@ import {
   Map,
   useMap,
 } from '@vis.gl/react-google-maps';
-import { Clock, LocateFixed, MapPin, X } from 'lucide-react';
+import { Clock, LocateFixed, MapPin, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react';
 
 import {
   categoryColor,
@@ -18,11 +24,17 @@ import {
 } from '@/constants/theme';
 import { absoluteImageUrl, formatPrice, formatWhen } from '@/lib/eventSeo';
 import { googleMapsApiKey } from '@/lib/env';
-import type { PublicEvent } from '@/lib/types';
+import {
+  eventStatusLabel,
+  getEventStatus,
+  type PublicEvent,
+} from '@/lib/types';
 import {
   FALLBACK_COORDS,
+  mapBoundsMovedSignificantly,
   toMapLatLng,
   type LatLng,
+  type MapBoundsLiteral,
 } from '@/lib/userLocation';
 
 type MappableEvent = PublicEvent & {
@@ -50,6 +62,10 @@ export type EventMapProps = {
    * 現在地モードやエリア選択時に使う。
    */
   preferCenter?: boolean;
+  /** 増やすたびに現在地（center）へ強制パン */
+  recenterKey?: number;
+  /** 「このエリアで再検索」確定時 */
+  onSearchArea?: (bounds: MapBoundsLiteral) => void;
 };
 
 function toMappable(events: PublicEvent[]): MappableEvent[] {
@@ -60,60 +76,119 @@ function toMappable(events: PublicEvent[]): MappableEvent[] {
   });
 }
 
+function boundsFromMap(map: google.maps.Map): MapBoundsLiteral | null {
+  const bounds = map.getBounds();
+  if (!bounds) return null;
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+  return {
+    north: ne.lat(),
+    east: ne.lng(),
+    south: sw.lat(),
+    west: sw.lng(),
+  };
+}
+
 function MapCamera({
   center,
   preferCenter,
-  events,
+  recenterKey = 0,
+  onProgrammaticMove,
 }: {
   center: { lat: number; lng: number };
   preferCenter: boolean;
-  events: MappableEvent[];
+  recenterKey?: number;
+  onProgrammaticMove?: () => void;
 }) {
   const map = useMap();
-  const eventBoundsKey = useMemo(
-    () =>
-      events
-        .map((event) => `${event.id}:${event.lat.toFixed(4)},${event.lng.toFixed(4)}`)
-        .join('|'),
-    [events],
-  );
 
   // 現在地／エリア中心を優先（アプリ版 applyArea のカメラ合わせに相当）
   useEffect(() => {
     if (!map || !preferCenter) return;
+    onProgrammaticMove?.();
     map.panTo(center);
     map.setZoom(NEARBY_ZOOM);
-  }, [map, preferCenter, center.lat, center.lng]);
+  }, [map, preferCenter, center.lat, center.lng, onProgrammaticMove]);
 
-  // preferCenter でないときのみイベント群にフィット
+  // 現在地ボタン：同じモードでも必ず中心へ戻す
   useEffect(() => {
-    if (!map || preferCenter) return;
+    if (!map || recenterKey <= 0) return;
+    onProgrammaticMove?.();
+    map.panTo(center);
+    map.setZoom(NEARBY_ZOOM);
+  }, [map, recenterKey, center.lat, center.lng, onProgrammaticMove]);
 
-    if (events.length === 0) {
-      map.panTo(center);
-      map.setZoom(NEARBY_ZOOM);
-      return;
-    }
+  return null;
+}
 
-    if (events.length === 1) {
-      map.setCenter({ lat: events[0].lat, lng: events[0].lng });
-      map.setZoom(13);
-      return;
-    }
+/** Map 内で idle を監視し、再検索ボタンの表示状態を親へ渡す */
+function MapIdleBridge({
+  onPromptChange,
+  skipIdleRef,
+}: {
+  onPromptChange: (next: {
+    show: boolean;
+    bounds: MapBoundsLiteral | null;
+    commit: () => void;
+  }) => void;
+  skipIdleRef: MutableRefObject<boolean>;
+}) {
+  const map = useMap();
+  const committedRef = useRef<MapBoundsLiteral | null>(null);
+  const idleBoundsRef = useRef<MapBoundsLiteral | null>(null);
+  const onPromptChangeRef = useRef(onPromptChange);
+  onPromptChangeRef.current = onPromptChange;
 
-    const lats = events.map((event) => event.lat);
-    const lngs = events.map((event) => event.lng);
-    map.fitBounds(
-      {
-        south: Math.min(...lats),
-        west: Math.min(...lngs),
-        north: Math.max(...lats),
-        east: Math.max(...lngs),
-      },
-      72,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- eventBoundsKey で範囲変化を検知
-  }, [map, preferCenter, eventBoundsKey, center.lat, center.lng]);
+  useEffect(() => {
+    if (!map) return;
+
+    const handleIdle = () => {
+      const bounds = boundsFromMap(map);
+      if (!bounds) return;
+      idleBoundsRef.current = bounds;
+
+      if (skipIdleRef.current) {
+        skipIdleRef.current = false;
+        committedRef.current = bounds;
+        onPromptChangeRef.current({
+          show: false,
+          bounds,
+          commit: () => undefined,
+        });
+        return;
+      }
+
+      if (!committedRef.current) {
+        committedRef.current = bounds;
+        onPromptChangeRef.current({
+          show: false,
+          bounds,
+          commit: () => undefined,
+        });
+        return;
+      }
+
+      const moved = mapBoundsMovedSignificantly(committedRef.current, bounds);
+      onPromptChangeRef.current({
+        show: moved,
+        bounds,
+        commit: () => {
+          committedRef.current = bounds;
+          onPromptChangeRef.current({
+            show: false,
+            bounds,
+            commit: () => undefined,
+          });
+        },
+      });
+    };
+
+    const listener = map.addListener('idle', handleIdle);
+    handleIdle();
+    return () => {
+      google.maps.event.removeListener(listener);
+    };
+  }, [map, skipIdleRef]);
 
   return null;
 }
@@ -193,10 +268,16 @@ function MapPreviewCard({
   const image = absoluteImageUrl(event.imageUri) || sportCover(event.sport);
   const when = formatWhen(event.eventDate, event.eventTime);
   const where = event.location || '場所未定';
+  const status = getEventStatus(event);
+  const ended = status === 'ended';
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 p-3 md:p-4">
-      <div className="pointer-events-auto card-shadow relative mx-auto w-full max-w-xl overflow-hidden p-3.5">
+      <div
+        className={`pointer-events-auto card-shadow relative mx-auto w-full max-w-xl overflow-hidden p-3.5 ${
+          ended ? 'opacity-60 grayscale-[0.35]' : ''
+        }`}
+      >
         <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-[#E4EBEE]" />
         <button
           type="button"
@@ -214,8 +295,14 @@ function MapPreviewCard({
             className="h-[84px] w-[84px] shrink-0 rounded-2xl object-cover bg-[#E5F9FC]"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-extrabold text-[#12B8D0]">
-              {[event.sport || 'スポーツ', event.level].filter(Boolean).join(' · ')}
+            <p
+              className={`truncate text-[11px] font-extrabold ${
+                ended ? 'text-[#8A9199]' : 'text-[#12B8D0]'
+              }`}
+            >
+              {ended
+                ? eventStatusLabel(status)
+                : [event.sport || 'スポーツ', event.level].filter(Boolean).join(' · ')}
             </p>
             <h2 className="mt-0.5 line-clamp-2 text-base font-extrabold tracking-tight leading-5">
               {event.title}
@@ -251,11 +338,30 @@ function GoogleEventMap({
   locating,
   onRecenter,
   preferCenter,
+  recenterKey = 0,
+  onSearchArea,
 }: Required<Pick<EventMapProps, 'events' | 'center' | 'preferCenter'>> &
-  Pick<EventMapProps, 'userCoords' | 'locating' | 'onRecenter'>) {
+  Pick<
+    EventMapProps,
+    'userCoords' | 'locating' | 'onRecenter' | 'recenterKey' | 'onSearchArea'
+  >) {
   const mappable = useMemo(() => toMappable(events), [events]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = mappable.find((event) => event.id === selectedId) ?? null;
+  const skipIdleRef = useRef(false);
+  const [searchPrompt, setSearchPrompt] = useState<{
+    show: boolean;
+    bounds: MapBoundsLiteral | null;
+    commit: () => void;
+  }>({ show: false, bounds: null, commit: () => undefined });
+
+  const markProgrammaticMove = useMemo(
+    () => () => {
+      skipIdleRef.current = true;
+      setSearchPrompt((prev) => ({ ...prev, show: false }));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (selectedId && !mappable.some((event) => event.id === selectedId)) {
@@ -277,7 +383,18 @@ function GoogleEventMap({
         className="h-full w-full"
         onClick={() => setSelectedId(null)}
       >
-        <MapCamera center={center} preferCenter={preferCenter} events={mappable} />
+        <MapCamera
+          center={center}
+          preferCenter={preferCenter}
+          recenterKey={recenterKey}
+          onProgrammaticMove={markProgrammaticMove}
+        />
+        {onSearchArea ? (
+          <MapIdleBridge
+            skipIdleRef={skipIdleRef}
+            onPromptChange={setSearchPrompt}
+          />
+        ) : null}
         {userCoords ? <UserLocationDot coords={userCoords} /> : null}
         {mappable.map((event) => (
           <AdvancedMarker
@@ -291,6 +408,24 @@ function GoogleEventMap({
           </AdvancedMarker>
         ))}
       </Map>
+
+      {onSearchArea && searchPrompt.show && searchPrompt.bounds ? (
+        <div className="pointer-events-none absolute inset-x-0 top-14 z-20 flex justify-center px-3">
+          <button
+            type="button"
+            onClick={() => {
+              const bounds = searchPrompt.bounds;
+              if (!bounds) return;
+              searchPrompt.commit();
+              onSearchArea(bounds);
+            }}
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-sm font-extrabold text-[#12202A] shadow-[0_8px_24px_rgba(18,32,42,0.14)] ring-1 ring-[#E4EBEE] transition hover:bg-white"
+          >
+            <RefreshCw size={15} strokeWidth={2.4} className="text-[#12B8D0]" />
+            このエリアで再検索
+          </button>
+        </div>
+      ) : null}
 
       <div className="absolute left-3 top-3 z-20 rounded-full bg-white/95 px-3 py-1 text-[11px] font-extrabold text-[#5B6B75] shadow-sm">
         マップ · {mappable.length}件
@@ -313,11 +448,11 @@ function GoogleEventMap({
       ) : null}
 
       {events.length === 0 ? (
-        <p className="absolute inset-0 z-20 grid place-items-center bg-white/70 px-6 text-center text-sm font-bold text-[#5B6B75]">
-          条件に合うイベントがありません。フィルターを変えてみてください。
+        <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
+          この範囲に条件に合うイベントはありません
         </p>
       ) : mappable.length === 0 ? (
-        <p className="absolute inset-0 z-20 grid place-items-center bg-white/70 px-6 text-center text-sm font-bold text-[#5B6B75]">
+        <p className="pointer-events-none absolute inset-x-0 bottom-4 z-20 mx-auto max-w-sm rounded-2xl bg-white/90 px-4 py-3 text-center text-sm font-bold text-[#5B6B75] shadow-sm">
           表示できる位置情報のあるイベントがありません
         </p>
       ) : null}
@@ -336,6 +471,8 @@ export function EventMap({
   locating = false,
   onRecenter,
   preferCenter = true,
+  recenterKey = 0,
+  onSearchArea,
 }: EventMapProps) {
   const apiKey = googleMapsApiKey();
   const resolvedCenter = center ?? DEFAULT_CENTER;
@@ -357,6 +494,8 @@ export function EventMap({
         locating={locating}
         onRecenter={onRecenter}
         preferCenter={preferCenter}
+        recenterKey={recenterKey}
+        onSearchArea={onSearchArea}
       />
     </APIProvider>
   );

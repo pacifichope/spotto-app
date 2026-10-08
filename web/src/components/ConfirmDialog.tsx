@@ -72,7 +72,7 @@ export function ConfirmDialog({
       : 'brand-gradient disabled:opacity-60';
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
       <button
         type="button"
         aria-label="閉じる"

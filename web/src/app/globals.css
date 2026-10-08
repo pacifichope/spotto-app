@@ -40,16 +40,26 @@ input {
   background: linear-gradient(165deg, #7eeaf2 0%, #e8f8f2 42%, #ffd4b0 100%);
 }
 
+/**
+ * 全ページ共通のコンテンツ枠。
+ * PC でも横に伸びきらず、スマホアプリに近いコンパクトな中央寄せレイアウトにする。
+ */
 .app-shell {
-  width: min(1440px, 100%);
-  margin: 0 auto;
-  padding: 8px 16px 104px;
+  width: 100%;
+  max-width: 48rem; /* max-w-3xl ≈ 768px */
+  margin-inline: auto;
+  padding: 12px 16px 104px;
 }
 
 @media (min-width: 768px) {
   .app-shell {
-    padding: 28px 28px 40px;
+    padding: 24px 24px 48px;
   }
+}
+
+/** ページ内メイン（shell 内で幅いっぱいに追従） */
+.page-main {
+  width: 100%;
 }
 
 .glass {

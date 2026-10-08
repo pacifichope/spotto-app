@@ -21,7 +21,7 @@ import {
 } from '@/lib/firebase';
 import { formatPrice } from '@/lib/eventSeo';
 import { confirmHostedCheckout, createHostedCheckout } from '@/lib/payments';
-import type { PublicEvent } from '@/lib/types';
+import { isEventPast, type PublicEvent } from '@/lib/types';
 
 const socialButtonClass =
   'flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-extrabold disabled:opacity-60';
@@ -85,8 +85,10 @@ function BookControls({
     }
   }
 
+  const ended = isEventPast(event);
+
   async function reserve() {
-    if (!user) return;
+    if (!user || ended) return;
     setBusy(true);
     setMessage('');
     try {
@@ -127,23 +129,37 @@ function BookControls({
     }
   }
 
-  const label = busy
-    ? '処理中…'
-    : event.priceYen > 0
-      ? '支払って参加する'
-      : '参加する';
+  const label = ended
+    ? 'イベント終了'
+    : busy
+      ? '処理中…'
+      : event.priceYen > 0
+        ? '支払って参加する'
+        : '参加する';
 
   return (
     <div className="glass fixed inset-x-0 bottom-[72px] z-30 px-4 py-3 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:p-5">
-      <p className="mb-1 hidden text-xs font-extrabold text-[#12B8D0] lg:block">参加する</p>
-      <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">{formatPrice(event.priceYen)}</p>
+      <p
+        className={`mb-1 hidden text-xs font-extrabold lg:block ${
+          ended ? 'text-[#8A9199]' : 'text-[#12B8D0]'
+        }`}
+      >
+        {ended ? '受付終了' : '参加する'}
+      </p>
+      <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">
+        {formatPrice(event.priceYen)}
+      </p>
       {user ? (
         <div className="flex flex-col gap-2">
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || ended}
             onClick={() => void reserve()}
-            className="brand-gradient h-12 w-full rounded-full text-sm font-extrabold disabled:opacity-60"
+            className={`h-12 w-full rounded-full text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-70 ${
+              ended
+                ? 'bg-[#94A3B8] text-white'
+                : 'brand-gradient disabled:opacity-60'
+            }`}
           >
             {label}
           </button>
@@ -162,6 +178,14 @@ function BookControls({
             </Link>
           ) : null}
         </div>
+      ) : ended ? (
+        <button
+          type="button"
+          disabled
+          className="h-12 w-full cursor-not-allowed rounded-full bg-[#94A3B8] text-sm font-extrabold text-white opacity-70"
+        >
+          イベント終了
+        </button>
       ) : (
         <div className="flex flex-col gap-2">
           <button

@@ -12,7 +12,7 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <main className="pt-4 text-sm font-bold text-[#8A9199]">読み込み中…</main>
+        <main className="page-main pt-4 text-sm font-bold text-[#8A9199]">読み込み中…</main>
       }
     >
       <ChatRoomScreen />

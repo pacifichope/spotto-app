@@ -10,6 +10,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
@@ -27,19 +28,27 @@ import {
   type MyEventsBundle,
 } from '@/lib/myEvents';
 import {
+  parseMyPageMode,
+  parseMyPageSegment,
+  type MyPageMode,
+  type MyPageSegment,
+} from '@/lib/mypageNav';
+import {
   EMPTY_ORGANIZER_PROFILE,
+  fetchOrganizerClubProfile,
   hasOrganizerProfileReady,
   loadOrganizerProfile,
+  mergeOrganizerProfiles,
+  saveOrganizerProfileLocal,
   type WebOrganizerProfile,
-} from '@/lib/organizerProfile';
-import {
+} from '@/lib/organizerProfile';import {
   fetchWebProfile,
   profileFromFirebaseUser,
   type WebUserProfile,
 } from '@/lib/profile';
 
-type Mode = 'participant' | 'organizer';
-type Segment = 'joined' | 'past' | 'favorites' | 'hosted' | 'drafts';
+type Mode = MyPageMode;
+type Segment = MyPageSegment;
 
 const emptyBundle: MyEventsBundle = {
   joinedUpcoming: [],
@@ -49,12 +58,21 @@ const emptyBundle: MyEventsBundle = {
   hostedPast: [],
 };
 
-const shellClass = 'mx-auto w-full max-w-3xl px-1 sm:px-2';
+const shellClass = 'page-main';
 
 export function MyPageScreen() {
   const { user, ready, busy, signOut } = useAuth();
-  const [mode, setMode] = useState<Mode>('participant');
-  const [segment, setSegment] = useState<Segment>('joined');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const modeFromUrl = parseMyPageMode(searchParams);
+  const segmentFromUrl = parseMyPageSegment(searchParams, modeFromUrl);
+
+  const [mode, setModeState] = useState<Mode>(modeFromUrl);
+  const [segment, setSegmentState] = useState<Segment>(
+    () => segmentFromUrl ?? (modeFromUrl === 'organizer' ? 'hosted' : 'joined'),
+  );
   const [bundle, setBundle] = useState<MyEventsBundle>(emptyBundle);
   const [drafts, setDrafts] = useState<WebEventDraft[]>([]);
   const [clubCount, setClubCount] = useState(0);
@@ -75,22 +93,29 @@ export function MyPageScreen() {
   const reloadLists = useCallback(async () => {
     if (!user) return;
     const fallback = profileFromFirebaseUser(user);
-    const [nextBundle, nextProfile, clubs] = await Promise.all([
+    const getIdToken = async () => idTokenWithAuthenticatedRole(user);
+    const [nextBundle, nextProfile, clubs, remoteClub] = await Promise.all([
       fetchMyEventsBundle({
         userId: user.uid,
-        getIdToken: async () => idTokenWithAuthenticatedRole(user),
+        getIdToken,
       }),
       fetchWebProfile({ userId: user.uid, fallback }),
       fetchJoinedClubs({
         userId: user.uid,
-        getIdToken: async () => idTokenWithAuthenticatedRole(user),
+        getIdToken,
       }).catch(() => []),
+      fetchOrganizerClubProfile({ userId: user.uid, getIdToken }).catch(
+        () => null,
+      ),
     ]);
     setBundle(nextBundle);
     setProfile(nextProfile);
     setClubCount(clubs.length);
     setDrafts(loadEventDrafts(user.uid));
-    setOrganizer(loadOrganizerProfile(user.uid));
+    const localOrg = loadOrganizerProfile(user.uid);
+    const merged = mergeOrganizerProfiles(localOrg, remoteClub);
+    setOrganizer(merged);
+    if (remoteClub) saveOrganizerProfileLocal(user.uid, merged);
   }, [user]);
 
   useEffect(() => {
@@ -126,11 +151,47 @@ export function MyPageScreen() {
     };
   }, [user, reloadLists]);
 
+  const syncUrl = useCallback(
+    (nextMode: Mode, nextSegment: Segment) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('mode', nextMode);
+      params.set('segment', nextSegment);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  const setMode = useCallback(
+    (next: Mode) => {
+      const nextSegment: Segment = next === 'organizer' ? 'hosted' : 'joined';
+      setModeState(next);
+      setSegmentState(nextSegment);
+      syncUrl(next, nextSegment);
+    },
+    [syncUrl],
+  );
+
+  const setSegment = useCallback(
+    (next: Segment) => {
+      setSegmentState(next);
+      syncUrl(mode, next);
+    },
+    [mode, syncUrl],
+  );
+
+  // ブラウザ戻る／下層ページからの ?mode=organizer 復元
   useEffect(() => {
-    setSegment(mode === 'organizer' ? 'hosted' : 'joined');
-  }, [mode]);
+    const nextMode = parseMyPageMode(searchParams);
+    const nextSegment =
+      parseMyPageSegment(searchParams, nextMode) ??
+      (nextMode === 'organizer' ? 'hosted' : 'joined');
+    setModeState(nextMode);
+    setSegmentState(nextSegment);
+  }, [searchParams]);
 
   const isOrganizer = mode === 'organizer';
+  const settingsHref = `/settings?from=${mode}`;
 
   const segments = useMemo(() => {
     if (isOrganizer) {
@@ -228,7 +289,7 @@ export function MyPageScreen() {
             <p className="mt-2 text-sm font-bold text-[#8A9199]">現在：未ログイン</p>
           </div>
           <Link
-            href="/settings"
+            href="/settings?from=participant"
             className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#12202A] shadow-sm"
             aria-label="設定"
           >
@@ -258,7 +319,7 @@ export function MyPageScreen() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/settings"
+            href={settingsHref}
             className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#12202A] shadow-sm"
             aria-label="アプリ設定"
             title="設定"
@@ -458,6 +519,7 @@ export function MyPageScreen() {
             events={[]}
             emptyTitle={emptyCopy.title}
             emptyBody={emptyCopy.body}
+            eventFrom={{ source: 'mypage', mode, segment }}
             emptyAction={
               <button
                 type="button"
@@ -510,6 +572,7 @@ export function MyPageScreen() {
           events={listEvents}
           emptyTitle={emptyCopy.title}
           emptyBody={emptyCopy.body}
+          eventFrom={{ source: 'mypage', mode, segment }}
           emptyAction={
             isOrganizer && segment === 'hosted' ? (
               <button
@@ -583,7 +646,6 @@ export function MyPageScreen() {
         }}
         onPublished={() => {
           setMode('organizer');
-          setSegment('hosted');
           void reloadLists();
         }}
         onDraftSaved={(next) => setDrafts(next)}

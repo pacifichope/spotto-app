@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 
 import { BookPanel } from '@/app/event/[id]/book-panel';
 import { EventAttendeesSection } from '@/components/EventAttendeesSection';
+import { EventBackLink } from '@/components/EventBackLink';
 import { sportCover } from '@/constants/theme';
 import { getPublicEvent, listPublicEvents } from '@/lib/events';
 import {
@@ -15,6 +16,7 @@ import {
   formatPrice,
   formatWhen,
 } from '@/lib/eventSeo';
+import { eventStatusLabel, getEventStatus } from '@/lib/types';
 
 /** 5分ごとにサーバーで HTML を作り直す。リクエストのたびに動的描画はしない。 */
 export const revalidate = 300;
@@ -55,20 +57,14 @@ export default async function EventPage({ params }: PageProps) {
   const jsonLd = JSON.stringify(eventJsonLd(event)).replace(/</g, '\\u003c');
   const photo = absoluteImageUrl(event.imageUri);
   const gallery = photo ? [photo, sportCover(event.sport)].filter((src, index, all) => all.indexOf(src) === index) : [sportCover(event.sport)];
-  const open = event.capacity <= 0 || event.joinedCount < event.capacity;
+  const status = getEventStatus(event);
 
   return (
-    <main className="pb-36 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start lg:gap-8 lg:pb-4">
+    <main className="page-main pb-36 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)] lg:items-start lg:gap-6 lg:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <article>
         <nav aria-label="パンくず" className="mb-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm font-extrabold text-[#5B6B75] transition-colors hover:text-[#12B8D0]"
-          >
-            <span aria-hidden>←</span>
-            イベント一覧に戻る
-          </Link>
+          <EventBackLink />
         </nav>
 
         <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:overflow-visible">
@@ -99,8 +95,16 @@ export default async function EventPage({ params }: PageProps) {
           </p>
           <div className="mt-2 flex items-start justify-between gap-3">
             <h1 className="text-2xl font-extrabold tracking-tight">{event.title}</h1>
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white ${open ? 'brand-gradient' : 'bg-[#8A9199]'}`}>
-              {open ? '募集中' : '満員'}
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white ${
+                status === 'open'
+                  ? 'brand-gradient'
+                  : status === 'ended'
+                    ? 'bg-[#94A3B8]'
+                    : 'bg-[#8A9199]'
+              }`}
+            >
+              {eventStatusLabel(status)}
             </span>
           </div>
 

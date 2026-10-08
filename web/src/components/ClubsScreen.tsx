@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
 import { useAuth } from '@/lib/auth-context';
-import { fetchJoinedClubs, type JoinedClub } from '@/lib/clubs';
+import { clubHref, fetchJoinedClubs, type JoinedClub } from '@/lib/clubs';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import { mypageHref } from '@/lib/mypageNav';
 
 export function ClubsScreen() {
   const { user, ready } = useAuth();
@@ -44,7 +46,7 @@ export function ClubsScreen() {
 
   if (!ready) {
     return (
-      <main className="pt-4 md:pt-2">
+      <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">参加したクラブ</h1>
         <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
       </main>
@@ -52,8 +54,11 @@ export function ClubsScreen() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl pt-4 md:pt-2">
-      <Link href="/mypage" className="text-sm font-extrabold text-[#12B8D0]">
+    <main className="page-main pt-4 md:pt-2">
+      <Link
+        href={mypageHref({ mode: 'participant' })}
+        className="text-sm font-extrabold text-[#12B8D0]"
+      >
         ← マイページ
       </Link>
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">参加したクラブ</h1>
@@ -81,27 +86,37 @@ export function ClubsScreen() {
           </Link>
         </section>
       ) : (
-        <ul className="card-shadow mt-5 divide-y divide-[#E4EBEE] overflow-hidden">
+        <ul className="mt-5 space-y-2">
           {clubs.map((club) => (
-            <li key={club.id} className="flex items-center gap-3 px-5 py-4">
-              {club.imageUri ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={club.imageUri}
-                  alt=""
-                  className="h-12 w-12 rounded-full object-cover"
+            <li key={club.id}>
+              <Link
+                href={clubHref(club.id)}
+                className="group card-shadow flex items-center gap-3 px-5 py-4 transition duration-200 hover:-translate-y-0.5 hover:bg-[#F7FBFC] hover:shadow-[0_12px_28px_rgba(18,32,42,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12B8D0]/50"
+              >
+                {club.imageUri ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={club.imageUri}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="brand-gradient grid h-12 w-12 shrink-0 place-items-center rounded-full text-base font-extrabold">
+                    {club.name.slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-extrabold">{club.name}</p>
+                  <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
+                    {[club.sport, club.bio].filter(Boolean).join(' · ') || 'サークル'}
+                  </p>
+                </div>
+                <ChevronRight
+                  size={18}
+                  className="shrink-0 text-[#8A9199] transition-colors group-hover:text-[#12B8D0]"
+                  aria-hidden
                 />
-              ) : (
-                <span className="brand-gradient grid h-12 w-12 place-items-center rounded-full text-base font-extrabold">
-                  {club.name.slice(0, 1)}
-                </span>
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-extrabold">{club.name}</p>
-                <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
-                  {[club.sport, club.bio].filter(Boolean).join(' · ') || 'サークル'}
-                </p>
-              </div>
+              </Link>
             </li>
           ))}
         </ul>

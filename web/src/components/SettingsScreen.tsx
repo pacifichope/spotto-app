@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { deleteWebAccount } from '@/lib/account';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { LEGAL_EXTERNAL_URLS } from '@/lib/legal';
+import { mypageHref, parseMyPageMode } from '@/lib/mypageNav';
 
 type Row = {
   key: string;
@@ -26,11 +27,16 @@ const DELETE_PHRASE = '削除する';
 
 export function SettingsScreen() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, ready, busy, signOut } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const fromMode = searchParams.get('from') || searchParams.get('mode') || '';
+  const mypageBackHref = mypageHref({
+    mode: parseMyPageMode(new URLSearchParams(`mode=${fromMode}`)),
+  });
 
   async function confirmLogout() {
     setMessage('');
@@ -69,7 +75,7 @@ export function SettingsScreen() {
 
   if (!ready) {
     return (
-      <main className="pt-4 md:pt-2">
+      <main className="page-main pt-4 md:pt-2">
         <h1 className="text-2xl font-extrabold tracking-tight">設定</h1>
         <p className="mt-4 text-sm font-bold text-[#8A9199]">読み込み中…</p>
       </main>
@@ -107,16 +113,18 @@ export function SettingsScreen() {
     {
       key: 'notifications',
       label: '通知設定',
-      caption: 'プッシュ通知はアプリで設定できます',
-      onClick: () =>
-        window.alert('通知のオン／オフは spotto アプリの設定から変更できます。'),
+      caption: 'リマインダー・チャット・イベント更新',
+      href: fromMode
+        ? `/settings/notifications?from=${encodeURIComponent(fromMode)}`
+        : '/settings/notifications',
     },
     {
       key: 'blocklist',
       label: 'ブロックリスト',
-      caption: 'ブロック管理はアプリで行えます',
-      onClick: () =>
-        window.alert('ブロックリストの確認・解除は spotto アプリから行えます。'),
+      caption: 'ブロック中のユーザーを確認・解除',
+      href: fromMode
+        ? `/settings/blocklist?from=${encodeURIComponent(fromMode)}`
+        : '/settings/blocklist',
     },
   ];
 
@@ -134,10 +142,10 @@ export function SettingsScreen() {
   }
 
   return (
-    <main className="pt-4 md:pt-2">
+    <main className="page-main pt-4 md:pt-2">
       <div className="flex items-center gap-3">
         <Link
-          href="/mypage"
+          href={mypageBackHref}
           className="text-sm font-extrabold text-[#12B8D0]"
         >
           ← マイページ
@@ -262,7 +270,10 @@ export function SettingsScreen() {
             {busy ? '処理中…' : 'ログアウト'}
           </button>
         ) : (
-          <Link href="/mypage" className="text-sm font-extrabold text-[#12B8D0]">
+          <Link
+            href={mypageBackHref}
+            className="text-sm font-extrabold text-[#12B8D0]"
+          >
             ログインへ
           </Link>
         )}

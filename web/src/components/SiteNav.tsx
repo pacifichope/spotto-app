@@ -22,7 +22,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-md">
-      <div className="mx-auto flex h-14 w-full max-w-[1440px] items-center justify-between gap-3 px-4 md:h-16 md:px-7">
+      <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between gap-3 px-4 md:h-16 md:px-6">
         <div className="flex min-w-0 items-center gap-4">
           <Link href="/" className="shrink-0 text-xl font-extrabold tracking-tight">
             spotto

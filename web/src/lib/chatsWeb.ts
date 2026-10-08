@@ -21,6 +21,8 @@ export type InboxThread = {
   eventId: string;
   mode: ChatMode;
   dmUserId: string | null;
+  /** イベント主催者 ID（ブロックフィルタ用） */
+  hostId: string;
   eventTitle: string;
   eventSport: string;
   eventImageUri: string | null;
@@ -42,12 +44,110 @@ type ChatMessageRow = {
 };
 
 const READS_KEY = 'spotto_web_chat_reads_v1';
+const HIDES_KEY = 'spotto_web_chat_hides_v1';
+
+/** threadId → hidden_at（ms） */
+type ChatHides = Record<string, number>;
 
 function threadId(eventId: string, mode: ChatMode, dmUserId?: string | null) {
   if (mode === 'host' && dmUserId?.trim()) {
     return `${eventId}:host:${dmUserId.trim()}`;
   }
   return `${eventId}:group`;
+}
+
+function loadLocalHides(): ChatHides {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(HIDES_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object') return {};
+    const next: ChatHides = {};
+    for (const [id, value] of Object.entries(parsed)) {
+      const key = id.trim();
+      const at = typeof value === 'number' ? value : Number(value);
+      if (!key || !Number.isFinite(at) || at <= 0) continue;
+      next[key] = at;
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalHides(hides: ChatHides) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(HIDES_KEY, JSON.stringify(hides));
+}
+
+function mergeHides(local: ChatHides, remote: ChatHides): ChatHides {
+  const next: ChatHides = { ...local };
+  for (const [id, at] of Object.entries(remote)) {
+    const key = id.trim();
+    if (!key || !(at > 0)) continue;
+    next[key] = Math.max(next[key] ?? 0, at);
+  }
+  return next;
+}
+
+/** 自分の一覧から隠す（メッセージ本体は残す）。hidden_at 以降の新着があれば再表示 */
+function isThreadHiddenFromList(lastAt: number, hiddenAtMs: number | undefined) {
+  const hiddenAt = Number(hiddenAtMs) || 0;
+  if (hiddenAt <= 0) return false;
+  if (!lastAt) return true;
+  return lastAt <= hiddenAt;
+}
+
+async function fetchRemoteHides(
+  getIdToken: () => Promise<string | null>,
+  userId: string,
+): Promise<ChatHides> {
+  const supabase = createAuthedSupabase(getIdToken);
+  const { data, error } = await supabase
+    .from('chat_thread_hides')
+    .select('thread_id, hidden_at')
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+
+  const next: ChatHides = {};
+  for (const row of data ?? []) {
+    const id = String((row as { thread_id?: string }).thread_id || '').trim();
+    const iso = String((row as { hidden_at?: string }).hidden_at || '');
+    const at = Date.parse(iso);
+    if (!id || !Number.isFinite(at) || at <= 0) continue;
+    next[id] = at;
+  }
+  return next;
+}
+
+/** チャットを自分の一覧から削除（非表示）。他ユーザーの履歴は消えない */
+export async function hideInboxThread(input: {
+  userId: string;
+  getIdToken: () => Promise<string | null>;
+  threadId: string;
+  lastAt?: number;
+}): Promise<void> {
+  const id = input.threadId.trim();
+  if (!id) throw new Error('チャットが指定されていません');
+
+  const at = Math.max(Date.now(), Math.floor(Number(input.lastAt) || 0));
+  const local = loadLocalHides();
+  local[id] = Math.max(local[id] ?? 0, at);
+  saveLocalHides(local);
+
+  const supabase = createAuthedSupabase(input.getIdToken);
+  const iso = new Date(at).toISOString();
+  const { error } = await supabase.from('chat_thread_hides').upsert(
+    {
+      user_id: input.userId,
+      thread_id: id,
+      hidden_at: iso,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,thread_id' },
+  );
+  if (error) throw new Error(error.message);
 }
 
 export function parseChatMode(value: string | null | undefined): ChatMode {
@@ -73,8 +173,27 @@ export function formatChatListTime(at: number, now = Date.now()) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-export function formatBubbleTime(at: number) {
-  return formatChatListTime(at);
+/**
+ * 吹き出し横の時刻。
+ * - 当日: "14:30"
+ * - 別日（同年）: "9/23 14:30"
+ * - 別年: "2025/9/23 14:30"
+ */
+export function formatBubbleTime(at: number, now = Date.now()) {
+  if (!at || !Number.isFinite(at)) return '';
+  const date = new Date(at);
+  const clock = formatClock(at);
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  if (at >= startOfToday.getTime()) return clock;
+
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = date.getFullYear();
+  if (year !== new Date(now).getFullYear()) {
+    return `${year}/${month}/${day} ${clock}`;
+  }
+  return `${month}/${day} ${clock}`;
 }
 
 function loadReads(): Record<string, number> {
@@ -178,15 +297,21 @@ export async function fetchInboxThreads(input: {
   if (eventIds.length === 0) return [];
 
   const supabase = createAuthedSupabase(input.getIdToken);
-  const { data, error } = await supabase
-    .from('chat_messages')
-    .select('*')
-    .in('event_id', eventIds)
-    .order('created_at', { ascending: false })
-    .limit(800);
-  if (error) throw new Error(error.message);
+  const [messagesRes, remoteHides] = await Promise.all([
+    supabase
+      .from('chat_messages')
+      .select('*')
+      .in('event_id', eventIds)
+      .order('created_at', { ascending: false })
+      .limit(800),
+    fetchRemoteHides(input.getIdToken, input.userId).catch(() => ({}) as ChatHides),
+  ]);
+  if (messagesRes.error) throw new Error(messagesRes.error.message);
 
-  const rows = (data ?? []) as ChatMessageRow[];
+  const hides = mergeHides(loadLocalHides(), remoteHides);
+  saveLocalHides(hides);
+
+  const rows = (messagesRes.data ?? []) as ChatMessageRow[];
   const reads = loadReads();
   const byThread = new Map<
     string,
@@ -226,6 +351,7 @@ export async function fetchInboxThreads(input: {
     const sorted = [...bucket.messages].sort((a, b) => a.at - b.at);
     const last = sorted[sorted.length - 1];
     if (!last) continue;
+    if (isThreadHiddenFromList(last.at, hides[key])) continue;
     const cutoff = reads[key] || 0;
     const unread = sorted.filter((m) => !m.mine && m.at > cutoff).length;
     threads.push({
@@ -233,6 +359,7 @@ export async function fetchInboxThreads(input: {
       eventId: bucket.event.id,
       mode: bucket.mode,
       dmUserId: bucket.dm,
+      hostId: bucket.event.hostId,
       eventTitle: bucket.event.title,
       eventSport: bucket.event.sport,
       eventImageUri: bucket.event.imageUri,

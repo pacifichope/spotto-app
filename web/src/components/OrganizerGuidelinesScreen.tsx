@@ -7,11 +7,15 @@ import {
   ORGANIZER_GUIDELINE_SECTIONS,
   ORGANIZER_GUIDELINE_UPDATED_AT,
 } from '@/lib/organizerGuidelines';
+import { mypageHref } from '@/lib/mypageNav';
 
 export function OrganizerGuidelinesScreen() {
   return (
-    <main className="mx-auto max-w-2xl pt-4 md:pt-2">
-      <Link href="/mypage" className="text-sm font-extrabold text-[#12B8D0]">
+    <main className="page-main pt-4 md:pt-2">
+      <Link
+        href={mypageHref({ mode: 'organizer' })}
+        className="text-sm font-extrabold text-[#12B8D0]"
+      >
         ← マイページ
       </Link>
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">主催ガイドライン</h1>

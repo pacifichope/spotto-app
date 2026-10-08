@@ -33,7 +33,7 @@ function LineCallbackInner() {
   }, [query, router]);
 
   return (
-    <main className="mx-auto max-w-md px-4 py-16 text-center">
+    <main className="page-main px-1 py-16 text-center">
       <h1 className="text-xl font-extrabold tracking-tight">LINE ログイン</h1>
       <p className="card-shadow mt-4 px-4 py-8 text-sm font-bold leading-6 text-[#5B6B75]">
         {message}

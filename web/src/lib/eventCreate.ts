@@ -110,6 +110,7 @@ export async function createWebEvent(input: {
     host_name: hostName,
     host_image_uri: input.organizer.imageUri?.trim() || null,
     host_bio: input.organizer.bio.trim() || null,
+    host_sns_links: input.organizer.snsLinks ?? [],
     description: input.payload.description.trim() || null,
     image_uri: imageUri,
     image_uris: [imageUri],
