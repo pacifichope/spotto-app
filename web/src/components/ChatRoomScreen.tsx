@@ -12,6 +12,7 @@ import {
 } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { ChatBubblesSkeleton } from '@/components/skeletons';
 import {
   UserProfileModal,
@@ -234,7 +235,8 @@ export function ChatRoomScreen() {
   if (!ready || loading) {
     return (
       <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
-        <div className="space-y-2" aria-hidden>
+        <BackButton fallbackHref="/messages" label={t('chat.backMessages')} />
+        <div className="mt-3 space-y-2" aria-hidden>
           <span className="skeleton-bone block h-3 w-28 rounded-full" />
           <span className="skeleton-bone block h-5 w-48 rounded-full" />
           <span className="skeleton-bone block h-3 w-20 rounded-full" />
@@ -247,9 +249,7 @@ export function ChatRoomScreen() {
   if (!user) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
-          {t('chat.backMessages')}
-        </Link>
+        <BackButton fallbackHref="/messages" label={t('chat.backMessages')} />
         <LoginPromptCard
           title={t('chat.loginTitle')}
           body={t('chat.loginBody')}
@@ -265,9 +265,7 @@ export function ChatRoomScreen() {
     <main className="page-main content-fade-in flex min-h-[70vh] flex-col pt-4 md:pt-2">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link href="/messages" className="text-sm font-extrabold text-[#12B8D0]">
-            {t('chat.backMessages')}
-          </Link>
+          <BackButton fallbackHref="/messages" label={t('chat.backMessages')} />
           <h1 className="mt-2 truncate text-xl font-extrabold tracking-tight">
             {title}
           </h1>

@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ListRowsSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
@@ -87,7 +87,11 @@ function BlocklistBody() {
   if (!authReady) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
+        <BackButton
+          fallbackHref={settingsBackHref}
+          label={t('blocklist.backSettings')}
+        />
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
         <ListRowsSkeleton count={4} />
       </main>
     );
@@ -95,9 +99,10 @@ function BlocklistBody() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link href={settingsBackHref} className="text-sm font-extrabold text-[#12B8D0]">
-        {t('blocklist.backSettings')}
-      </Link>
+      <BackButton
+        fallbackHref={settingsBackHref}
+        label={t('blocklist.backSettings')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
       <p className="mt-1 text-sm font-bold text-[#5B6B75]">{t('blocklist.subtitle')}</p>
 
@@ -198,7 +203,8 @@ export function BlocklistScreen() {
     <Suspense
       fallback={
         <main className="page-main pt-4 md:pt-2">
-          <h1 className="text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
+          <BackButton fallbackHref="/settings" label={t('blocklist.backSettings')} />
+          <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('blocklist.title')}</h1>
           <ListRowsSkeleton count={4} />
         </main>
       }

@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-
+import { BackButton } from '@/components/BackButton';
 import {
   ORGANIZER_GUIDELINE_INTRO,
   ORGANIZER_GUIDELINE_SECTIONS,
@@ -14,12 +13,10 @@ export function OrganizerGuidelinesScreen() {
   const t = useT();
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link
-        href={mypageHref({ mode: 'organizer' })}
-        className="text-sm font-extrabold text-[#12B8D0]"
-      >
-        {t('guidelines.backMypage')}
-      </Link>
+      <BackButton
+        fallbackHref={mypageHref({ mode: 'organizer' })}
+        label={t('guidelines.backMypage')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('guidelines.title')}</h1>
       <p className="mt-1 text-xs font-bold text-[#8A9199]">
         {t('guidelines.updated', { date: ORGANIZER_GUIDELINE_UPDATED_AT })}

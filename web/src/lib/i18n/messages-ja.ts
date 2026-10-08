@@ -60,8 +60,6 @@ export const messagesJa: MessageTree = {
     mypage: 'マイページ',
   },
   auth: {
-    guestHintBefore: 'ゲストです。参加や予約の確認は',
-    guestHintAfter: 'からログインしてください。',
     loginRequiredTitle: 'ログインが必要です',
     loginRequiredBody:
       '参加予定やプロフィールを確認するには、Google・Apple・LINE のいずれかでログインしてください。',
@@ -113,11 +111,12 @@ export const messagesJa: MessageTree = {
     empty: '条件に合うイベントはまだありません',
     emptyInArea: 'この範囲に条件に合うイベントはありません',
     locationDenied:
-      '位置情報がブロックされています。ブラウザの設定で許可するか、エリアを選んでください。マップは東京都心を中心に表示します。',
+      '位置情報がブロックされています。ブラウザの設定で許可するか、エリアを選んでください。',
     nearby: '現在地付近',
     locating: '現在地を取得中…',
     nearbyDenied: '現在地付近（位置情報オフ）',
-    nearbyFallback: '現在地付近（東京都）',
+    nearbyFallback: '現在地付近',
+
     mapArea: 'マップ表示範囲',
     catAll: 'すべて',
     catHot: '人気',

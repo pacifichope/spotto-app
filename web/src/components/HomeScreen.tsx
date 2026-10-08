@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { List, Map as MapIcon } from 'lucide-react';
 
+import { DateTimeline } from '@/components/DateTimeline';
 import { EventCard } from '@/components/EventCard';
 import { EventMap } from '@/components/EventMap';
 import { Header } from '@/components/Header';
@@ -34,67 +35,11 @@ import { useLocale } from '@/lib/i18n/locale-context';
 import type { PublicEvent } from '@/lib/types';
 import {
   NEARBY_RADIUS_KM,
+  isWithinMapBounds,
   isWithinRadiusKm,
   toMapLatLng,
   type MapBoundsLiteral,
 } from '@/lib/userLocation';
-
-const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
-const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
-function startOfLocalDay(value = new Date()) {
-  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
-}
-
-function formatDateStamp(value: Date) {
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${value.getFullYear()}-${month}-${day}`;
-}
-
-/** 本日〜ちょうど1ヶ月先（両端含む）の日付一覧。アクセス日基準で毎回再計算。 */
-function dateOptions(now = new Date()) {
-  const today = startOfLocalDay(now);
-  const end = startOfLocalDay(now);
-  end.setMonth(end.getMonth() + 1);
-  const dayCount =
-    Math.round((end.getTime() - today.getTime()) / 86_400_000) + 1;
-
-  return Array.from({ length: Math.max(1, dayCount) }, (_, index) => {
-    const value = new Date(today);
-    value.setDate(today.getDate() + index);
-    return {
-      stamp: formatDateStamp(value),
-      weekdayIndex: value.getDay(),
-      dayNum: value.getDate(),
-      monthNum: value.getMonth() + 1,
-      isToday: index === 0,
-      isMonthStart: index > 0 && value.getDate() === 1,
-    };
-  });
-}
-
-/** ローカル暦日が変わったら stamp を更新（タブ復帰・日付跨ぎ対応） */
-function useTodayStamp() {
-  const [todayStamp, setTodayStamp] = useState(() => formatDateStamp(new Date()));
-
-  useEffect(() => {
-    const sync = () => {
-      const next = formatDateStamp(new Date());
-      setTodayStamp((prev) => (prev === next ? prev : next));
-    };
-    const intervalId = window.setInterval(sync, 60_000);
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', sync);
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', sync);
-      document.removeEventListener('visibilitychange', sync);
-    };
-  }, []);
-
-  return todayStamp;
-}
 
 function areaMapCenter(area: string): { lat: number; lng: number } | null {
   if (area === NEARBY_AREA) return null;
@@ -142,7 +87,6 @@ export function HomeScreen({
   } = useUserLocation();
   const { hiddenIds } = useHiddenUserIds();
   const { locale, t } = useLocale();
-  const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_JA;
 
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<string>(NEARBY_AREA);
@@ -160,19 +104,11 @@ export function HomeScreen({
   const [recenterKey, setRecenterKey] = useState(0);
   const mapFetchAbortRef = useRef<AbortController | null>(null);
   const areaFetchAbortRef = useRef<AbortController | null>(null);
-  const todayStamp = useTodayStamp();
-  const days = useMemo(() => dateOptions(new Date()), [todayStamp]);
-  const leadBlanks = days[0]?.weekdayIndex ?? 0;
-
-  useEffect(() => {
-    if (date && !days.some((option) => option.stamp === date)) {
-      setDate(null);
-    }
-  }, [date, days]);
 
   const isNearbyMode = area === NEARBY_AREA;
   const browseOrigin = locationCenter;
-  const mapViewportActive = view === 'map' && mapBounds != null;
+  /** マップでパン／ズームした表示範囲。リスト側の絞り込みにも共有する */
+  const mapViewportActive = mapBounds != null;
 
   const mapCenter = useMemo(() => {
     if (isNearbyMode) return toMapLatLng(browseOrigin);
@@ -289,6 +225,24 @@ export function HomeScreen({
   );
 
   const listVisible = useMemo(() => {
+    // マップで見た範囲をリストにも反映（双方向同期のマップ→リスト）
+    if (mapBounds) {
+      const byId = new Map<string, PublicEvent>();
+      for (const event of mapEvents) byId.set(event.id, event);
+      for (const event of events) {
+        const coords = resolveEventCoords(event);
+        if (coords && isWithinMapBounds(coords, mapBounds)) {
+          byId.set(event.id, event);
+        }
+      }
+      return applyCommonFilters([...byId.values()], filterInput).filter(
+        (event) => {
+          const coords = resolveEventCoords(event);
+          return coords ? isWithinMapBounds(coords, mapBounds) : false;
+        },
+      );
+    }
+
     if (isNearbyMode) {
       return applyCommonFilters(events, filterInput).filter((event) => {
         const coords = resolveEventCoords(event);
@@ -310,6 +264,8 @@ export function HomeScreen({
     );
   }, [
     events,
+    mapEvents,
+    mapBounds,
     areaEvents,
     filterInput,
     isNearbyMode,
@@ -339,44 +295,8 @@ export function HomeScreen({
             onCategory={setCategory}
             onPriceRange={setPriceRange}
           />
-          <p className="mb-2 mt-5 text-xs font-extrabold text-[#5B6B75]">
-            {t('home.date')}
-          </p>
-          <div className="grid grid-cols-7 gap-y-1 text-center">
-            {weekdays.map((label) => (
-              <span key={label} className="pb-1 text-[11px] font-extrabold text-[#8A9199]">
-                {label}
-              </span>
-            ))}
-            {Array.from({ length: leadBlanks }, (_, index) => (
-              <span key={`blank-${index}`} />
-            ))}
-            {days.map((option) => {
-              const selected = date === option.stamp;
-              return (
-                <button
-                  key={option.stamp}
-                  type="button"
-                  aria-pressed={selected}
-                  aria-label={`${option.stamp}${option.isToday ? ` ${t('home.today')}` : ''}`}
-                  className={`relative mx-auto grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold ${
-                    selected
-                      ? 'brand-gradient'
-                      : option.isToday
-                        ? 'text-[#12B8D0] ring-2 ring-[#29D1E8]'
-                        : 'text-[#12202A]'
-                  }`}
-                  onClick={() => setDate(selected ? null : option.stamp)}
-                >
-                  {option.isMonthStart ? (
-                    <span className="absolute -top-2.5 text-[9px] font-extrabold text-[#8A9199]">
-                      {option.monthNum}
-                    </span>
-                  ) : null}
-                  {option.dayNum}
-                </button>
-              );
-            })}
+          <div className="mt-5">
+            <DateTimeline selectedStamp={date} onSelect={setDate} />
           </div>
         </div>
       </aside>
@@ -437,6 +357,7 @@ export function HomeScreen({
             locating={locating}
             onRecenter={handleRecenter}
             preferCenter={!mapViewportActive}
+            restoreBounds={mapBounds}
             recenterKey={recenterKey}
             onBoundsIdle={handleBoundsIdle}
             fetching={mapFetching}

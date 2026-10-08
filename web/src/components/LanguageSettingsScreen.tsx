@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { BackButton } from '@/components/BackButton';
 import { SettingsSkeleton } from '@/components/skeletons';
 import {
   LOCALE_META,
@@ -23,9 +23,7 @@ function LanguageSettingsBody() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link href={backHref} className="text-sm font-extrabold text-[#12B8D0]">
-        {t('common.backToSettings')}
-      </Link>
+      <BackButton fallbackHref={backHref} label={t('common.backToSettings')} />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
         {t('settings.languageScreenTitle')}
       </h1>
@@ -82,7 +80,8 @@ export function LanguageSettingsScreen() {
     <Suspense
       fallback={
         <main className="page-main pt-4 md:pt-2">
-          <h1 className="text-2xl font-extrabold tracking-tight">
+          <BackButton fallbackHref="/settings" label={t('common.backToSettings')} />
+          <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
             {t('settings.languageScreenTitle')}
           </h1>
           <SettingsSkeleton rows={3} />

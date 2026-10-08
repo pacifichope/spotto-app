@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { useAuth } from '@/lib/auth-context';
 import { clubHref, fetchJoinedClubs, type JoinedClub } from '@/lib/clubs';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -78,12 +79,10 @@ export function ClubsScreen() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link
-        href={mypageHref({ mode: 'participant' })}
-        className="text-sm font-extrabold text-[#12B8D0]"
-      >
-        {t('clubs.backMypage')}
-      </Link>
+      <BackButton
+        fallbackHref={mypageHref({ mode: 'participant' })}
+        label={t('clubs.backMypage')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
         {t('clubs.title')}
       </h1>

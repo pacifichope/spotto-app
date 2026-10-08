@@ -33,6 +33,7 @@ import {
 } from '@/lib/types';
 import {
   FALLBACK_COORDS,
+  isValidMapBounds,
   toMapLatLng,
   type LatLng,
   type MapBoundsLiteral,
@@ -68,6 +69,11 @@ export type EventMapProps = {
   recenterKey?: number;
   /** パン／ズーム完了（idle）時に現在の表示範囲を通知 */
   onBoundsIdle?: (bounds: MapBoundsLiteral) => void;
+  /**
+   * マウント時に復元する表示範囲（リスト⇔マップ切替で直前のビューポートを維持）。
+   * preferCenter が true のときは無視する。
+   */
+  restoreBounds?: MapBoundsLiteral | null;
   /** 範囲取得中など */
   fetching?: boolean;
   /** expanded: マップタブ専用で画面いっぱいに近づける */
@@ -99,17 +105,31 @@ function MapCamera({
   center,
   preferCenter,
   recenterKey = 0,
+  restoreBounds,
   onProgrammaticMove,
 }: {
   center: { lat: number; lng: number };
   preferCenter: boolean;
   recenterKey?: number;
+  restoreBounds?: MapBoundsLiteral | null;
   onProgrammaticMove?: () => void;
 }) {
   const map = useMap();
+  const restoredRef = useRef(false);
+
+  // リストから戻ったときなど、直前の表示範囲を一度だけ復元
+  useEffect(() => {
+    if (!map || preferCenter || restoredRef.current) return;
+    if (!isValidMapBounds(restoreBounds)) return;
+    restoredRef.current = true;
+    onProgrammaticMove?.();
+    map.fitBounds(restoreBounds);
+  }, [map, preferCenter, restoreBounds, onProgrammaticMove]);
 
   useEffect(() => {
     if (!map || !preferCenter) return;
+    // 中心優先で開いたあとに restoreBounds で上書きしない
+    restoredRef.current = true;
     onProgrammaticMove?.();
     map.panTo(center);
     map.setZoom(NEARBY_ZOOM);
@@ -117,6 +137,7 @@ function MapCamera({
 
   useEffect(() => {
     if (!map || recenterKey <= 0) return;
+    restoredRef.current = true;
     onProgrammaticMove?.();
     map.panTo(center);
     map.setZoom(NEARBY_ZOOM);
@@ -331,6 +352,7 @@ function GoogleEventMap({
   preferCenter,
   recenterKey = 0,
   onBoundsIdle,
+  restoreBounds = null,
   fetching = false,
   variant = 'default',
 }: Required<Pick<EventMapProps, 'events' | 'center' | 'preferCenter'>> &
@@ -341,6 +363,7 @@ function GoogleEventMap({
     | 'onRecenter'
     | 'recenterKey'
     | 'onBoundsIdle'
+    | 'restoreBounds'
     | 'fetching'
     | 'variant'
   >) {
@@ -368,10 +391,20 @@ function GoogleEventMap({
       ? 'card-shadow relative h-[min(calc(100dvh-11rem),920px)] min-h-[560px] w-full overflow-hidden'
       : 'card-shadow relative h-[min(72vh,820px)] min-h-[520px] w-full overflow-hidden';
 
+  const defaultCenter = useMemo(() => {
+    if (!preferCenter && isValidMapBounds(restoreBounds)) {
+      return {
+        lat: (restoreBounds.north + restoreBounds.south) / 2,
+        lng: (restoreBounds.east + restoreBounds.west) / 2,
+      };
+    }
+    return center;
+  }, [preferCenter, restoreBounds, center]);
+
   return (
     <div className={shellClass}>
       <Map
-        defaultCenter={center}
+        defaultCenter={defaultCenter}
         defaultZoom={NEARBY_ZOOM}
         mapId={MAP_ID}
         gestureHandling="greedy"
@@ -386,6 +419,7 @@ function GoogleEventMap({
           center={center}
           preferCenter={preferCenter}
           recenterKey={recenterKey}
+          restoreBounds={restoreBounds}
           onProgrammaticMove={markProgrammaticMove}
         />
         {onBoundsIdle ? (
@@ -454,6 +488,7 @@ export function EventMap({
   preferCenter = true,
   recenterKey = 0,
   onBoundsIdle,
+  restoreBounds = null,
   fetching = false,
   variant = 'default',
 }: EventMapProps) {
@@ -481,6 +516,7 @@ export function EventMap({
         preferCenter={preferCenter}
         recenterKey={recenterKey}
         onBoundsIdle={onBoundsIdle}
+        restoreBounds={restoreBounds}
         fetching={fetching}
         variant={variant}
       />

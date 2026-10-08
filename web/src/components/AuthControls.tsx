@@ -45,24 +45,6 @@ export function HeaderAccountButton() {
   );
 }
 
-export function HeaderGuestHint() {
-  const { user, ready } = useAuth();
-  const t = useT();
-  if (!ready || user) return null;
-  return (
-    <p className="min-w-0 truncate text-xs font-bold leading-none text-[#5B6B75]">
-      <span className="whitespace-nowrap">{t('auth.guestHintBefore')}</span>
-      <Link
-        href="/mypage"
-        className="mx-1 inline whitespace-nowrap font-extrabold text-[#12B8D0] underline"
-      >
-        {t('nav.mypage')}
-      </Link>
-      <span className="whitespace-nowrap">{t('auth.guestHintAfter')}</span>
-    </p>
-  );
-}
-
 export function LoginPromptCard({
   title,
   body,

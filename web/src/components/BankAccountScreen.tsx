@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DashboardSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
@@ -137,12 +137,10 @@ export function BankAccountScreen() {
         </div>
       ) : null}
 
-      <Link
-        href={mypageHref({ mode: 'organizer' })}
-        className="text-sm font-extrabold text-[#12B8D0]"
-      >
-        {t('bank.backMypage')}
-      </Link>
+      <BackButton
+        fallbackHref={mypageHref({ mode: 'organizer' })}
+        label={t('bank.backMypage')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('bank.title')}</h1>
       <p className="mt-1 text-sm font-bold leading-6 text-[#5B6B75]">{t('bank.subtitle')}</p>
 

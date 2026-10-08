@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { useWideLayout } from '@/components/AppShell';
-import { HeaderAccountButton, HeaderGuestHint } from '@/components/AuthControls';
+import { HeaderAccountButton } from '@/components/AuthControls';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/locale-context';
@@ -28,7 +28,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-md">
       <div
-        className={`mx-auto flex h-14 w-full flex-nowrap items-center gap-3 px-4 md:h-16 md:gap-4 md:px-7 xl:px-10 ${
+        className={`mx-auto flex h-14 w-full flex-nowrap items-center justify-between gap-4 px-4 md:h-16 md:gap-6 md:px-7 xl:px-10 ${
           wide ? 'max-w-[90rem]' : 'max-w-3xl'
         }`}
       >
@@ -48,21 +48,17 @@ export function SiteHeader() {
           />
         </Link>
 
-        <div className="hidden min-w-0 flex-1 items-center xl:flex">
-          <HeaderGuestHint />
-        </div>
-
-        <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1.5 sm:gap-2 md:gap-3">
+        <div className="flex shrink-0 flex-nowrap items-center gap-2 sm:gap-2.5 md:gap-3">
           {ready ? (
             <span
-              className={`hidden whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-extrabold lg:inline ${
+              className={`hidden whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-extrabold sm:inline ${
                 user ? 'bg-[#E5F9FC] text-[#12B8D0]' : 'bg-[#F4F7F8] text-[#8A9199]'
               }`}
             >
               {user ? t('common.loggedIn') : t('common.loggedOut')}
             </span>
           ) : null}
-          <nav className="hidden flex-nowrap items-center gap-1 md:flex">
+          <nav className="hidden flex-nowrap items-center gap-1.5 md:flex">
             {tabs.map((tab) => {
               const active = isActive(pathname, tab.href);
               const Icon = tab.icon;
@@ -71,7 +67,7 @@ export function SiteHeader() {
                   key={tab.href}
                   href={tab.href}
                   aria-current={active ? 'page' : undefined}
-                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-extrabold lg:px-4 ${
+                  className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-extrabold ${
                     active ? 'brand-gradient' : 'text-[#5B6B75] hover:bg-white'
                   }`}
                 >

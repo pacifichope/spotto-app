@@ -5,6 +5,7 @@ import { ChevronRight, ExternalLink } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { BackButton } from '@/components/BackButton';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ProfileEditModal } from '@/components/ProfileEditModal';
 import { SettingsSkeleton } from '@/components/skeletons';
@@ -221,7 +222,11 @@ export function SettingsScreen() {
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">
+        <BackButton
+          fallbackHref={mypageBackHref}
+          label={t('settings.backMypage')}
+        />
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
           {t('settings.title')}
         </h1>
         <SettingsSkeleton />
@@ -231,14 +236,10 @@ export function SettingsScreen() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <div className="flex items-center gap-3">
-        <Link
-          href={mypageBackHref}
-          className="text-sm font-extrabold text-[#12B8D0]"
-        >
-          {t('settings.backMypage')}
-        </Link>
-      </div>
+      <BackButton
+        fallbackHref={mypageBackHref}
+        label={t('settings.backMypage')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
         {t('settings.title')}
       </h1>

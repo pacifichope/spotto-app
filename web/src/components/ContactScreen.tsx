@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState, type FormEvent } from 'react';
 
+import { BackButton } from '@/components/BackButton';
 import { useAuth } from '@/lib/auth-context';
 import { apiBaseUrl } from '@/lib/env';
 import { useT } from '@/lib/i18n/locale-context';
@@ -89,9 +89,7 @@ export function ContactScreen() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link href="/settings" className="text-sm font-extrabold text-[#12B8D0]">
-        {t('contact.backSettings')}
-      </Link>
+      <BackButton fallbackHref="/settings" label={t('contact.backSettings')} />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('contact.title')}</h1>
       <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">
         {t('contact.subtitle')}

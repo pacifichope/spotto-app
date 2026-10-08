@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { ClubDetailSkeleton } from '@/components/skeletons';
 import { SnsBrandIcon } from '@/components/SnsBrandIcon';
 import { sportCover } from '@/constants/theme';
@@ -256,17 +257,27 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
   return (
     <main className="page-main relative pb-28 pt-0 md:pb-32 md:pt-0">
       {loading || !ready ? (
-        <ClubDetailSkeleton />
+        <div className="relative">
+          <BackButton
+            variant="overlay"
+            fallbackHref="/clubs"
+            aria-label={t('clubs.backList')}
+          />
+          <ClubDetailSkeleton />
+        </div>
       ) : error || !club ? (
-        <section className="card-shadow mt-5 px-5 py-10 text-center">
-          <p className="text-base font-extrabold">{error || t('clubs.notFound')}</p>
-          <Link
-            href="/clubs"
-            className="brand-gradient mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-extrabold"
-          >
-            {t('clubs.backToList')}
-          </Link>
-        </section>
+        <div className="pt-4 md:pt-2">
+          <BackButton fallbackHref="/clubs" label={t('clubs.backList')} />
+          <section className="card-shadow mt-5 px-5 py-10 text-center">
+            <p className="text-base font-extrabold">{error || t('clubs.notFound')}</p>
+            <Link
+              href="/clubs"
+              className="brand-gradient mt-5 inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-extrabold"
+            >
+              {t('clubs.backToList')}
+            </Link>
+          </section>
+        </div>
       ) : (
         <div className="content-fade-in">
           {/* Cover + overlapping avatar */}
@@ -283,13 +294,11 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
                 <div className="brand-gradient h-full w-full" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent" />
-              <Link
-                href="/clubs"
-                className="absolute left-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-black/35 text-lg font-extrabold text-white backdrop-blur-sm"
+              <BackButton
+                variant="overlay"
+                fallbackHref="/clubs"
                 aria-label={t('clubs.backList')}
-              >
-                ‹
-              </Link>
+              />
             </div>
 
             <div className="relative z-10 -mt-10 flex justify-center px-4 sm:-mt-12">

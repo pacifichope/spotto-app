@@ -60,8 +60,6 @@ export const messagesEn: MessageTree = {
     mypage: 'My page',
   },
   auth: {
-    guestHintBefore: 'You’re browsing as a guest. To join or check bookings, sign in from',
-    guestHintAfter: '.',
     loginRequiredTitle: 'Sign in required',
     loginRequiredBody:
       'Sign in with Google, Apple, or LINE to view your plans and profile.',
@@ -113,11 +111,12 @@ export const messagesEn: MessageTree = {
     empty: 'No events match your filters yet',
     emptyInArea: 'No matching events in this area',
     locationDenied:
-      'Location access is blocked. Allow it in your browser settings or pick an area. The map centers on central Tokyo.',
+      'Location access is blocked. Allow it in your browser settings or pick an area.',
     nearby: 'Near me',
     locating: 'Getting your location…',
     nearbyDenied: 'Near me (location off)',
-    nearbyFallback: 'Near me (Tokyo)',
+    nearbyFallback: 'Near me',
+
     mapArea: 'Map viewport',
     catAll: 'All',
     catHot: 'Popular',

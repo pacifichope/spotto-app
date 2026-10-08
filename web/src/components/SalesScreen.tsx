@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton } from '@/components/BackButton';
 import { DashboardSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
@@ -110,7 +111,11 @@ export function SalesScreen() {
   if (!ready) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
+        <BackButton
+          fallbackHref={mypageHref({ mode: 'organizer' })}
+          label={t('sales.backMypage')}
+        />
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
         <DashboardSkeleton />
       </main>
     );
@@ -121,12 +126,10 @@ export function SalesScreen() {
 
   return (
     <main className="page-main pt-4 md:pt-2">
-      <Link
-        href={mypageHref({ mode: 'organizer' })}
-        className="text-sm font-extrabold text-[#12B8D0]"
-      >
-        {t('sales.backMypage')}
-      </Link>
+      <BackButton
+        fallbackHref={mypageHref({ mode: 'organizer' })}
+        label={t('sales.backMypage')}
+      />
       <h1 className="mt-3 text-2xl font-extrabold tracking-tight">{t('sales.title')}</h1>
       <p className="mt-1 text-sm font-bold text-[#5B6B75]">{t('sales.subtitle')}</p>
 

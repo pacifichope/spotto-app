@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { LoginPromptCard } from '@/components/AuthControls';
+import { BackButton, navigateBack } from '@/components/BackButton';
 import { TicketSkeleton } from '@/components/skeletons';
 import { useAuth } from '@/lib/auth-context';
 import { formatPrice } from '@/lib/eventSeo';
@@ -94,18 +95,16 @@ export function TicketScreen() {
     };
   }, [ready, user, eventId, t]);
 
-  const close = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.replace('/mypage?mode=participant&segment=joined');
-  };
+  const fallbackHref = '/mypage?mode=participant&segment=joined';
+  const close = () => navigateBack(router, fallbackHref);
 
   if (!ready || loading) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <TicketSkeleton />
+        <BackButton fallbackHref={fallbackHref} />
+        <div className="mt-3">
+          <TicketSkeleton />
+        </div>
       </main>
     );
   }
@@ -113,13 +112,7 @@ export function TicketScreen() {
   if (!user) {
     return (
       <main className="page-main pt-4 md:pt-2">
-        <button
-          type="button"
-          onClick={close}
-          className="text-sm font-extrabold text-[#12B8D0]"
-        >
-          {t('common.back')}
-        </button>
+        <BackButton fallbackHref={fallbackHref} />
         <h1 className="mt-3 text-2xl font-extrabold tracking-tight">
           {t('ticket.title')}
         </h1>
@@ -133,42 +126,42 @@ export function TicketScreen() {
 
   if (!event) {
     return (
-      <main className="page-main flex min-h-[50vh] flex-col items-center justify-center px-4 pt-8 text-center">
-        <h1 className="text-xl font-extrabold">{t('ticket.notFoundTitle')}</h1>
-        <p className="mt-2 text-sm font-bold text-[#5B6B75]">
-          {loadFailed ? t('ticket.loadFailed') : t('ticket.notFoundBody')}
-        </p>
-        <button
-          type="button"
-          onClick={close}
-          className="mt-6 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
-        >
-          {t('common.back')}
-        </button>
+      <main className="page-main pt-4 md:pt-2">
+        <BackButton fallbackHref={fallbackHref} />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 pt-8 text-center">
+          <h1 className="text-xl font-extrabold">{t('ticket.notFoundTitle')}</h1>
+          <p className="mt-2 text-sm font-bold text-[#5B6B75]">
+            {loadFailed ? t('ticket.loadFailed') : t('ticket.notFoundBody')}
+          </p>
+          <BackButton
+            fallbackHref={fallbackHref}
+            className="mt-6 rounded-full bg-white px-5 py-2.5 text-[#12202A] ring-1 ring-[#E4EBEE] hover:text-[#12202A]"
+          />
+        </div>
       </main>
     );
   }
 
   if (!ticket) {
     return (
-      <main className="page-main flex min-h-[50vh] flex-col items-center justify-center px-4 pt-8 text-center">
-        <h1 className="text-xl font-extrabold">{t('ticket.noReservationTitle')}</h1>
-        <p className="mt-2 text-sm font-bold text-[#5B6B75]">
-          {t('ticket.noReservationBody')}
-        </p>
-        <Link
-          href={`/event/${event.id}`}
-          className="mt-6 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
-        >
-          {t('ticket.toEventDetail')}
-        </Link>
-        <button
-          type="button"
-          onClick={close}
-          className="mt-3 text-sm font-bold text-[#5B6B75]"
-        >
-          {t('common.back')}
-        </button>
+      <main className="page-main pt-4 md:pt-2">
+        <BackButton fallbackHref={fallbackHref} />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 pt-8 text-center">
+          <h1 className="text-xl font-extrabold">{t('ticket.noReservationTitle')}</h1>
+          <p className="mt-2 text-sm font-bold text-[#5B6B75]">
+            {t('ticket.noReservationBody')}
+          </p>
+          <Link
+            href={`/event/${event.id}`}
+            className="mt-6 rounded-full bg-white px-5 py-2.5 text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
+          >
+            {t('ticket.toEventDetail')}
+          </Link>
+          <BackButton
+            fallbackHref={fallbackHref}
+            className="mt-3 text-[#5B6B75] hover:text-[#12B8D0]"
+          />
+        </div>
       </main>
     );
   }
