@@ -11,6 +11,12 @@ import { clubHref, fetchJoinedClubs, type JoinedClub } from '@/lib/clubs';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { useT } from '@/lib/i18n/locale-context';
 import { mypageHref } from '@/lib/mypageNav';
+import {
+  clubsCacheKey,
+  isQueryCacheFresh,
+  peekQueryCache,
+  QUERY_FRESH_MS,
+} from '@/lib/queryCache';
 
 const SKELETON_COUNT = 4;
 
@@ -40,8 +46,11 @@ function ClubListSkeleton() {
 export function ClubsScreen() {
   const { user, ready } = useAuth();
   const t = useT();
-  const [clubs, setClubs] = useState<JoinedClub[]>([]);
-  const [loading, setLoading] = useState(false);
+  const cachedClubs = user
+    ? peekQueryCache<JoinedClub[]>(clubsCacheKey(user.uid))
+    : null;
+  const [clubs, setClubs] = useState<JoinedClub[]>(() => cachedClubs ?? []);
+  const [loading, setLoading] = useState(() => Boolean(user) && !cachedClubs);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -51,7 +60,15 @@ export function ClubsScreen() {
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const key = clubsCacheKey(user.uid);
+    const cached = peekQueryCache<JoinedClub[]>(key);
+    if (cached) {
+      setClubs(cached);
+      setLoading(false);
+      if (isQueryCacheFresh(key, QUERY_FRESH_MS)) return;
+    } else {
+      setLoading(true);
+    }
     setError('');
     void fetchJoinedClubs({
       userId: user.uid,
@@ -75,7 +92,7 @@ export function ClubsScreen() {
     };
   }, [user, t]);
 
-  const showSkeleton = !ready || (Boolean(user) && loading);
+  const showSkeleton = !ready || (Boolean(user) && loading && clubs.length === 0);
 
   return (
     <main className="page-main pt-4 md:pt-2">

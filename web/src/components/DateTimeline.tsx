@@ -1,35 +1,12 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useLocale } from '@/lib/i18n/locale-context';
 
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'] as const;
 const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
-/** 一度に前後へ足す日数（おおよそ1ヶ月） */
-const CHUNK_DAYS = 31;
-/** 初回表示：今日から何日先まで */
-const INITIAL_FORWARD = 45;
-/** 端に近づいたら追加するしきい値（px） */
-const EDGE_PX = 120;
-/** アイテム幅（padding込み・スクロール位置補正用） */
-const ITEM_WIDTH = 48;
-
-export type DateTimelineOption = {
-  stamp: string;
-  weekdayIndex: number;
-  dayNum: number;
-  monthNum: number;
-  isToday: boolean;
-  isMonthStart: boolean;
-};
 
 function startOfLocalDay(value = new Date()) {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
@@ -46,20 +23,8 @@ function parseStamp(stamp: string) {
   return new Date(y!, m! - 1, d!);
 }
 
-function buildRange(start: Date, count: number, todayStamp: string): DateTimelineOption[] {
-  return Array.from({ length: Math.max(0, count) }, (_, index) => {
-    const value = new Date(start);
-    value.setDate(start.getDate() + index);
-    const stamp = formatDateStamp(value);
-    return {
-      stamp,
-      weekdayIndex: value.getDay(),
-      dayNum: value.getDate(),
-      monthNum: value.getMonth() + 1,
-      isToday: stamp === todayStamp,
-      isMonthStart: value.getDate() === 1,
-    };
-  });
+function monthKey(year: number, monthIndex: number) {
+  return year * 12 + monthIndex;
 }
 
 function useTodayStamp() {
@@ -88,226 +53,184 @@ type DateTimelineProps = {
   onSelect: (stamp: string | null) => void;
 };
 
+type DayCell = {
+  stamp: string;
+  dayNum: number;
+  inMonth: boolean;
+  selectable: boolean;
+  isToday: boolean;
+};
+
+/**
+ * 今日〜ちょうど1ヶ月先までを選ぶカレンダー。
+ * 日付タップでその日のイベントに即フィルタ（再タップで解除）。
+ */
 export function DateTimeline({ selectedStamp, onSelect }: DateTimelineProps) {
   const { locale, t } = useLocale();
   const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_JA;
   const todayStamp = useTodayStamp();
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const prependPendingRef = useRef(0);
-  const extendingRef = useRef(false);
 
-  const [days, setDays] = useState<DateTimelineOption[]>(() => {
-    const today = startOfLocalDay();
-    return buildRange(today, INITIAL_FORWARD + 1, formatDateStamp(today));
-  });
-
-  // 暦日が変わったら、今日を先頭にした範囲を作り直す
-  useEffect(() => {
-    const today = startOfLocalDay();
-    setDays(buildRange(today, INITIAL_FORWARD + 1, todayStamp));
+  const { today, endStamp, minMonth, maxMonth } = useMemo(() => {
+    const todayDate = startOfLocalDay();
+    const endDate = startOfLocalDay();
+    endDate.setMonth(endDate.getMonth() + 1);
+    return {
+      today: todayDate,
+      endStamp: formatDateStamp(endDate),
+      minMonth: monthKey(todayDate.getFullYear(), todayDate.getMonth()),
+      maxMonth: monthKey(endDate.getFullYear(), endDate.getMonth()),
+    };
   }, [todayStamp]);
 
+  const [viewYear, setViewYear] = useState(() => today.getFullYear());
+  const [viewMonthIndex, setViewMonthIndex] = useState(() => today.getMonth());
+
+  // 暦日が変わったら（未選択時のみ）表示月を今日へ寄せる
   useEffect(() => {
-    if (
-      selectedStamp &&
-      !days.some((option) => option.stamp === selectedStamp)
-    ) {
+    if (selectedStamp) return;
+    setViewYear(today.getFullYear());
+    setViewMonthIndex(today.getMonth());
+  }, [todayStamp, today, selectedStamp]);
+
+  useEffect(() => {
+    if (!selectedStamp) return;
+    if (selectedStamp < todayStamp || selectedStamp > endStamp) {
       onSelect(null);
+      return;
     }
-  }, [days, selectedStamp, onSelect]);
+    const selected = parseStamp(selectedStamp);
+    setViewYear(selected.getFullYear());
+    setViewMonthIndex(selected.getMonth());
+  }, [selectedStamp, todayStamp, endStamp, onSelect]);
 
-  // 先頭に日を足したあと見た目の位置を保ち、拡張ロックを解除
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    const prepended = prependPendingRef.current;
-    if (scroller && prepended > 0) {
-      scroller.scrollLeft += prepended * ITEM_WIDTH;
-      prependPendingRef.current = 0;
-    }
-    extendingRef.current = false;
-  }, [days]);
+  const viewKey = monthKey(viewYear, viewMonthIndex);
+  const canPrev = viewKey > minMonth;
+  const canNext = viewKey < maxMonth;
 
-  const extendBackward = useCallback(() => {
-    if (extendingRef.current) return;
-    extendingRef.current = true;
-    setDays((prev) => {
-      if (prev.length === 0) return prev;
-      const first = parseStamp(prev[0]!.stamp);
-      const start = new Date(first);
-      start.setDate(first.getDate() - CHUNK_DAYS);
-      const chunk = buildRange(start, CHUNK_DAYS, todayStamp);
-      prependPendingRef.current = chunk.length;
-      return [...chunk, ...prev];
+  const monthTitle = useMemo(() => {
+    const value = new Date(viewYear, viewMonthIndex, 1);
+    return value.toLocaleDateString(locale === 'en' ? 'en-US' : 'ja-JP', {
+      year: 'numeric',
+      month: 'long',
     });
-  }, [todayStamp]);
+  }, [viewYear, viewMonthIndex, locale]);
 
-  const extendForward = useCallback(() => {
-    if (extendingRef.current) return;
-    extendingRef.current = true;
-    setDays((prev) => {
-      if (prev.length === 0) return prev;
-      const last = parseStamp(prev[prev.length - 1]!.stamp);
-      const start = new Date(last);
-      start.setDate(last.getDate() + 1);
-      const chunk = buildRange(start, CHUNK_DAYS, todayStamp);
-      return [...prev, ...chunk];
-    });
-  }, [todayStamp]);
+  const cells = useMemo((): DayCell[] => {
+    const first = new Date(viewYear, viewMonthIndex, 1);
+    const lead = first.getDay();
+    const daysInMonth = new Date(viewYear, viewMonthIndex + 1, 0).getDate();
+    const total = Math.ceil((lead + daysInMonth) / 7) * 7;
+    const result: DayCell[] = [];
 
-  const onScroll = useCallback(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller || extendingRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = scroller;
-    if (scrollLeft < EDGE_PX) {
-      extendBackward();
-    } else if (scrollLeft + clientWidth > scrollWidth - EDGE_PX) {
-      extendForward();
+    for (let index = 0; index < total; index++) {
+      const dayNum = index - lead + 1;
+      const inMonth = dayNum >= 1 && dayNum <= daysInMonth;
+      if (!inMonth) {
+        result.push({
+          stamp: `pad-${index}`,
+          dayNum: 0,
+          inMonth: false,
+          selectable: false,
+          isToday: false,
+        });
+        continue;
+      }
+      const value = new Date(viewYear, viewMonthIndex, dayNum);
+      const stamp = formatDateStamp(value);
+      result.push({
+        stamp,
+        dayNum,
+        inMonth: true,
+        selectable: stamp >= todayStamp && stamp <= endStamp,
+        isToday: stamp === todayStamp,
+      });
     }
-  }, [extendBackward, extendForward]);
+    return result;
+  }, [viewYear, viewMonthIndex, todayStamp, endStamp]);
 
-  // マウス／ペンでのドラッグスクロール（タッチはネイティブ慣性に任せる）
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-
-    let pointerId: number | null = null;
-    let startX = 0;
-    let startScroll = 0;
-    let moved = false;
-    let lastX = 0;
-    let lastTs = 0;
-    let velocity = 0;
-    let rafId = 0;
-
-    const stopInertia = () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = 0;
-      }
-    };
-
-    const runInertia = () => {
-      const el = scrollerRef.current;
-      if (!el || Math.abs(velocity) < 0.15) {
-        rafId = 0;
-        return;
-      }
-      el.scrollLeft -= velocity;
-      velocity *= 0.95;
-      rafId = requestAnimationFrame(runInertia);
-    };
-
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.pointerType === 'touch') return;
-      stopInertia();
-      pointerId = event.pointerId;
-      startX = event.clientX;
-      lastX = event.clientX;
-      lastTs = performance.now();
-      startScroll = scroller.scrollLeft;
-      moved = false;
-      velocity = 0;
-      scroller.setPointerCapture(event.pointerId);
-    };
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (pointerId !== event.pointerId) return;
-      const dx = event.clientX - startX;
-      if (Math.abs(dx) > 3) moved = true;
-      scroller.scrollLeft = startScroll - dx;
-      const now = performance.now();
-      const dt = now - lastTs;
-      if (dt > 0) {
-        velocity = ((event.clientX - lastX) / dt) * 16;
-      }
-      lastX = event.clientX;
-      lastTs = now;
-    };
-
-    const onPointerUp = (event: PointerEvent) => {
-      if (pointerId !== event.pointerId) return;
-      pointerId = null;
-      if (moved) {
-        // クリック選択を抑止したい場合は次の click を潰す
-        const blockClick = (clickEvent: MouseEvent) => {
-          clickEvent.preventDefault();
-          clickEvent.stopPropagation();
-          scroller.removeEventListener('click', blockClick, true);
-        };
-        scroller.addEventListener('click', blockClick, true);
-        runInertia();
-      }
-    };
-
-    scroller.addEventListener('pointerdown', onPointerDown);
-    scroller.addEventListener('pointermove', onPointerMove);
-    scroller.addEventListener('pointerup', onPointerUp);
-    scroller.addEventListener('pointercancel', onPointerUp);
-
-    return () => {
-      stopInertia();
-      scroller.removeEventListener('pointerdown', onPointerDown);
-      scroller.removeEventListener('pointermove', onPointerMove);
-      scroller.removeEventListener('pointerup', onPointerUp);
-      scroller.removeEventListener('pointercancel', onPointerUp);
-    };
-  }, []);
+  function shiftMonth(delta: number) {
+    const next = new Date(viewYear, viewMonthIndex + delta, 1);
+    const key = monthKey(next.getFullYear(), next.getMonth());
+    if (key < minMonth || key > maxMonth) return;
+    setViewYear(next.getFullYear());
+    setViewMonthIndex(next.getMonth());
+  }
 
   return (
-    <div className="date-timeline">
+    <div className="date-calendar">
       <p className="mb-2 text-xs font-extrabold text-[#5B6B75]">{t('home.date')}</p>
-      <div
-        ref={scrollerRef}
-        className="date-timeline-scroll"
-        onScroll={onScroll}
-        role="listbox"
-        aria-label={t('home.date')}
-      >
-        <div className="date-timeline-track">
-          {days.map((option) => {
-            const selected = selectedStamp === option.stamp;
-            const weekday = weekdays[option.weekdayIndex]!;
-            return (
-              <button
-                key={option.stamp}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                aria-label={`${option.stamp}${option.isToday ? ` ${t('home.today')}` : ''}`}
-                className="date-timeline-item"
-                onClick={() => onSelect(selected ? null : option.stamp)}
+
+      <div className="date-calendar-header">
+        <button
+          type="button"
+          className="date-calendar-nav"
+          aria-label={t('common.back')}
+          disabled={!canPrev}
+          onClick={() => shiftMonth(-1)}
+        >
+          <ChevronLeft size={18} strokeWidth={2.4} aria-hidden />
+        </button>
+        <p className="date-calendar-month">{monthTitle}</p>
+        <button
+          type="button"
+          className="date-calendar-nav"
+          aria-label={locale === 'en' ? 'Next month' : '翌月'}
+          disabled={!canNext}
+          onClick={() => shiftMonth(1)}
+        >
+          <ChevronRight size={18} strokeWidth={2.4} aria-hidden />
+        </button>
+      </div>
+
+      <div className="date-calendar-weekdays" role="row">
+        {weekdays.map((label) => (
+          <span key={label} className="date-calendar-weekday">
+            {label}
+          </span>
+        ))}
+      </div>
+
+      <div className="date-calendar-grid" role="grid" aria-label={t('home.date')}>
+        {cells.map((cell) => {
+          if (!cell.inMonth) {
+            return <span key={cell.stamp} className="date-calendar-cell" aria-hidden />;
+          }
+          const selected = selectedStamp === cell.stamp;
+          return (
+            <button
+              key={cell.stamp}
+              type="button"
+              role="gridcell"
+              disabled={!cell.selectable}
+              aria-selected={selected}
+              aria-current={cell.isToday ? 'date' : undefined}
+              aria-label={`${cell.stamp}${cell.isToday ? ` ${t('home.today')}` : ''}`}
+              className={`date-calendar-cell date-calendar-day${
+                selected ? ' date-calendar-day--selected' : ''
+              }${cell.isToday && !selected ? ' date-calendar-day--today' : ''}${
+                !cell.selectable ? ' date-calendar-day--muted' : ''
+              }`}
+              onClick={() => {
+                if (!cell.selectable) return;
+                onSelect(selected ? null : cell.stamp);
+              }}
+            >
+              <span
+                className={`date-calendar-day-num${
+                  selected ? ' brand-gradient' : ''
+                }`}
               >
-                {option.isMonthStart ? (
-                  <span className="date-timeline-month" aria-hidden>
-                    {option.monthNum}
-                  </span>
-                ) : (
-                  <span className="date-timeline-month-spacer" aria-hidden />
-                )}
-                <span
-                  className={`date-timeline-weekday${
-                    selected ? ' date-timeline-weekday--selected' : ''
-                  }${option.isToday && !selected ? ' date-timeline-weekday--today' : ''}`}
-                >
-                  {weekday}
-                </span>
-                <span
-                  className={`date-timeline-day${
-                    selected ? ' date-timeline-day--selected brand-gradient' : ''
-                  }${option.isToday && !selected ? ' date-timeline-day--today' : ''}`}
-                >
-                  {option.dayNum}
-                </span>
-                <span
-                  className={`date-timeline-today-mark${
-                    option.isToday ? ' date-timeline-today-mark--visible' : ''
-                  }`}
-                  aria-hidden
-                />
-              </button>
-            );
-          })}
-        </div>
+                {cell.dayNum}
+              </span>
+              <span
+                className={`date-calendar-today-dot${
+                  cell.isToday ? ' date-calendar-today-dot--on' : ''
+                }`}
+                aria-hidden
+              />
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { createAuthedSupabase } from '@/lib/supabase';
+import { setQueryCache } from '@/lib/queryCache';
 import {
-  eventColumns,
+  eventListColumns,
   isEventPast,
   mapEventRow,
   type EventRow,
@@ -19,20 +20,27 @@ async function fetchEventsByIds(
   getIdToken: () => Promise<string | null>,
   ids: string[],
 ): Promise<PublicEvent[]> {
-  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].slice(
+    0,
+    150,
+  );
   if (unique.length === 0) return [];
   const supabase = createAuthedSupabase(getIdToken);
-  const { data, error } = await supabase
-    .from('events')
-    .select(eventColumns())
-    .in('id', unique)
-    .is('cancelled_at', null);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as unknown as EventRow[];
-  const mapped = rows.flatMap((row) => {
-    const event = mapEventRow(row);
-    return event ? [event] : [];
-  });
+  const mapped: PublicEvent[] = [];
+  const chunkSize = 60;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from('events')
+      .select(eventListColumns())
+      .in('id', chunk)
+      .is('cancelled_at', null);
+    if (error) throw new Error(error.message);
+    for (const row of (data ?? []) as unknown as EventRow[]) {
+      const event = mapEventRow(row);
+      if (event) mapped.push(event);
+    }
+  }
   const order = new Map(unique.map((id, i) => [id, i]));
   return mapped.sort(
     (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
@@ -77,14 +85,20 @@ export async function fetchMyEventsBundle(input: {
     supabase
       .from('event_participants')
       .select('event_id, status')
-      .eq('user_id', userId),
-    supabase.from('event_favorites').select('event_id').eq('user_id', userId),
+      .eq('user_id', userId)
+      .limit(200),
+    supabase
+      .from('event_favorites')
+      .select('event_id')
+      .eq('user_id', userId)
+      .limit(100),
     supabase
       .from('events')
-      .select(eventColumns())
+      .select(eventListColumns())
       .eq('host_id', userId)
       .is('cancelled_at', null)
-      .order('event_date', { ascending: true }),
+      .order('event_date', { ascending: true })
+      .limit(80),
   ]);
 
   if (joinedRes.error) throw new Error(joinedRes.error.message);
@@ -118,11 +132,13 @@ export async function fetchMyEventsBundle(input: {
   const joined = splitUpcomingPast(joinedEvents);
   const hosted = splitUpcomingPast(hostedEvents);
 
-  return {
+  const bundle: MyEventsBundle = {
     joinedUpcoming: joined.upcoming,
     joinedPast: joined.past,
     favorites: favoriteEvents,
     hostedUpcoming: hosted.upcoming,
     hostedPast: hosted.past,
   };
+  setQueryCache(`myEvents:${userId}`, bundle);
+  return bundle;
 }

@@ -19,6 +19,12 @@ import {
 } from '@/lib/chatsWeb';
 import { absoluteImageUrl } from '@/lib/eventSeo';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
+import {
+  inboxCacheKey,
+  isQueryCacheFresh,
+  peekQueryCache,
+  QUERY_FRESH_MS,
+} from '@/lib/queryCache';
 import { sportCover } from '@/constants/theme';
 
 const shellClass = 'page-main';
@@ -27,44 +33,71 @@ export function MessagesScreen() {
   const { user, ready } = useAuth();
   const { hiddenIds } = useHiddenUserIds();
   const t = useT();
-  const [threads, setThreads] = useState<InboxThread[]>([]);
-  const [loading, setLoading] = useState(false);
+  const cachedThreads = user
+    ? peekQueryCache<InboxThread[]>(inboxCacheKey(user.uid))
+    : null;
+  const [threads, setThreads] = useState<InboxThread[]>(
+    () => cachedThreads ?? [],
+  );
+  const [loading, setLoading] = useState(() => !cachedThreads);
   const [error, setError] = useState('');
   const [pendingHide, setPendingHide] = useState<InboxThread | null>(null);
   const [hiding, setHiding] = useState(false);
   const loadingRef = useRef(false);
 
-  const reload = useCallback(async () => {
-    if (!user) {
-      setThreads([]);
-      return;
-    }
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
-    setError('');
-    try {
-      const next = await fetchInboxThreads({
-        userId: user.uid,
-        getIdToken: async () => idTokenWithAuthenticatedRole(user),
-      });
-      setThreads(next);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t('messages.fetchFailed'));
-      setThreads([]);
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  }, [user]);
+  const reload = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!user) {
+        setThreads([]);
+        return;
+      }
+      if (loadingRef.current) return;
+      const silent =
+        opts?.silent ||
+        Boolean(peekQueryCache<InboxThread[]>(inboxCacheKey(user.uid)));
+      loadingRef.current = true;
+      if (!silent) setLoading(true);
+      setError('');
+      try {
+        const next = await fetchInboxThreads({
+          userId: user.uid,
+          getIdToken: async () => idTokenWithAuthenticatedRole(user),
+        });
+        setThreads(next);
+      } catch (caught) {
+        setError(
+          caught instanceof Error ? caught.message : t('messages.fetchFailed'),
+        );
+        if (!silent) setThreads([]);
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [user, t],
+  );
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    if (!user) {
+      setThreads([]);
+      setLoading(false);
+      return;
+    }
+    const key = inboxCacheKey(user.uid);
+    const cached = peekQueryCache<InboxThread[]>(key);
+    if (cached) {
+      setThreads(cached);
+      setLoading(false);
+      if (isQueryCacheFresh(key, QUERY_FRESH_MS)) return;
+      void reload({ silent: true });
+      return;
+    }
+    void reload({ silent: false });
+  }, [user, reload]);
 
   useEffect(() => {
     if (!user) return;
-    const id = window.setInterval(() => void reload(), 20_000);
+    const id = window.setInterval(() => void reload({ silent: true }), 30_000);
     return () => window.clearInterval(id);
   }, [user, reload]);
 

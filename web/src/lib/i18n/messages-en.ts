@@ -129,8 +129,9 @@ export const messagesEn: MessageTree = {
     maxAria: 'Maximum price',
     zero: '¥0',
     threeThousand: '¥3,000',
-    anyRange: 'Any (¥0 – ¥3,000+)',
+    anyRange: 'Any',
     fromMinOpen: '{min} – ¥3,000+',
+
     range: '{min} – {max}',
   },
   map: {

@@ -1,8 +1,14 @@
 import { absoluteImageUrl } from '@/lib/eventSeo';
+import {
+  clubDetailCacheKey,
+  clubsCacheKey,
+  isQueryCacheFresh,
+  setQueryCache,
+} from '@/lib/queryCache';
 import { sanitizeSnsLinks, type SnsLink } from '@/lib/snsLinks';
 import { createAuthedSupabase, createPublicSupabase } from '@/lib/supabase';
 import {
-  eventColumns,
+  eventListColumns,
   mapEventRow,
   type EventRow,
   type PublicEvent,
@@ -108,7 +114,8 @@ export async function fetchJoinedClubs(input: {
   const { data: parts, error: partsError } = await supabase
     .from('event_participants')
     .select('event_id, status')
-    .eq('user_id', uid);
+    .eq('user_id', uid)
+    .limit(300);
   if (partsError) throw new Error(partsError.message);
 
   const eventIds = [
@@ -121,36 +128,58 @@ export async function fetchJoinedClubs(input: {
         .map((row) => String((row as { event_id?: string }).event_id ?? '').trim())
         .filter(Boolean),
     ),
-  ];
+  ].slice(0, 120);
 
   const byHost = new Map<string, JoinedClub>();
 
   if (eventIds.length > 0) {
-    const { data: events, error } = await supabase
-      .from('events')
-      .select('host_id, host_name, host_image_uri, image_uri, sport, host_bio')
-      .in('id', eventIds.slice(0, 200));
-    if (error) throw new Error(error.message);
-    for (const row of events ?? []) {
-      const hostId = String((row as { host_id?: string }).host_id ?? '').trim();
-      if (!hostId || byHost.has(hostId)) continue;
-      byHost.set(hostId, {
-        id: hostId,
-        name:
-          String((row as { host_name?: string }).host_name ?? '').trim() || 'クラブ',
-        imageUri:
-          String(
-            (row as { host_image_uri?: string }).host_image_uri ||
-              (row as { image_uri?: string }).image_uri ||
-              '',
-          ).trim() || undefined,
-        sport: String((row as { sport?: string }).sport ?? '').trim() || undefined,
-        bio: String((row as { host_bio?: string }).host_bio ?? '').trim() || undefined,
-      });
+    // チャンクで軽量カラムのみ取得（bio は clubs 詳細で読む）
+    const chunkSize = 60;
+    for (let i = 0; i < eventIds.length; i += chunkSize) {
+      const chunk = eventIds.slice(i, i + chunkSize);
+      const { data: events, error } = await supabase
+        .from('events')
+        .select('host_id, host_name, host_image_uri, image_uri, sport')
+        .in('id', chunk);
+      if (error) throw new Error(error.message);
+      for (const row of events ?? []) {
+        const hostId = String((row as { host_id?: string }).host_id ?? '').trim();
+        if (!hostId || byHost.has(hostId)) continue;
+        byHost.set(hostId, {
+          id: hostId,
+          name:
+            String((row as { host_name?: string }).host_name ?? '').trim() ||
+            'クラブ',
+          imageUri:
+            String(
+              (row as { host_image_uri?: string }).host_image_uri ||
+                (row as { image_uri?: string }).image_uri ||
+                '',
+            ).trim() || undefined,
+          sport:
+            String((row as { sport?: string }).sport ?? '').trim() || undefined,
+        });
+      }
     }
   }
 
-  return [...byHost.values()].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+  const list = [...byHost.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, 'ja'),
+  );
+  setQueryCache(clubsCacheKey(uid), list);
+  return list;
+}
+
+/** マイページ等からのプリフェッチ */
+export function prefetchJoinedClubs(input: {
+  userId: string;
+  getIdToken: () => Promise<string | null>;
+}): void {
+  const key = clubsCacheKey(input.userId);
+  if (isQueryCacheFresh(key)) return;
+  void fetchJoinedClubs(input).catch(() => {
+    /* ignore */
+  });
 }
 
 /**
@@ -166,13 +195,11 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   const [eventsRes, clubRes, profileRes] = await Promise.all([
     supabase
       .from('events')
-      .select(
-        `${eventColumns()}, host_image_uri, host_bio, host_sns_links`,
-      )
+      .select(`${eventListColumns()}, host_image_uri, host_bio`)
       .eq('host_id', id)
       .is('cancelled_at', null)
       .order('event_date', { ascending: true })
-      .limit(80),
+      .limit(48),
     supabase
       .from('clubs')
       .select('id, name, image_url, cover_image_url, bio, sns_links')
@@ -214,7 +241,6 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     EventRow & {
       host_image_uri?: string | null;
       host_bio?: string | null;
-      host_sns_links?: unknown;
     }
   >;
   const events = eventRows.flatMap((row) => {
@@ -260,9 +286,8 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     [...new Set(events.map((event) => event.sport).filter(Boolean))][0] ||
     undefined;
 
-  const clubSns = sanitizeSnsLinks(clubRow?.sns_links);
-  const eventSns = sanitizeSnsLinks(sample?.host_sns_links);
-  const snsLinks = clubSns.length > 0 ? clubSns : eventSns;
+  // SNS は clubs テーブルのみ（イベント行のネスト列は読まない）
+  const snsLinks = sanitizeSnsLinks(clubRow?.sns_links);
 
   if (!clubRow && !profileRow && events.length === 0) {
     return null;
@@ -276,7 +301,7 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     eventIds: events.map((event) => event.id),
   });
 
-  return {
+  const detail: ClubDetail = {
     id,
     name,
     hostName,
@@ -288,6 +313,8 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     events,
     members,
   };
+  setQueryCache(clubDetailCacheKey(id), detail);
+  return detail;
 }
 
 function looksLikeFirebaseUid(id: string) {
@@ -317,7 +344,7 @@ export async function fetchClubMembers(input: {
 
   const eventIds = [
     ...new Set(input.eventIds.map((id) => id.trim()).filter(Boolean)),
-  ].slice(0, 80);
+  ].slice(0, 40);
 
   const supabase = createPublicSupabase();
 
@@ -335,7 +362,8 @@ export async function fetchClubMembers(input: {
       .from('event_participants')
       .select('event_id, user_id, status, display_name, avatar_url')
       .in('event_id', eventIds)
-      .eq('status', 'joined');
+      .eq('status', 'joined')
+      .limit(400);
 
     if (
       withSnapshot.error &&
@@ -346,7 +374,8 @@ export async function fetchClubMembers(input: {
         .from('event_participants')
         .select('event_id, user_id, status')
         .in('event_id', eventIds)
-        .eq('status', 'joined');
+        .eq('status', 'joined')
+        .limit(400);
       if (!legacy.error) rows = (legacy.data ?? []) as ParticipantRow[];
     } else if (!withSnapshot.error) {
       rows = (withSnapshot.data ?? []) as ParticipantRow[];
@@ -358,7 +387,7 @@ export async function fetchClubMembers(input: {
           .map((row) => String(row.user_id || '').trim())
           .filter(Boolean),
       ),
-    ];
+    ].slice(0, 80);
     if (hostId && !userIds.includes(hostId) && looksLikeFirebaseUid(hostId)) {
       userIds.push(hostId);
     }
@@ -375,7 +404,7 @@ export async function fetchClubMembers(input: {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, nickname, avatar_url')
-        .in('id', userIds.slice(0, 200));
+        .in('id', userIds);
       for (const profile of profiles ?? []) {
         const pid = String((profile as { id?: string }).id ?? '').trim();
         if (!pid) continue;

@@ -1,5 +1,41 @@
 import { createAuthedSupabase } from '@/lib/supabase';
-import { eventColumns, mapEventRow, type EventRow, type PublicEvent } from '@/lib/types';
+import {
+  eventColumns,
+  eventInboxColumns,
+  mapEventRow,
+  type EventRow,
+  type PublicEvent,
+} from '@/lib/types';
+import {
+  chatRoomCacheKey,
+  inboxCacheKey,
+  isQueryCacheFresh,
+  setQueryCache,
+} from '@/lib/queryCache';
+
+/** ナビ hover などから呼ぶ。新鮮なら何もしない */
+export function prefetchInboxThreads(input: {
+  userId: string;
+  getIdToken: () => Promise<string | null>;
+}): void {
+  const key = inboxCacheKey(input.userId);
+  if (isQueryCacheFresh(key)) return;
+  void fetchInboxThreads(input).catch(() => {
+    /* prefetch 失敗は無視 */
+  });
+}
+
+/** インボックス用メッセージ（画像カラムは不要） */
+const CHAT_INBOX_COLUMNS =
+  'id, event_id, mode, dm_user_id, sender_id, sender_name, body, created_at';
+
+/** ルーム表示用 */
+const CHAT_ROOM_COLUMNS =
+  'id, event_id, mode, dm_user_id, sender_id, sender_name, sender_image_uri, body, created_at';
+
+const INBOX_MESSAGE_LIMIT = 240;
+const ROOM_MESSAGE_LIMIT = 120;
+const ACCESSIBLE_EVENTS_LIMIT = 200;
 
 export type ChatMode = 'group' | 'host';
 
@@ -38,7 +74,7 @@ type ChatMessageRow = {
   dm_user_id: string | null;
   sender_id: string;
   sender_name: string;
-  sender_image_uri: string | null;
+  sender_image_uri?: string | null;
   body: string;
   created_at: string;
 };
@@ -228,7 +264,7 @@ function rowToMessage(row: ChatMessageRow, currentUserId: string): WebChatMessag
     dmUserId: row.dm_user_id,
     senderId: row.sender_id,
     senderName: row.sender_name || '参加者',
-    senderImageUri: row.sender_image_uri,
+    senderImageUri: row.sender_image_uri ?? null,
     body: row.body || '',
     at: Number.isFinite(at) ? at : Date.now(),
     mine: row.sender_id === currentUserId,
@@ -244,12 +280,15 @@ async function accessibleEventIds(input: {
     supabase
       .from('event_participants')
       .select('event_id, status')
-      .eq('user_id', input.userId),
+      .eq('user_id', input.userId)
+      .limit(ACCESSIBLE_EVENTS_LIMIT),
     supabase
       .from('events')
-      .select(eventColumns())
+      .select(eventInboxColumns())
       .eq('host_id', input.userId)
-      .is('cancelled_at', null),
+      .is('cancelled_at', null)
+      .order('event_date', { ascending: false })
+      .limit(120),
   ]);
   if (joinedRes.error) throw new Error(joinedRes.error.message);
   if (hostedRes.error) throw new Error(hostedRes.error.message);
@@ -268,16 +307,22 @@ async function accessibleEventIds(input: {
     return event ? [event] : [];
   });
 
-  const eventIds = [...new Set([...joinedIds, ...hostedEvents.map((e) => e.id)])];
+  const eventIds = [...new Set([...joinedIds, ...hostedEvents.map((e) => e.id)])].slice(
+    0,
+    ACCESSIBLE_EVENTS_LIMIT,
+  );
   const eventsById = new Map<string, PublicEvent>();
   for (const event of hostedEvents) eventsById.set(event.id, event);
 
   const missing = joinedIds.filter((id) => !eventsById.has(id));
-  if (missing.length > 0) {
+  // .in() はチャンクして負荷を抑える
+  const chunkSize = 80;
+  for (let i = 0; i < missing.length; i += chunkSize) {
+    const chunk = missing.slice(i, i + chunkSize);
     const { data, error } = await supabase
       .from('events')
-      .select(eventColumns())
-      .in('id', missing)
+      .select(eventInboxColumns())
+      .in('id', chunk)
       .is('cancelled_at', null);
     if (error) throw new Error(error.message);
     for (const row of (data ?? []) as unknown as EventRow[]) {
@@ -297,16 +342,41 @@ export async function fetchInboxThreads(input: {
   if (eventIds.length === 0) return [];
 
   const supabase = createAuthedSupabase(input.getIdToken);
-  const [messagesRes, remoteHides] = await Promise.all([
-    supabase
-      .from('chat_messages')
-      .select('*')
-      .in('event_id', eventIds)
-      .order('created_at', { ascending: false })
-      .limit(800),
+  // event_id の .in() が大きいと重いのでチャンクして最新順をマージ
+  const eventChunks: string[][] = [];
+  for (let i = 0; i < eventIds.length; i += 60) {
+    eventChunks.push(eventIds.slice(i, i + 60));
+  }
+  const perChunkLimit = Math.max(
+    40,
+    Math.ceil(INBOX_MESSAGE_LIMIT / Math.max(1, eventChunks.length)),
+  );
+
+  const [messageChunks, remoteHides] = await Promise.all([
+    Promise.all(
+      eventChunks.map(async (chunk) => {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select(CHAT_INBOX_COLUMNS)
+          .in('event_id', chunk)
+          .order('created_at', { ascending: false })
+          .limit(perChunkLimit);
+        if (error) throw new Error(error.message);
+        return (data ?? []) as ChatMessageRow[];
+      }),
+    ),
     fetchRemoteHides(input.getIdToken, input.userId).catch(() => ({}) as ChatHides),
   ]);
-  if (messagesRes.error) throw new Error(messagesRes.error.message);
+  const messagesRes = {
+    data: messageChunks
+      .flat()
+      .sort(
+        (a, b) =>
+          Date.parse(b.created_at) - Date.parse(a.created_at),
+      )
+      .slice(0, INBOX_MESSAGE_LIMIT),
+    error: null as null,
+  };
 
   const hides = mergeHides(loadLocalHides(), remoteHides);
   saveLocalHides(hides);
@@ -370,6 +440,7 @@ export async function fetchInboxThreads(input: {
   }
 
   threads.sort((a, b) => b.lastAt - a.lastAt);
+  setQueryCache(inboxCacheKey(input.userId), threads);
   return threads;
 }
 
@@ -406,11 +477,11 @@ export async function fetchRoomMessages(input: {
 
   let query = supabase
     .from('chat_messages')
-    .select('*')
+    .select(CHAT_ROOM_COLUMNS)
     .eq('event_id', eventId)
     .eq('mode', input.mode)
-    .order('created_at', { ascending: true })
-    .limit(300);
+    .order('created_at', { ascending: false })
+    .limit(ROOM_MESSAGE_LIMIT);
   if (input.mode === 'host') {
     query = query.eq('dm_user_id', dm);
   } else {
@@ -420,15 +491,18 @@ export async function fetchRoomMessages(input: {
   const msgQuery = await query;
   if (msgQuery.error) throw new Error(msgQuery.error.message);
 
-  const messages = ((msgQuery.data ?? []) as ChatMessageRow[]).map((row) =>
-    rowToMessage(row, input.userId),
-  );
+  // 新しい順で取って表示用に古い→新しいへ
+  const messages = ((msgQuery.data ?? []) as ChatMessageRow[])
+    .map((row) => rowToMessage(row, input.userId))
+    .reverse();
 
   const key = threadId(eventId, input.mode, dm);
   const lastAt = messages[messages.length - 1]?.at ?? Date.now();
   markThreadRead(key, lastAt);
 
-  return { event, messages, dmUserId: dm };
+  const result = { event, messages, dmUserId: dm };
+  setQueryCache(chatRoomCacheKey(eventId, input.mode, dm), result);
+  return result;
 }
 
 export async function sendRoomMessage(input: {
@@ -470,7 +544,7 @@ export async function sendRoomMessage(input: {
   const { data, error } = await supabase
     .from('chat_messages')
     .insert(payload)
-    .select('*')
+    .select(CHAT_ROOM_COLUMNS)
     .single();
   if (error || !data) throw new Error(error?.message || '送信に失敗しました');
 

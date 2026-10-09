@@ -29,6 +29,12 @@ import {
   type WebChatMessage,
 } from '@/lib/chatsWeb';
 import { absoluteImageUrl } from '@/lib/eventSeo';
+import {
+  chatRoomCacheKey,
+  isQueryCacheFresh,
+  peekQueryCache,
+  QUERY_FRESH_MS,
+} from '@/lib/queryCache';
 import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { useT } from '@/lib/i18n/locale-context';
 import { fetchWebProfile, profileFromFirebaseUser } from '@/lib/profile';
@@ -81,37 +87,55 @@ export function ChatRoomScreen() {
   const eventId = String(params.eventId || '');
   const mode: ChatMode = parseChatMode(params.mode);
   const dmFromQuery = query.get('dm');
+  type RoomCache = {
+    event: PublicEvent | null;
+    messages: WebChatMessage[];
+    dmUserId: string | null;
+  };
+  const roomKey = chatRoomCacheKey(eventId, mode, dmFromQuery);
+  const cachedRoom = peekQueryCache<RoomCache>(roomKey);
 
-  const [event, setEvent] = useState<PublicEvent | null>(null);
-  const [resolvedDm, setResolvedDm] = useState<string | null>(dmFromQuery);
-  const [messages, setMessages] = useState<WebChatMessage[]>([]);
+  const [event, setEvent] = useState<PublicEvent | null>(
+    () => cachedRoom?.event ?? null,
+  );
+  const [resolvedDm, setResolvedDm] = useState<string | null>(
+    () => cachedRoom?.dmUserId ?? dmFromQuery,
+  );
+  const [messages, setMessages] = useState<WebChatMessage[]>(
+    () => cachedRoom?.messages ?? [],
+  );
   const [draft, setDraft] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !cachedRoom);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [profileTarget, setProfileTarget] = useState<ProfilePerson | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const reload = useCallback(async () => {
-    if (!user || !eventId) return;
-    try {
-      const next = await fetchRoomMessages({
-        userId: user.uid,
-        getIdToken: async () => idTokenWithAuthenticatedRole(user),
-        eventId,
-        mode,
-        dmUserId: mode === 'host' ? dmFromQuery : null,
-      });
-      setEvent(next.event);
-      setResolvedDm(next.dmUserId);
-      setMessages(next.messages);
-      setError('');
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : t('chat.loadFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [user, eventId, mode, dmFromQuery, t]);
+  const reload = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!user || !eventId) return;
+      const silent = opts?.silent ?? false;
+      if (!silent) setLoading(true);
+      try {
+        const next = await fetchRoomMessages({
+          userId: user.uid,
+          getIdToken: async () => idTokenWithAuthenticatedRole(user),
+          eventId,
+          mode,
+          dmUserId: mode === 'host' ? dmFromQuery : null,
+        });
+        setEvent(next.event);
+        setResolvedDm(next.dmUserId);
+        setMessages(next.messages);
+        setError('');
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : t('chat.loadFailed'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user, eventId, mode, dmFromQuery, t],
+  );
 
   useEffect(() => {
     if (!ready) return;
@@ -119,13 +143,23 @@ export function ChatRoomScreen() {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    void reload();
-  }, [ready, user, reload]);
+    const key = chatRoomCacheKey(eventId, mode, dmFromQuery);
+    const cached = peekQueryCache<RoomCache>(key);
+    if (cached) {
+      setEvent(cached.event);
+      setResolvedDm(cached.dmUserId);
+      setMessages(cached.messages);
+      setLoading(false);
+      if (isQueryCacheFresh(key, QUERY_FRESH_MS)) return;
+      void reload({ silent: true });
+      return;
+    }
+    void reload({ silent: false });
+  }, [ready, user, eventId, mode, dmFromQuery, reload]);
 
   useEffect(() => {
     if (!user) return;
-    const id = window.setInterval(() => void reload(), 8_000);
+    const id = window.setInterval(() => void reload({ silent: true }), 12_000);
     return () => window.clearInterval(id);
   }, [user, reload]);
 
@@ -232,7 +266,7 @@ export function ChatRoomScreen() {
     }
   }
 
-  if (!ready || loading) {
+  if (!ready || (loading && messages.length === 0)) {
     return (
       <main className="page-main flex min-h-[70vh] flex-col pt-4 md:pt-2">
         <BackButton fallbackHref="/messages" label={t('chat.backMessages')} />

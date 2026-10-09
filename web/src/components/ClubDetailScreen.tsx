@@ -20,6 +20,12 @@ import {
 import { absoluteImageUrl, formatWhen } from '@/lib/eventSeo';
 import { sportLabel } from '@/lib/i18n/labels';
 import { useLocale, useT } from '@/lib/i18n/locale-context';
+import {
+  clubDetailCacheKey,
+  isQueryCacheFresh,
+  peekQueryCache,
+  QUERY_FRESH_MS,
+} from '@/lib/queryCache';
 import { snsKindMeta } from '@/lib/snsLinks';
 import {
   getEventStatus,
@@ -114,8 +120,14 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
   const t = useT();
   const { locale } = useLocale();
   const { user, ready } = useAuth();
-  const [club, setClub] = useState<ClubDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [club, setClub] = useState<ClubDetail | null>(() => {
+    const id = clubId.trim();
+    return id ? peekQueryCache<ClubDetail>(clubDetailCacheKey(id)) : null;
+  });
+  const [loading, setLoading] = useState(() => {
+    const id = clubId.trim();
+    return !(id && peekQueryCache<ClubDetail>(clubDetailCacheKey(id)));
+  });
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<ActivityFilter>('upcoming');
   const [joined, setJoined] = useState(false);
@@ -132,7 +144,24 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    const key = clubDetailCacheKey(id);
+    const cached = peekQueryCache<ClubDetail>(key);
+    const applyClub = (next: ClubDetail) => {
+      const uid = user?.uid?.trim() || '';
+      const members = next.members.map((member) => ({
+        ...member,
+        self: Boolean(uid && member.id === uid),
+      }));
+      setClub({ ...next, members });
+    };
+    if (cached) {
+      applyClub(cached);
+      setLoading(false);
+      setError('');
+      if (isQueryCacheFresh(key, QUERY_FRESH_MS)) return;
+    } else {
+      setLoading(true);
+    }
     setError('');
     void fetchClubDetail(id)
       .then((next) => {
@@ -142,15 +171,12 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
           setError(t('clubs.notFound'));
           return;
         }
-        const uid = user?.uid?.trim() || '';
-        const members = next.members.map((member) => ({
-          ...member,
-          self: Boolean(uid && member.id === uid),
-        }));
-        setClub({ ...next, members });
+        applyClub(next);
       })
       .catch((caught) => {
         if (cancelled) return;
+        // キャッシュ表示中はエラーで画面を潰さない
+        if (cached) return;
         setClub(null);
         setError(
           caught instanceof Error ? caught.message : t('clubs.fetchFailed'),
@@ -256,7 +282,7 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
 
   return (
     <main className="page-main relative pb-28 pt-0 md:pb-32 md:pt-0">
-      {loading || !ready ? (
+      {(loading || !ready) && !club ? (
         <div className="relative">
           <BackButton
             variant="overlay"

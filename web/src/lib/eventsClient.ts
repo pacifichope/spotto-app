@@ -1,7 +1,7 @@
 import { createPublicSupabase } from '@/lib/supabase';
 import {
   activeEventsOrFilter,
-  eventColumns,
+  eventListColumns,
   filterActiveEvents,
   mapEventRow,
   type EventRow,
@@ -46,12 +46,12 @@ export async function listPublicEventsInBounds(
   const north = bounds.north + padLat;
   const west = bounds.west - padLng;
   const east = bounds.east + padLng;
-  const limit = Math.min(300, Math.max(1, options?.limit ?? 200));
+  const limit = Math.min(200, Math.max(1, options?.limit ?? 120));
 
   const supabase = createPublicSupabase();
   let query = supabase
     .from('events')
-    .select(eventColumns())
+    .select(eventListColumns())
     .is('cancelled_at', null)
     .or(activeEventsOrFilter())
     .not('latitude', 'is', null)

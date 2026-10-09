@@ -8,6 +8,8 @@ import { useWideLayout } from '@/components/AppShell';
 import { HeaderAccountButton } from '@/components/AuthControls';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useAuth } from '@/lib/auth-context';
+import { prefetchInboxThreads } from '@/lib/chatsWeb';
+import { idTokenWithAuthenticatedRole } from '@/lib/firebase';
 import { useT } from '@/lib/i18n/locale-context';
 
 function isActive(pathname: string, href: string) {
@@ -24,6 +26,14 @@ export function SiteHeader() {
     { href: '/', label: t('nav.home'), icon: Home },
     { href: '/messages', label: t('nav.messages'), icon: MessageCircle },
   ] as const;
+
+  const prefetchMessages = () => {
+    if (!user) return;
+    prefetchInboxThreads({
+      userId: user.uid,
+      getIdToken: async () => idTokenWithAuthenticatedRole(user),
+    });
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-md">
@@ -67,6 +77,10 @@ export function SiteHeader() {
                   key={tab.href}
                   href={tab.href}
                   aria-current={active ? 'page' : undefined}
+                  onPointerEnter={
+                    tab.href === '/messages' ? prefetchMessages : undefined
+                  }
+                  onFocus={tab.href === '/messages' ? prefetchMessages : undefined}
                   className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-extrabold ${
                     active ? 'brand-gradient' : 'text-[#5B6B75] hover:bg-white'
                   }`}
@@ -87,6 +101,7 @@ export function SiteHeader() {
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const t = useT();
 
   const tabs = [
@@ -94,6 +109,14 @@ export function BottomNav() {
     { href: '/messages', label: t('nav.messages'), icon: MessageCircle },
     { href: '/mypage', label: t('nav.mypage'), icon: UserRound },
   ] as const;
+
+  const prefetchMessages = () => {
+    if (!user) return;
+    prefetchInboxThreads({
+      userId: user.uid,
+      getIdToken: async () => idTokenWithAuthenticatedRole(user),
+    });
+  };
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">
@@ -109,6 +132,10 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? 'page' : undefined}
+              onPointerEnter={
+                tab.href === '/messages' ? prefetchMessages : undefined
+              }
+              onFocus={tab.href === '/messages' ? prefetchMessages : undefined}
               className={`flex min-h-12 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] font-extrabold ${
                 active ? 'text-[#12B8D0]' : 'text-[#8A9199]'
               }`}

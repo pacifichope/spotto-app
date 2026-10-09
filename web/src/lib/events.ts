@@ -4,6 +4,7 @@ import { createPublicSupabase } from '@/lib/supabase';
 import {
   activeEventsOrFilter,
   eventColumns,
+  eventListColumns,
   filterActiveEvents,
   mapEventRow,
   type EventRow,
@@ -15,11 +16,11 @@ export const listPublicEvents = cache(async (): Promise<PublicEvent[]> => {
   const supabase = createPublicSupabase();
   const { data, error } = await supabase
     .from('events')
-    .select(eventColumns())
+    .select(eventListColumns())
     .is('cancelled_at', null)
     .or(activeEventsOrFilter())
     .order('event_date', { ascending: true })
-    .limit(100);
+    .limit(80);
 
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as unknown as EventRow[];

@@ -32,6 +32,7 @@ export function formatPriceYen(
   return `${value.toLocaleString('ja-JP')}${t('common.yen')}`;
 }
 
+/** デフォルト（指定なし）のときは空文字。上部ラベルは描画しない */
 export function formatPriceRangeLabel(
   range: PriceRange,
   t: (key: string, params?: Record<string, string | number>) => string,
@@ -39,7 +40,7 @@ export function formatPriceRangeLabel(
   const min = clamp(range.min, PRICE_RANGE_MIN, PRICE_RANGE_MAX);
   const max = clamp(range.max, PRICE_RANGE_MIN, PRICE_RANGE_MAX);
   if (min <= PRICE_RANGE_MIN && max >= PRICE_RANGE_MAX) {
-    return t('price.anyRange');
+    return '';
   }
   if (max >= PRICE_RANGE_MAX) {
     return t('price.fromMinOpen', { min: formatPriceYen(min, t) });
@@ -83,13 +84,17 @@ export function PriceRangeSlider({ value, onChange }: PriceRangeSliderProps) {
     onChange({ min, max: next });
   }
 
+  const rangeLabel = formatPriceRangeLabel({ min, max }, t);
+
   return (
     <div>
       <div className="flex items-end justify-between gap-3">
         <p className="text-xs font-extrabold text-[#5B6B75]">{t('price.title')}</p>
-        <p className="text-sm font-extrabold tracking-tight text-[#12B8D0]">
-          {formatPriceRangeLabel({ min, max }, t)}
-        </p>
+        {rangeLabel ? (
+          <p className="text-sm font-extrabold tracking-tight text-[#12B8D0]">
+            {rangeLabel}
+          </p>
+        ) : null}
       </div>
 
       <div className="relative mt-4 h-8 touch-none select-none">
