@@ -1,5 +1,5 @@
 /**
- * Apple → Firebase Auth（ネイティブ: OAuthProvider apple.com + signInWithCredential）
+ * Apple → Firebase Auth（ネイティブ: AppleAuthProvider + signInWithCredential）
  */
 import '@/lib/firebaseNativeInit';
 
@@ -13,6 +13,7 @@ import {
   ensureNativeFirebaseApp,
   isNativeFirebaseLinked,
 } from '@/lib/firebaseNativeInit';
+import { waitForNativeAuthPresenter } from '@/lib/nativeAuthPresenter';
 import { SOCIAL_LOGIN_USER_ERRORS } from '@/lib/socialLoginErrors';
 
 export type FirebaseAppleSignInResult =
@@ -155,6 +156,7 @@ export async function signInWithAppleFirebase(): Promise<FirebaseAppleSignInResu
 
     let credential: AppleAuthentication.AppleAuthenticationCredential;
     try {
+      await waitForNativeAuthPresenter(Platform.isPad ? 200 : 0);
       credential = await signInAppleWithRetry(() =>
         AppleAuthentication.signInAsync({
           requestedScopes: [

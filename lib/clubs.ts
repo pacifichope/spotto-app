@@ -79,7 +79,6 @@ export type Club = {
   name: string;
   imageUri?: string;
   coverUri: string;
-  bio: string;
   tag?: string;
   hostName: string;
   members: ClubMember[];
@@ -153,7 +152,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'harajuku-shuttle',
     name: 'Harajuku Shuttle',
     coverUri: SPORT_IMAGE_PRESETS['バドミントン'],
-    bio: '原宿・表参道でバドミントン交流を主催。ラリーの気持ちよさと新しいつながりを大切にしています。',
     tag: 'バドミントン',
     hostName: 'Harajuku Shuttle',
     members: members('Harajuku Shuttle', ['Mika', 'Ken', 'Yui', 'Sota', 'Nao']),
@@ -162,7 +160,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'ebisu-night',
     name: 'Ebisu Night',
     coverUri: SPORT_IMAGE_PRESETS['フットサル'],
-    bio: '恵比寿のナイトフットサル。初心者・ブランクあり歓迎の、楽しさ優先クラブです。',
     tag: 'フットサル',
     hostName: 'Ebisu Night',
     members: members('Ebisu Night', ['Ryo', 'Kana', 'Daiki', 'Mei']),
@@ -171,7 +168,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'gaien-tennis',
     name: 'Gaien Tennis',
     coverUri: SPORT_IMAGE_PRESETS['テニス'],
-    bio: '明治神宮外苑でダブルス中心のテニス。朝ラリーからゲーム形式まで。',
     tag: 'テニス',
     hostName: 'Gaien Tennis',
     members: members('Gaien Tennis', ['Haru', 'Emi', 'Tomo']),
@@ -180,7 +176,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'morning-pace',
     name: 'Morning Pace',
     coverUri: SPORT_IMAGE_PRESETS['ランニング'],
-    bio: '代々木公園のゆる朝ラン。会話できるペースで、コーヒー終わりつき。',
     tag: 'ランニング',
     hostName: 'Morning Pace',
     members: members('Morning Pace', ['Jun', 'Saki', 'Hiro', 'Aya', 'Leo', 'Mao']),
@@ -189,7 +184,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'shibuya-hoops',
     name: 'Shibuya Hoops',
     coverUri: SPORT_IMAGE_PRESETS['バスケットボール'],
-    bio: '渋谷でナイトバスケ。3on3〜5on5、レベル分けしてマッチングします。',
     tag: 'バスケ',
     hostName: 'Shibuya Hoops',
     members: members('Shibuya Hoops', ['Koki', 'Ren', 'Yuna', 'Shin', 'Miu']),
@@ -198,7 +192,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'omotesando-flow',
     name: 'Omotesando Flow',
     coverUri: SPORT_IMAGE_PRESETS['ヨガ'],
-    bio: '表参道周辺のヨガコミュニティ。ランチタイムからサンセットまで、無料回も定期開催。',
     tag: 'ヨガ',
     hostName: 'Omotesando Flow',
     members: members('Omotesando Flow', ['Hina', 'Riku', 'Momo']),
@@ -207,7 +200,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'tama-catch',
     name: 'Tama Catch',
     coverUri: SPORT_IMAGE_PRESETS['野球'],
-    bio: '多摩川〜皇居周辺でキャッチボール会を主催。グローブ持参歓迎、初心者OK。',
     tag: '野球',
     hostName: 'Tama Catch',
     members: members('Tama Catch', ['Osamu', 'Kei', 'Nao']),
@@ -216,7 +208,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'yoyogi-fc',
     name: 'Yoyogi FC',
     coverUri: SPORT_IMAGE_PRESETS['サッカー'],
-    bio: '代々木公園のピックアップサッカー。芝生の上で、楽しさ優先のキックオフ。',
     tag: 'サッカー',
     hostName: 'Yoyogi FC',
     members: members('Yoyogi FC', ['Taku', 'Natsuki', 'Gaku', 'Rin', 'Sho']),
@@ -242,7 +233,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'meguro-spike',
     name: 'Meguro Spike',
     coverUri: SPORT_IMAGE_PRESETS['バレーボール'],
-    bio: '目黒の本気寄りバレー。経験者向けの練習マッチを主催しています。',
     tag: 'バレー',
     hostName: 'Meguro Spike',
     members: members('Meguro Spike', ['Asahi', 'Kaho']),
@@ -251,7 +241,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'sapporo-kick',
     name: 'Sapporo Kick',
     coverUri: SPORT_IMAGE_PRESETS['サッカー'],
-    bio: '札幌・大通周辺のゆるサッカークラブ。',
     tag: 'サッカー',
     hostName: 'Sapporo Kick',
     members: members('Sapporo Kick', ['Yuta', 'Hana']),
@@ -260,7 +249,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'odori-pace',
     name: 'Odori Pace',
     coverUri: SPORT_IMAGE_PRESETS['ランニング'],
-    bio: '中島公園をゆっくり走る札幌の朝ランクラブ。',
     tag: 'ランニング',
     hostName: 'Odori Pace',
     members: members('Odori Pace', ['Kenta', 'Mio']),
@@ -269,7 +257,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'osaka-castle-run',
     name: 'Osaka Castle Run',
     coverUri: SPORT_IMAGE_PRESETS['ランニング'],
-    bio: '大阪城公園のナイトラン。ライトアップを眺めながら。',
     tag: 'ランニング',
     hostName: 'Osaka Castle Run',
     members: members('Osaka Castle Run', ['Sora', 'Ami']),
@@ -278,7 +265,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'nishi-futsal',
     name: 'Nishi Futsal',
     coverUri: SPORT_IMAGE_PRESETS['フットサル'],
-    bio: '大阪西区のインドアナイトフットサル。',
     tag: 'フットサル',
     hostName: 'Nishi Futsal',
     members: members('Nishi Futsal', ['Kai', 'Fuka']),
@@ -287,7 +273,6 @@ export const SAMPLE_CLUBS: Club[] = [
     id: 'ohori-morning',
     name: 'Ohori Morning',
     coverUri: SPORT_IMAGE_PRESETS['ランニング'],
-    bio: '福岡・大濠公園の周回朝ラン。',
     tag: 'ランニング',
     hostName: 'Ohori Morning',
     members: members('Ohori Morning', ['Ren', 'Kotomi']),
@@ -355,9 +340,6 @@ export function clubFromOrganizer(
     name,
     imageUri: clubImage || coverUri,
     coverUri,
-    bio:
-      organizer.bio.trim() ||
-      i18n.t('club.defaultBioSelf'),
     tag: i18n.t('club.myCircleTag'),
     hostName: name,
     members: [
@@ -427,9 +409,6 @@ export function resolveClub(
     name: sample.host,
     imageUri: coverUri,
     coverUri,
-    bio:
-      sample.hostBio?.trim() ||
-      i18n.t('club.defaultBioHosted', { name: sample.host }),
     tag: sample.sport,
     hostName: sample.host,
     members: members(sample.host, [], hostPersonal).map((member, index) =>
@@ -449,7 +428,6 @@ export function clubFromPublicProfile(
     name?: string | null;
     imageUri?: string | null;
     coverUri?: string | null;
-    bio?: string | null;
   },
 ): Club {
   const name =
@@ -462,9 +440,6 @@ export function clubFromPublicProfile(
     name,
     imageUri: clubImage,
     coverUri,
-    bio:
-      String(profile.bio || '').trim() ||
-      i18n.t('club.defaultBioHosted', { name }),
     tag: i18n.t('club.fallbackName'),
     hostName: name,
     members: [
@@ -480,7 +455,7 @@ export function applyClubRowToClub(
     name?: string | null;
     image_url?: string | null;
     cover_image_url?: string | null;
-    bio?: string | null;
+    sns_links?: unknown;
   } | null | undefined,
 ): Club {
   if (!row) return club;
@@ -489,13 +464,13 @@ export function applyClubRowToClub(
   const image =
     String(row.image_url || '').trim() || club.imageUri || cover;
   const name = String(row.name || '').trim() || club.name;
-  const bio = String(row.bio || '').trim() || club.bio;
+  const fromRow = sanitizeSnsLinks(row.sns_links);
   return {
     ...club,
     name,
     coverUri: cover,
     imageUri: image,
-    bio,
     hostName: name || club.hostName,
+    snsLinks: fromRow.length > 0 ? fromRow : club.snsLinks,
   };
 }

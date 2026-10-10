@@ -22,7 +22,6 @@ export type RemoteClubStub = {
   name: string;
   coverUri: string;
   tag?: string;
-  bio?: string;
 };
 
 const EVENT_ID_CHUNK = 80;
@@ -42,19 +41,16 @@ function stubFromEventRow(row: {
   host_name?: string | null;
   image_uri?: string | null;
   sport?: string | null;
-  host_bio?: string | null;
 }): RemoteClubStub | null {
   const hostId = String(row.host_id ?? '').trim();
   if (!hostId) return null;
   const hostName = String(row.host_name ?? '').trim() || 'クラブ';
   const sport = String(row.sport ?? '').trim();
-  const bio = String(row.host_bio ?? '').trim();
   return {
     id: hostId,
     name: hostName,
     coverUri: resolveCover(row.image_uri),
     tag: sport || undefined,
-    bio: bio || undefined,
   };
 }
 
@@ -62,7 +58,7 @@ function stubFromEventRow(row: {
 export function clubStubFromSportEvent(
   event: Pick<
     SportEvent,
-    'host' | 'hostId' | 'imageUri' | 'sport' | 'hostBio'
+    'host' | 'hostId' | 'imageUri' | 'sport'
   >,
 ): RemoteClubStub | null {
   const id = clubIdFromEvent(event);
@@ -73,7 +69,6 @@ export function clubStubFromSportEvent(
     name,
     coverUri: resolveCover(event.imageUri),
     tag: String(event.sport || '').trim() || undefined,
-    bio: String(event.hostBio || '').trim() || undefined,
   };
 }
 
@@ -137,7 +132,7 @@ export async function fetchJoinedClubsForUser(
         const chunk = eventIds.slice(i, i + EVENT_ID_CHUNK);
         const { data: eventRows, error: eventsError } = await client
           .from('events')
-          .select('id, host_id, host_name, image_uri, sport, host_bio')
+          .select('id, host_id, host_name, image_uri, sport')
           .in('id', chunk);
 
         if (eventsError) {
@@ -160,7 +155,6 @@ export async function fetchJoinedClubsForUser(
               host_name?: string | null;
               image_uri?: string | null;
               sport?: string | null;
-              host_bio?: string | null;
             },
           );
           if (stub && !byHost.has(stub.id)) byHost.set(stub.id, stub);
@@ -172,7 +166,7 @@ export async function fetchJoinedClubsForUser(
     if (!byHost.has(uid)) {
       const { data: hosted, error: hostedError } = await client
         .from('events')
-        .select('id, host_id, host_name, image_uri, sport, host_bio')
+        .select('id, host_id, host_name, image_uri, sport')
         .eq('host_id', uid)
         .order('created_at', { ascending: false })
         .limit(1);
@@ -189,7 +183,6 @@ export async function fetchJoinedClubsForUser(
             host_name?: string | null;
             image_uri?: string | null;
             sport?: string | null;
-            host_bio?: string | null;
           },
         );
         if (stub) byHost.set(stub.id, stub);
@@ -201,7 +194,7 @@ export async function fetchJoinedClubsForUser(
     if (hostIds.length > 0) {
       const { data: clubRows } = await client
         .from('clubs')
-        .select('id, name, cover_image_url, image_url, bio')
+        .select('id, name, cover_image_url, image_url')
         .in('id', hostIds);
       for (const row of clubRows ?? []) {
         const id = String((row as { id?: string }).id ?? '').trim();
@@ -216,22 +209,17 @@ export async function fetchJoinedClubsForUser(
           String((row as { name?: string }).name ?? '').trim() ||
           existing?.name ||
           'クラブ';
-        const bio =
-          String((row as { bio?: string }).bio ?? '').trim() ||
-          existing?.bio;
         if (existing) {
           byHost.set(id, {
             ...existing,
             name,
             coverUri: cover ? resolveCover(cover) : existing.coverUri,
-            bio: bio || existing.bio,
           });
         } else if (cover) {
           byHost.set(id, {
             id,
             name,
             coverUri: resolveCover(cover),
-            bio: bio || undefined,
           });
         }
       }
@@ -277,7 +265,6 @@ function stubToClub(stub: RemoteClubStub): Club {
     name: stub.name,
     imageUri: stub.coverUri,
     coverUri: stub.coverUri,
-    bio: stub.bio || `${stub.name} が主催するクラブスポーツの集まりです。`,
     tag: stub.tag,
     hostName: stub.name,
     members: [

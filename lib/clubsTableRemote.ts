@@ -10,7 +10,7 @@ export type ClubRow = {
   name: string;
   image_url: string | null;
   cover_image_url: string | null;
-  bio: string;
+  sns_links?: unknown;
 };
 
 export type UpsertClubInput = {
@@ -18,7 +18,7 @@ export type UpsertClubInput = {
   name?: string;
   imageUrl?: string | null;
   coverImageUrl?: string | null;
-  bio?: string;
+  snsLinks?: unknown;
 };
 
 function mapRow(raw: Record<string, unknown> | null | undefined): ClubRow | null {
@@ -36,7 +36,7 @@ function mapRow(raw: Record<string, unknown> | null | undefined): ClubRow | null
       typeof raw.cover_image_url === 'string' && raw.cover_image_url.trim()
         ? raw.cover_image_url.trim()
         : null,
-    bio: String(raw.bio ?? '').trim(),
+    sns_links: raw.sns_links,
   };
 }
 
@@ -53,14 +53,24 @@ export async function fetchClubRow(
   if (!client) return { ok: false, error: 'Supabase が未設定です' };
 
   try {
-    const { data, error } = await client
+    let { data, error } = await client
       .from('clubs')
-      .select('id, name, image_url, cover_image_url, bio')
+      .select('id, name, image_url, cover_image_url, sns_links')
       .eq('id', id)
       .maybeSingle();
 
+    // sns_links 未適用時はフォールバック
+    if (error && /sns_links/i.test(error.message || '')) {
+      const fallback = await client
+        .from('clubs')
+        .select('id, name, image_url, cover_image_url')
+        .eq('id', id)
+        .maybeSingle();
+      data = fallback.data as typeof data;
+      error = fallback.error;
+    }
+
     if (error) {
-      // テーブル未適用時は静かに失敗
       console.warn('[clubsTable] fetch failed', {
         id,
         code: error.code,
@@ -96,7 +106,6 @@ export async function upsertClubRow(
     const payload: Record<string, unknown> = {
       id,
       name: String(input.name ?? '').trim(),
-      bio: String(input.bio ?? '').trim(),
     };
     if (input.imageUrl !== undefined) {
       payload.image_url = input.imageUrl?.trim() || null;
@@ -104,11 +113,14 @@ export async function upsertClubRow(
     if (input.coverImageUrl !== undefined) {
       payload.cover_image_url = input.coverImageUrl?.trim() || null;
     }
+    if (input.snsLinks !== undefined) {
+      payload.sns_links = input.snsLinks;
+    }
 
     const { data, error } = await client
       .from('clubs')
       .upsert(payload, { onConflict: 'id' })
-      .select('id, name, image_url, cover_image_url, bio')
+      .select('id, name, image_url, cover_image_url, sns_links')
       .single();
 
     if (error) {

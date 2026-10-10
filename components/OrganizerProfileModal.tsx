@@ -6,7 +6,6 @@ import {
   Alert,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -58,7 +57,6 @@ function emptyLink(kind: SnsKind = 'instagram'): DraftLink {
 function normalizeLinksForCompare(links: SnsLink[]) {
   return sanitizeOrganizerProfile({
     name: '_',
-    bio: '',
     snsLinks: links
       .map((item) => ({
         ...item,
@@ -70,7 +68,6 @@ function normalizeLinksForCompare(links: SnsLink[]) {
 
 function profilesEqual(a: OrganizerProfile, b: OrganizerProfile) {
   if (a.name.trim() !== b.name.trim()) return false;
-  if (a.bio.trim() !== b.bio.trim()) return false;
   if ((a.imageUri ?? '') !== (b.imageUri ?? '')) return false;
   if ((a.coverUri ?? '') !== (b.coverUri ?? '')) return false;
   const left = normalizeLinksForCompare(a.snsLinks);
@@ -360,17 +357,6 @@ export default function OrganizerProfileModal({
                   })}
             </Text>
 
-            <Text style={styles.label}>{t('organizer.bioLabel')}</Text>
-            <TextInput
-              style={[styles.input, styles.multiline]}
-              value={draft.bio}
-              onChangeText={(bio) => setDraft((prev) => ({ ...prev, bio }))}
-              placeholder={t('organizer.bioPlaceholder')}
-              placeholderTextColor={theme.colors.textMuted}
-              multiline
-              textAlignVertical="top"
-            />
-
             <Text style={styles.label}>{t('organizer.snsLabel')}</Text>
             <Text style={styles.hint}>
               {t('organizer.snsHint')}
@@ -396,11 +382,7 @@ export default function OrganizerProfileModal({
                   </Pressable>
                 </View>
 
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.kindRow}
-                >
+                <View style={styles.kindRow}>
                   {SNS_KIND_OPTIONS.map((option) => {
                     const active = link.kind === option.kind;
                     const optionLabel =
@@ -433,7 +415,7 @@ export default function OrganizerProfileModal({
                       </Pressable>
                     );
                   })}
-                </ScrollView>
+                </View>
 
                 <TextInput
                   style={styles.snsInput}
@@ -615,10 +597,6 @@ const styles = StyleSheet.create({
   nameMetaError: {
     color: theme.colors.danger,
   },
-  multiline: {
-    minHeight: 110,
-    paddingTop: 12,
-  },
   snsCard: {
     backgroundColor: theme.colors.surfaceAlt,
     borderRadius: 14,
@@ -642,6 +620,8 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
   },
   kindRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingVertical: 2,
   },

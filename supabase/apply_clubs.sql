@@ -20,11 +20,14 @@ create table if not exists public.clubs (
   name text not null default '',
   image_url text,
   cover_image_url text,
-  bio text not null default '',
+  sns_links jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint clubs_id_nonempty check (char_length(trim(id)) > 0)
 );
+
+alter table public.clubs
+  add column if not exists sns_links jsonb not null default '[]'::jsonb;
 
 create index if not exists clubs_updated_at_idx
   on public.clubs (updated_at desc);
@@ -124,3 +127,5 @@ create policy "event_images_authenticated_delete"
     bucket_id = 'event-images'
     and (storage.foldername(name))[1] in ('events', 'profiles', 'contact', 'clubs')
   );
+
+-- bio は apply_drop_bio_fields.sql で削除

@@ -24,6 +24,8 @@ export default function SnsLinksRow({ links, size = 'lg' }: SnsLinksRowProps) {
     <View style={styles.row}>
       {links.map((link) => {
         const meta = snsKindMeta(link.kind);
+        const label =
+          link.kind === 'web' ? t('organizer.snsWeb') : meta.label;
         return (
           <Pressable
             key={link.id}
@@ -43,13 +45,13 @@ export default function SnsLinksRow({ links, size = 'lg' }: SnsLinksRowProps) {
               })();
             }}
             accessibilityRole="link"
-            accessibilityLabel={t('sns.openA11y', { label: meta.label })}
+            accessibilityLabel={t('sns.openA11y', { label })}
           >
             <View style={styles.iconShadow}>
               <SnsBrandIcon kind={link.kind} size={iconSize} />
             </View>
             <Text style={styles.label} numberOfLines={1}>
-              {meta.label}
+              {label}
             </Text>
           </Pressable>
         );

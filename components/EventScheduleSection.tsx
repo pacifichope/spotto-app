@@ -2,6 +2,7 @@ import AppModal from '@/components/AppModal';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -397,12 +398,32 @@ export default function EventScheduleSection({
 
       <AppModal
         visible={calendarOpen}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        transparent={false}
+        animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+        presentationStyle={Platform.OS === 'web' ? 'overFullScreen' : 'pageSheet'}
+        transparent={Platform.OS === 'web'}
         onRequestClose={() => setCalendarOpen(false)}
       >
-        <View style={[styles.calModal, { paddingTop: insets.top || 12 }]}>
+        <View
+          style={
+            Platform.OS === 'web' ? styles.calWebRoot : styles.calNativeRoot
+          }
+          pointerEvents="box-none"
+        >
+          {Platform.OS === 'web' ? (
+            <Pressable
+              style={styles.calWebBackdrop}
+              onPress={() => setCalendarOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close')}
+            />
+          ) : null}
+          <View
+            style={[
+              styles.calModal,
+              Platform.OS === 'web' && styles.calModalWeb,
+              { paddingTop: Platform.OS === 'web' ? 16 : insets.top || 12 },
+            ]}
+          >
           <View style={styles.calHeader}>
             <Text style={styles.calTitle}>{t('events.schedule.calendarTitle')}</Text>
             <Pressable
@@ -535,6 +556,7 @@ export default function EventScheduleSection({
               {t('events.schedule.calendarHint')}
             </Text>
           </ScrollView>
+          </View>
         </View>
       </AppModal>
     </View>
@@ -643,9 +665,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  calNativeRoot: {
+    flex: 1,
+  },
+  calWebRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
   calModal: {
     flex: 1,
     backgroundColor: theme.colors.surface,
+  },
+  calWebBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11, 26, 34, 0.45)',
+  },
+  calModalWeb: {
+    flexGrow: 0,
+    flexShrink: 1,
+    width: '100%',
+    maxWidth: 440,
+    maxHeight: '90%',
+    borderRadius: 24,
+    overflow: 'hidden',
+    zIndex: 1,
+    shadowColor: '#0B1A22',
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
   },
   calHeader: {
     flexDirection: 'row',
@@ -754,7 +803,7 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.primaryDark,
   },
   eventDotSelected: {
     backgroundColor: theme.colors.onPrimary,

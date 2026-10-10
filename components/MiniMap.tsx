@@ -59,9 +59,9 @@ export default function MiniMap({ event }: MiniMapProps) {
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    height: 148,
+    height: 168,
     overflow: 'hidden',
-    borderRadius: 12,
+    borderRadius: 16,
   },
   miniMap: {
     width: '100%',

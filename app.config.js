@@ -77,10 +77,21 @@ function reversedGoogleIosScheme(clientId) {
   return `com.googleusercontent.apps.${id.slice(0, -suffix.length)}`;
 }
 
+// iOS URL scheme は必ず iOS OAuth クライアントから作る（Web クライアント ID の
+// 逆引きは GIDSignIn と一致せず、審査ビルドで Google ログインが即失敗する）
 const googleReversedScheme = reversedGoogleIosScheme(
-  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
 );
+if (
+  !googleReversedScheme &&
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID &&
+  !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+) {
+  console.warn(
+    '[app.config] EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID が未設定です。' +
+      'GoogleService-Info.plist の CLIENT_ID を設定してください（Web クライアントでは代用不可）。',
+  );
+}
 
 /** Android package / 共通アプリ ID（Google Play・Firebase・LINE Android） */
 const BUNDLE_ID = 'com.taiki.spotto';
@@ -88,8 +99,10 @@ const BUNDLE_ID = 'com.taiki.spotto';
 const IOS_BUNDLE_ID = 'com.taiki.spotto';
 /** アプリ本体のカスタムスキーム（Expo Linking / createURL の唯一のプライマリ） */
 const APP_SCHEME = 'spotto';
-/** 共有・Universal Links 用ドメイン */
-const WEB_HOST = 'spotto.fun';
+/** Web アプリ（Vercel カスタムドメイン）・共有・Universal Links */
+const WEB_HOST = 'app.spotto.fun';
+/** マーケサイト（利用規約など）。旧リンク互換のため Associated Domains にも残す */
+const WEB_HOST_APEX = 'spotto.fun';
 const WEB_HOST_WWW = 'www.spotto.fun';
 /** LINE Login: line3rdp.<bundle id>（LINE アプリからの復帰用） */
 const lineUrlScheme = `line3rdp.${IOS_BUNDLE_ID}`;
@@ -359,9 +372,10 @@ if (googleReversedScheme) {
     '@react-native-google-signin/google-signin',
     { iosUrlScheme: googleReversedScheme },
   ]);
-} else if (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
+} else {
   console.warn(
-    '[app.config] Google Sign-In: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID / WEB_CLIENT_ID から URL scheme を作れませんでした。',
+    '[app.config] Google Sign-In: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID から URL scheme を作れませんでした。' +
+      'iOS 実機の Google ログイン前に必須です。',
   );
 }
 
@@ -389,17 +403,22 @@ const config = {
     // ログインボタンが無反応になる。全画面のまま横向きは Info.plist で許可する。
     requireFullScreen: true,
     bundleIdentifier: IOS_BUNDLE_ID,
+    // App Store Connect: 1.0.1 の build 1 は使用済み → 再提出は 2 から
+    buildNumber: '2',
     usesAppleSignIn: true,
     ...(hasGoogleServicesPlist
       ? { googleServicesFile: './GoogleService-Info.plist' }
       : {}),
-    // Universal Links（https://spotto.fun/... → アプリ）
+    // Universal Links（https://app.spotto.fun/... → アプリ）
     associatedDomains: [
       `applinks:${WEB_HOST}`,
+      `applinks:${WEB_HOST_APEX}`,
       `applinks:${WEB_HOST_WWW}`,
     ],
     // Google Sign-In (GIDSignIn) の Keychain エラー -34018 / Code=-2 対策
+    // Sign in with Apple は usesAppleSignIn でも付くが、EAS の capability 同期用に明示する
     entitlements: {
+      'com.apple.developer.applesignin': ['Default'],
       'keychain-access-groups': [
         `$(AppIdentifierPrefix)${IOS_BUNDLE_ID}`,
       ],
@@ -470,7 +489,7 @@ const config = {
         data: [{ scheme }],
         category: ['BROWSABLE', 'DEFAULT'],
       })),
-      // Android App Links: https://spotto.fun/event/...
+      // Android App Links: https://app.spotto.fun/event/...
       {
         action: 'VIEW',
         autoVerify: true,
@@ -478,6 +497,11 @@ const config = {
           {
             scheme: 'https',
             host: WEB_HOST,
+            pathPrefix: '/event',
+          },
+          {
+            scheme: 'https',
+            host: WEB_HOST_APEX,
             pathPrefix: '/event',
           },
           {
@@ -488,7 +512,7 @@ const config = {
         ],
         category: ['BROWSABLE', 'DEFAULT'],
       },
-      // クラブ詳細なども App Link で開けるようにする
+      // クラブ詳細（Web: /clubs、ネイティブ互換: /club）
       {
         action: 'VIEW',
         autoVerify: true,
@@ -496,6 +520,16 @@ const config = {
           {
             scheme: 'https',
             host: WEB_HOST,
+            pathPrefix: '/clubs',
+          },
+          {
+            scheme: 'https',
+            host: WEB_HOST,
+            pathPrefix: '/club',
+          },
+          {
+            scheme: 'https',
+            host: WEB_HOST_APEX,
             pathPrefix: '/club',
           },
           {

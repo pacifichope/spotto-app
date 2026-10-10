@@ -1,5 +1,47 @@
 # 認証トラブルシューティング（Google / LINE）
 
+## 0. App Store 審査 — Guideline 2.1(a)「ログインが全滅」（特に iPad）
+
+審査端末（例: iPad Air / iPadOS）で Google・Apple・LINE がすべて使えない場合、次を **この順** で潰す。
+
+### 最重要: `GoogleService-Info.plist` の Bundle ID
+
+アプリの iOS Bundle ID は **`com.taiki.spotto`**。ルートの plist が旧 ID（`com.spotto.app`）のままだと、Firebase / Google Sign-In が審査ビルドで失敗する。
+
+| 項目 | 期待値 |
+|---|---|
+| `app.config.js` / Xcode Bundle ID | `com.taiki.spotto` |
+| `GoogleService-Info.plist` → `BUNDLE_ID` | `com.taiki.spotto`（**不一致はビルド前に必ず修正**） |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | 上記 plist の `CLIENT_ID` と同一（EAS Secret も同期） |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | plist `ANDROID_CLIENT_ID` / `com.taiki.spotto` の type=1（旧 `com.spotto.app` 不可） |
+| Firebase Console | iOS アプリとして **`com.taiki.spotto`** が登録済み |
+
+手順:
+
+1. [Firebase Console](https://console.firebase.google.com/) → プロジェクト設定 → マイアプリ  
+2. Bundle ID = `com.taiki.spotto` の iOS アプリを選ぶ（無ければ追加）  
+3. `GoogleService-Info.plist` を再ダウンロードし、リポジトリルートへ上書き  
+4. `.env` / EAS Secrets の `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` を新しい `CLIENT_ID` に合わせる  
+5. `npm run check:firebase` が **OK** になるまで直す（BUNDLE_ID 不一致は exit 1）  
+6. **EAS で iOS を再ビルド**してから再提出（plist はビルド時に埋め込まれる）
+
+### アプリ側の iPad 対策（コード済み）
+
+| 対策 | 内容 |
+|---|---|
+| ログイン UI | iPad では RN Modal を隠さずオーバーレイのまま認可シートを出す（空画面で固まるのを防止） |
+| タッチ | シート `zIndex` / `elevation`、ボタン `minHeight: 52`、backdrop とシートの `pointerEvents` 分離 |
+| presenter | `waitForNativeAuthPresenter` で InteractionManager 完了後に Google / Apple / LINE を開始 |
+| LINE | iPad は最初から `onlyWebLogin: true`。それ以外は失敗時に Web ログインへフォールバック |
+| loading | 認可が戻らなくても 90 秒でボタン復帰（`socialSignInGuard`） |
+
+### 再提出前の実機確認
+
+- **iPad**（または iPad シミュレータ）でクリーンインストール後、Google / Apple / LINE のそれぞれでログインできること  
+- 審査メモ例: 「デモ用にメールログインは無く、Google・Sign in with Apple・LINE のいずれでも利用できます。審査用アカウントが必要な場合は Reply でお知らせください。」
+
+---
+
 ## 1. Google Sign-In — `DEVELOPER_ERROR` / API Exception 10
 
 Android のほぼすべてが **OAuth クライアントとアプリ署名の不一致**です。

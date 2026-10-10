@@ -16,7 +16,6 @@ export type OrganizerProfile = {
   imageUri?: string;
   /** クラブカバー写真（ヘッダー画像） */
   coverUri?: string;
-  bio: string;
   /** 複数 SNS / Web リンク */
   snsLinks: SnsLink[];
 };
@@ -25,7 +24,6 @@ export const EMPTY_ORGANIZER_PROFILE: OrganizerProfile = {
   name: '',
   imageUri: undefined,
   coverUri: undefined,
-  bio: '',
   snsLinks: [],
 };
 
@@ -133,7 +131,6 @@ export function sanitizeOrganizerProfile(
     name: normalizeOrganizerName(input.name),
     imageUri: input.imageUri?.trim() || undefined,
     coverUri: input.coverUri?.trim() || undefined,
-    bio: input.bio.trim(),
     snsLinks: merged,
   };
 }

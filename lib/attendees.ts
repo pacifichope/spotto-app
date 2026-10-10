@@ -5,7 +5,6 @@ export type EventAttendee = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
   /** 個人プロフィールの性別（設定済みの場合） */
   gender?: '男性' | '女性';
   clubIds?: string[];
@@ -85,161 +84,138 @@ export const ATTENDEE_POOL: EventAttendee[] = [
     id: 'mika',
     name: 'Mika',
     gender: '女性',
-    bio: '原宿でバドミントン中心。ラリーの気持ちよさと、終わったあとのお茶が好きです。',
     clubIds: ['harajuku-shuttle'],
   },
   {
     id: 'ken',
     name: 'Ken',
     gender: '男性',
-    bio: '仕事終わりに体を動かすのが日課。バスケもバドも気軽にやります。',
     clubIds: ['harajuku-shuttle', 'shibuya-hoops'],
   },
   {
     id: 'yui',
     name: 'Yui',
     gender: '女性',
-    bio: '初めての種目でも顔を出してみるタイプ。雰囲気のいい会を探しています。',
     clubIds: ['harajuku-shuttle', 'morning-pace'],
   },
   {
     id: 'sota',
     name: 'Sota',
     gender: '男性',
-    bio: 'ダブルスが好きな社会人。勝ち負けより、いい球の打ち合いを大事にしています。',
     clubIds: ['harajuku-shuttle'],
   },
   {
     id: 'nao',
     name: 'Nao',
     gender: '女性',
-    bio: '表参道周辺のイベントによく参加。新しい人とのつながりも楽しみです。',
     clubIds: ['harajuku-shuttle', 'ebisu-night'],
   },
   {
     id: 'ryo',
     name: 'Ryo',
     gender: '男性',
-    bio: 'フットサルは楽しさ優先。ブランクありなので、ゆるい会が安心です。',
     clubIds: ['ebisu-night'],
   },
   {
     id: 'kana',
     name: 'Kana',
     gender: '女性',
-    bio: '夜のインドア派。仕事帰りにサッと汗をかいてリセットしています。',
     clubIds: ['ebisu-night', 'nishi-futsal'],
   },
   {
     id: 'daiki',
     name: 'Daiki',
     gender: '男性',
-    bio: 'ポジション固定なしが好き。初参加の人も声をかけやすい会を選んでいます。',
     clubIds: ['ebisu-night', 'yoyogi-fc'],
   },
   {
     id: 'mei',
     name: 'Mei',
     gender: '女性',
-    bio: '運動不足解消が目的。終わったあとに近くで飲むのも好きです。',
     clubIds: ['ebisu-night'],
   },
   {
     id: 'haru',
     name: 'Haru',
     gender: '男性',
-    bio: '朝テニスが習慣。ストロークを安定させたい中級者です。',
     clubIds: ['gaien-tennis'],
   },
   {
     id: 'emi',
     name: 'Emi',
     gender: '女性',
-    bio: '外苑のコートがお気に入り。ダブルス中心で、ゲーム形式も歓迎です。',
     clubIds: ['gaien-tennis'],
   },
   {
     id: 'tomo',
     name: 'Tomo',
     gender: '男性',
-    bio: '週末の朝だけ本気。ラリーから入って、最後にゲームしたい派です。',
     clubIds: ['gaien-tennis', 'morning-pace'],
   },
   {
     id: 'jun',
     name: 'Jun',
     gender: '男性',
-    bio: '会話できるペースのランが好き。代々木公園の朝が一番落ち着きます。',
     clubIds: ['morning-pace'],
   },
   {
     id: 'saki',
     name: 'Saki',
     gender: '女性',
-    bio: '5km前後のゆるラン勢。コーヒー終わりつきの会をよく探しています。',
     clubIds: ['morning-pace', 'odori-pace'],
   },
   {
     id: 'hiro',
     name: 'Hiro',
     gender: '男性',
-    bio: '走ったあとの雑談が本番、という気持ちで参加しています。',
     clubIds: ['morning-pace'],
   },
   {
     id: 'koki',
     name: 'Koki',
     gender: '男性',
-    bio: 'ナイトバスケ中心。3on3でも5on5でも、マッチアップが分かれていると安心。',
     clubIds: ['shibuya-hoops'],
   },
   {
     id: 'ren',
     name: 'Ren',
     gender: '男性',
-    bio: 'シュート練習の時間がある会が好き。初めてのコートでも顔を出します。',
     clubIds: ['shibuya-hoops', 'ohori-morning'],
   },
   {
     id: 'yuna',
     name: 'Yuna',
     gender: '女性',
-    bio: 'レベル分けしてくれる会だと参加しやすいです。汗をかいてリフレッシュ。',
     clubIds: ['shibuya-hoops'],
   },
   {
     id: 'taku',
     name: 'Taku',
     gender: '男性',
-    bio: '芝生のピックアップサッカーが好物。楽しさ優先で走ります。',
     clubIds: ['yoyogi-fc'],
   },
   {
     id: 'natsuki',
     name: 'Natsuki',
     gender: '女性',
-    bio: '途中参加も見学もOKな空気が好き。週末の朝に体を動かしています。',
     clubIds: ['yoyogi-fc', 'morning-pace'],
   },
   {
     id: 'gaku',
     name: 'Gaku',
     gender: '男性',
-    bio: 'フォーメーションより楽しさ。試合後カフェも歓迎です。',
     clubIds: ['yoyogi-fc'],
   },
   {
     id: 'asahi',
     name: 'Asahi',
     gender: '男性',
-    bio: 'バレーは経験者向けの練習マッチが中心。目黒周辺によく出ます。',
     clubIds: ['meguro-spike'],
   },
   {
     id: 'kaho',
     name: 'Kaho',
     gender: '女性',
-    bio: 'スパイクレシーブを磨きたい社会人。本気寄りだけど雰囲気は良い会が好き。',
     clubIds: ['meguro-spike'],
   },
 ];
@@ -299,7 +275,6 @@ export function seedAttendees(
     id: eventHostAttendeeId({ ...event, host: hostName }),
     name: hostName,
     imageUri: event.hostImageUri,
-    bio: i18n.t('events.hostBioSeed', { name: hostName }),
     clubIds: hostClubId ? [hostClubId] : undefined,
   };
 
@@ -328,7 +303,6 @@ export function seedAttendees(
     others.push({
       id: `${event.id}-plus-${n}`,
       name: i18n.t('events.attendeeSeedName', { n }),
-      bio: i18n.t('events.attendeeSeedBio'),
       clubIds: hostClubId ? [hostClubId] : undefined,
     });
   }

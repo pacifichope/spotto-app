@@ -138,7 +138,6 @@ export default function ClubProfileScreen() {
           name: result.data.name,
           imageUri: result.data.image_url,
           coverUri: result.data.cover_image_url,
-          bio: result.data.bio,
         });
       setClubRowOverlay(applyClubRowToClub(base, result.data));
     })();
@@ -467,9 +466,6 @@ export default function ClubProfileScreen() {
               })}
               {club.tag ? ` · ${club.tag}` : ''}
             </Text>
-            {club.bio?.trim() ? (
-              <Text style={styles.bio}>{club.bio}</Text>
-            ) : null}
             {club.snsLinks && club.snsLinks.length > 0 ? (
               <View style={styles.snsBlock}>
                 <Text style={styles.snsTitle}>{t('club.snsTitle')}</Text>
@@ -653,7 +649,6 @@ export default function ClubProfileScreen() {
                 name: club.hostName,
                 // ブロック対象は主催者個人。クラブカバーではなくメンバー側アバター
                 imageUri: hostMember?.imageUri,
-                bio: club.bio,
               });
             })
           }
@@ -766,13 +761,6 @@ const styles = StyleSheet.create({
   statsLine: {
     fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-  },
-  bio: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 21,
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },

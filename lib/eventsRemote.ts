@@ -60,7 +60,6 @@ export type EventRow = {
   joined_count: number;
   host_name: string;
   host_image_uri: string | null;
-  host_bio: string | null;
   host_sns_links: SnsLink[] | null;
   vibe: string;
   description: string;
@@ -203,7 +202,6 @@ export function eventRowToSportEvent(row: EventRow): SportEvent {
     host: String(row.host_name || '').trim() || i18n.t('events.host'),
     hostId: row.host_id,
     hostImageUri,
-    hostBio: row.host_bio?.trim() || undefined,
     hostSnsUrl: snsLinks[0]?.url,
     hostSnsLinks: snsLinks,
     vibe: row.vibe || '',
@@ -301,7 +299,6 @@ export function buildEventInsertRow(input: {
     joined_count: 1,
     host_name: displayName,
     host_image_uri: organizer.imageUri?.trim() || null,
-    host_bio: organizer.bio.trim() || null,
     host_sns_links: snsLinks,
     vibe: deriveEventVibe(description, title),
     description,
@@ -751,7 +748,6 @@ export async function updateRemoteHostProfileFields(input: {
   hostId: string;
   hostName: string;
   hostImageUri?: string;
-  hostBio?: string;
   hostSnsLinks: SnsLink[];
 }): Promise<EventsRemoteResult<void>> {
   if (!isSupabaseConfigured()) {
@@ -773,7 +769,6 @@ export async function updateRemoteHostProfileFields(input: {
     .update({
       host_name: input.hostName,
       host_image_uri: input.hostImageUri?.trim() || null,
-      host_bio: input.hostBio?.trim() || null,
       host_sns_links: sanitizeSnsLinks(input.hostSnsLinks),
       updated_at: new Date().toISOString(),
     })

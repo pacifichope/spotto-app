@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
 
   // --- LINE ---
   lineBtn: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 8,
     backgroundColor: '#06C755',
     flexDirection: 'row',
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   linePressed: {
     backgroundColor: '#04A848',
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
 
   // --- Google ---
   googleBtn: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 4,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   googlePressed: {
     backgroundColor: '#F2F2F2',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
 
   // --- Apple ---
   appleBtn: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 8,
     backgroundColor: '#000000',
     flexDirection: 'row',
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   applePressed: {
     backgroundColor: '#1A1A1A',

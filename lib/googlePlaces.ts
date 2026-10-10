@@ -24,7 +24,7 @@ const PLACEHOLDER_KEY_RE = /^(YOUR_|CHANGE_ME|TODO|xxx)/i;
 let googlePlacesDisabled = false;
 let googleGeocodeDisabled = false;
 
-function getGoogleMapsApiKey() {
+export function getGoogleMapsApiKey() {
   const key = (
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
     Constants.expoConfig?.ios?.config?.googleMapsApiKey ||

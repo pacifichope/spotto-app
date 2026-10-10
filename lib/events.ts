@@ -38,7 +38,6 @@ export type SportEvent = {
   /** 自分の主催イベントなら 'me' */
   hostId?: string;
   hostImageUri?: string;
-  hostBio?: string;
   /** @deprecated 連絡先フィールドは廃止。互換のため残置 */
   hostContact?: string;
   /** @deprecated hostSnsLinks を優先 */
@@ -1517,7 +1516,6 @@ export const SAMPLE_EVENTS: SportEvent[] = [
       hostId: 'mock_host_bball_lab',
       hostImageUri:
         'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-      hostBio: '渋谷周辺でバスケ練習会を開催しています。',
       vibe: 'パス回し中心のゆる練。',
       description: `🏀 平日夜バスケ練習（${date} 開催・第${index + 1}回）\n\n同一タイトルの他日付とは別イベントです。\n参加・定員・参加者リストは日付ごとに独立しています。`,
       itemsToBring: ['室内シューズ', 'タオル'],
@@ -1554,8 +1552,6 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     hostId: 'mock_host_osushi',
     hostImageUri:
       'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&q=80',
-    hostBio:
-      '渋谷・代々木周辺でスポーツイベントを主催。初心者歓迎・気軽にどうぞ。',
     vibe: '平日夜のゆる練習。パス回し中心。',
     description:
       '⚽️ おすし主催サッカー練習会\n\n勝ち負けよりタッチ数。初心者・ブランク大歓迎です。\nビブス貸出あり。終了後は近隣で軽く飲む人もいます。',
@@ -1589,8 +1585,6 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     hostId: 'mock_host_osushi',
     hostImageUri:
       'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&q=80',
-    hostBio:
-      '渋谷・代々木周辺でスポーツイベントを主催。初心者歓迎・気軽にどうぞ。',
     vibe: '週末の試合形式。5vs5ローテーション。',
     description:
       '🌙 おすし主催フットサルマッチ\n\n試合形式でしっかり動けます。ポジション固定なし。\n室内シューズ必須。',
@@ -1624,8 +1618,6 @@ export const SAMPLE_EVENTS: SportEvent[] = [
     hostId: 'mock_host_osushi',
     hostImageUri:
       'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&q=80',
-    hostBio:
-      '渋谷・代々木周辺でスポーツイベントを主催。初心者歓迎・気軽にどうぞ。',
     vibe: 'レシーブ練習中心。初参加OK。',
     description:
       '🏐 おすし主催バレーゆる練\n\nサーブ・レシーブの基礎から。試合は希望者のみ後半で。\n完全初心者歓迎です。',

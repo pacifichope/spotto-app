@@ -539,29 +539,38 @@ export async function signInWithLineFirebase(): Promise<FirebaseLineSignInResult
     // 初回（またはトークン失効／ユーザー解除後）のみ同意画面へ
     // botPrompt は渡さない（Android 旧 SDK デフォルト normal が毎回許可 UI の原因だった）
     // scopes は初回と同じ最小セットを維持（増やすと再同意が出る）
+    //
+    // iPad 審査端末には LINE アプリが無いことが多く、アプリ切替ログインが失敗しやすい。
+    // iPad は最初から Web ログイン。それ以外はアプリ優先 → 失敗時に Web へフォールバック。
     let loginResult: {
       accessToken: LineAccessTokenLike;
     };
-    const login = () =>
+    // iPad 審査端末・LINE 未インストール端末向け: Web ログイン優先。
+    // iPhone でもアプリ切替失敗時は Web へフォールバックする。
+    const preferWebLogin = Platform.OS === 'ios' && Platform.isPad;
+    const login = (onlyWebLogin: boolean) =>
       Line.login({
         scopes: [Scope.Profile, Scope.OpenId],
-        onlyWebLogin: false,
+        onlyWebLogin,
       });
     try {
-      loginResult = await login();
+      loginResult = await login(preferWebLogin);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : String(error || '');
-      if (
-        /cancel|キャンセル/i.test(message) ||
-        !/present|window|view controller|setup/i.test(message)
-      ) {
+      if (/cancel|キャンセル|user.?cancel|ERR_CANCEL/i.test(message)) {
         console.error('[auth] Line.login', error);
+        return mapLineError(error);
+      }
+      // 既に Web で失敗した場合は同じ手段の再試行を避け、エラーを返す
+      if (preferWebLogin) {
+        console.error('[auth] Line.login (web)', error);
         return mapLineError(error);
       }
       try {
         await new Promise((resolve) => setTimeout(resolve, 450));
-        loginResult = await login();
+        // ネイティブ失敗時は Web ログインで再試行（LINE 未インストール対策）
+        loginResult = await login(true);
       } catch (retryError) {
         console.error('[auth] Line.login', retryError);
         return mapLineError(retryError);

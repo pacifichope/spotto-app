@@ -13,6 +13,7 @@ import {
   ensureNativeFirebaseApp,
   isNativeFirebaseLinked,
 } from '@/lib/firebaseNativeInit';
+import { waitForNativeAuthPresenter } from '@/lib/nativeAuthPresenter';
 import { SOCIAL_LOGIN_USER_ERRORS } from '@/lib/socialLoginErrors';
 
 export type FirebaseGoogleSignInResult =
@@ -219,6 +220,7 @@ export async function signInWithGoogleFirebase(): Promise<FirebaseGoogleSignInRe
         // ignore
       }
 
+      await waitForNativeAuthPresenter(Platform.isPad ? 200 : 0);
       const response = await signInWithPresenterRetry(() =>
         GoogleSignin.signIn(),
       );

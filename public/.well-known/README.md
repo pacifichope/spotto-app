@@ -30,7 +30,7 @@
 | 種別 | 例 |
 |---|---|
 | カスタムスキーム | `spotto://event/{id}` |
-| Universal / App Link | `https://spotto.fun/event/{id}` |
+| Universal / App Link | `https://app.spotto.fun/event/{id}` |
 
 Expo の `scheme` は **`spotto` のみ**（Google / LINE 用スキームは Info.plist / intent-filter のみ）。
 
@@ -44,7 +44,7 @@ npx uri-scheme open "spotto://event/demo-id" --ios
 # App Links（実機・検証済みドメイン）
 adb shell am start -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
-  -d "https://spotto.fun/event/demo-id" com.taiki.spotto
+  -d "https://app.spotto.fun/event/demo-id" com.taiki.spotto
 ```
 
 設定変更後は **ネイティブ再ビルド**（`eas build` / `npx expo prebuild`）が必要です。

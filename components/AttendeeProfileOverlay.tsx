@@ -405,9 +405,6 @@ export default function AttendeeProfileOverlay({
                   <Text style={styles.safetyBtnText}>{t('events.overlay.blockReport')}</Text>
                 </Pressable>
               ) : null}
-              {profile.bio?.trim() ? (
-                <Text style={styles.profileBio}>{profile.bio.trim()}</Text>
-              ) : null}
               {hostMode ? (
                 <Pressable
                   style={[
@@ -852,15 +849,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: theme.colors.textSecondary,
-  },
-  profileBio: {
-    marginBottom: 16,
-    paddingHorizontal: 8,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
   },
   profileCheckIn: {
     flexDirection: 'row',

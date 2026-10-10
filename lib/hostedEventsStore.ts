@@ -112,7 +112,6 @@ export function sanitizeStoredSportEvent(raw: unknown): SportEvent | null {
     host: asString(record.host).trim() || 'マイサークル',
     hostId: asString(record.hostId).trim() || MY_ORGANIZER_ID,
     hostImageUri: asString(record.hostImageUri).trim() || undefined,
-    hostBio: asString(record.hostBio).trim() || undefined,
     hostSnsUrl: asString(record.hostSnsUrl).trim() || undefined,
     hostSnsLinks: sanitizeSnsLinks(record.hostSnsLinks),
     vibe: asString(record.vibe).trim() || '主催イベント',

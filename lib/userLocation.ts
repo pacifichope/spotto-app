@@ -11,7 +11,7 @@ export type MapRegion = LatLng & {
   longitudeDelta: number;
 };
 
-/** 地図カメラ用のフォールバック（東京都心）。UIラベルには使わない */
+/** 地図カメラ用のフォールバック座標（UIラベルには使わない） */
 export const FALLBACK_COORDS: LatLng = {
   latitude: 35.6895,
   longitude: 139.6917,

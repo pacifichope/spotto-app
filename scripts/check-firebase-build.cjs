@@ -199,6 +199,82 @@ if (!hasPlist) {
   issues.push(
     'GoogleService-Info.plist がプロジェクトルートにありません（iOS 必須）',
   );
+} else {
+  try {
+    const plist = fs.readFileSync(plistPath, 'utf8');
+    const bundleMatch = plist.match(
+      /<key>BUNDLE_ID<\/key>\s*<string>([^<]+)<\/string>/,
+    );
+    const clientMatch = plist.match(
+      /<key>CLIENT_ID<\/key>\s*<string>([^<]+)<\/string>/,
+    );
+    const appIdMatch = plist.match(
+      /<key>GOOGLE_APP_ID<\/key>\s*<string>([^<]+)<\/string>/,
+    );
+    const plistBundle = bundleMatch?.[1]?.trim() || '';
+    const plistClient = clientMatch?.[1]?.trim() || '';
+    const plistAppId = appIdMatch?.[1]?.trim() || '';
+    if (!plistBundle) {
+      issues.push('GoogleService-Info.plist に BUNDLE_ID がありません');
+    } else if (plistBundle !== EXPECTED_PACKAGE) {
+      issues.push(
+        `GoogleService-Info.plist の BUNDLE_ID が ${plistBundle} です（期待: ${EXPECTED_PACKAGE}）。` +
+          'Firebase Console で iOS アプリ（Bundle ID = com.taiki.spotto）の GoogleService-Info.plist を再ダウンロードして置き換えてください。' +
+          '不一致のままだと App Store 審査の iPad で Google / Firebase ログインが失敗します。',
+      );
+    } else {
+      hints.push(`GoogleService-Info.plist BUNDLE_ID: ${plistBundle}`);
+    }
+    const iosClientEnv = String(
+      env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
+    ).trim();
+    const androidClientEnv = String(
+      env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '',
+    ).trim();
+    const plistAndroidClient =
+      (
+        plist.match(
+          /<key>ANDROID_CLIENT_ID<\/key>\s*<string>([^<]+)<\/string>/,
+        ) || []
+      )[1]?.trim() || '';
+    if (plistClient) {
+      hints.push(`GoogleService-Info.plist CLIENT_ID: ${plistClient}`);
+    }
+    if (!iosClientEnv) {
+      issues.push(
+        '.env に EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID が未設定です（iOS Google URL scheme 必須）',
+      );
+    } else if (plistClient && iosClientEnv !== plistClient) {
+      issues.push(
+        'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID が GoogleService-Info.plist の CLIENT_ID と一致しません。',
+      );
+    }
+    if (
+      androidClientEnv &&
+      plistAndroidClient &&
+      androidClientEnv !== plistAndroidClient
+    ) {
+      // plist の ANDROID_CLIENT_ID は com.taiki.spotto 向け。旧 com.spotto.app クライアントを指しているとレガシー AuthSession 経路が壊れる
+      issues.push(
+        'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID が GoogleService-Info.plist の ANDROID_CLIENT_ID と一致しません（package=com.taiki.spotto の Android OAuth を使ってください）。',
+      );
+    } else if (androidClientEnv && plistAndroidClient) {
+      hints.push(
+        'EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID は plist ANDROID_CLIENT_ID と一致',
+      );
+    }
+    if (plistAppId && !/:ios:/i.test(plistAppId)) {
+      issues.push(
+        `GoogleService-Info.plist の GOOGLE_APP_ID が iOS 用ではありません: ${plistAppId}`,
+      );
+    }
+  } catch (error) {
+    issues.push(
+      `GoogleService-Info.plist の解析に失敗: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 const remoteApi = String(env.EXPO_PUBLIC_API_BASE_URL_REMOTE || '').trim();

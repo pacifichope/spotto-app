@@ -224,17 +224,18 @@ const styles = StyleSheet.create({
       : null),
     elevation: 0,
   },
+  /** SVG 白丸 (cx=24, cy=21.5, r=13.2) に合わせてアイコンを完全中央配置 */
   iconSlot: {
     position: 'absolute',
-    top: 10,
+    top: 8.3,
     left: 0,
     right: 0,
-    height: 28,
+    height: 26.4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconSlotCompact: {
-    top: 9,
-    height: 24,
+    top: 8.3 * 0.86,
+    height: 26.4 * 0.86,
   },
 });

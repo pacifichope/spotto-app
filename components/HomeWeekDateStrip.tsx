@@ -1,6 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  AppState,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { theme } from '@/constants/theme';
 import { formatDateStamp } from '@/lib/events';
@@ -8,8 +15,6 @@ import i18n from '@/lib/i18n';
 
 /** Date#getDay() の順（日曜始まり） */
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
-/** 今日を含む約1ヶ月分（横スクロール） */
-const DATE_STRIP_DAYS = 30;
 
 export type WeekDateOption = {
   stamp: string;
@@ -21,13 +26,19 @@ export type WeekDateOption = {
 type HomeWeekDateStripProps = {
   selectedStamp: string | null;
   onSelect: (stamp: string | null) => void;
-  /** 基準日（未指定時は端末の今日） */
+  /** 基準日（未指定時は端末の今日。日付跨ぎで自動更新） */
   now?: Date;
 };
 
+/** 本日〜ちょうど1ヶ月先（両端含む）。アクセス日基準で毎日更新。 */
 export function buildWeekDateOptions(now = new Date()): WeekDateOption[] {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return Array.from({ length: DATE_STRIP_DAYS }, (_, index) => {
+  const end = new Date(today);
+  end.setMonth(end.getMonth() + 1);
+  const dayCount =
+    Math.round((end.getTime() - today.getTime()) / 86_400_000) + 1;
+
+  return Array.from({ length: Math.max(1, dayCount) }, (_, index) => {
     const value = new Date(today);
     value.setDate(today.getDate() + index);
     const stamp = formatDateStamp(value);
@@ -50,9 +61,45 @@ export default function HomeWeekDateStrip({
 }: HomeWeekDateStripProps) {
   const { t, i18n: i18nInstance } = useTranslation();
   const language = i18nInstance.language;
-  // language は言語切替時にラベルを再生成するための依存
+  const [todayStamp, setTodayStamp] = useState(() =>
+    formatDateStamp(now ?? new Date()),
+  );
+
+  useEffect(() => {
+    if (now) {
+      setTodayStamp(formatDateStamp(now));
+      return;
+    }
+    const sync = () => {
+      const next = formatDateStamp(new Date());
+      setTodayStamp((prev) => (prev === next ? prev : next));
+    };
+    sync();
+    const intervalId = setInterval(sync, 60_000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync();
+    });
+    return () => {
+      clearInterval(intervalId);
+      sub.remove();
+    };
+  }, [now]);
+
+  // language / todayStamp でラベルと範囲を再生成
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const options = useMemo(() => buildWeekDateOptions(now), [now, language]);
+  const options = useMemo(
+    () => buildWeekDateOptions(now ?? new Date()),
+    [now, language, todayStamp],
+  );
+
+  useEffect(() => {
+    if (
+      selectedStamp &&
+      !options.some((option) => option.stamp === selectedStamp)
+    ) {
+      onSelect(null);
+    }
+  }, [options, selectedStamp, onSelect]);
 
   return (
     <View style={styles.wrap}>

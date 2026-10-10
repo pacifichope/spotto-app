@@ -413,7 +413,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       return sanitizeOrganizerProfile({
         name: mine.host,
         imageUri: mine.hostImageUri,
-        bio: mine.hostBio || '',
         snsLinks: mine.hostSnsLinks || [],
       });
     },
@@ -444,7 +443,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             name: remoteClub.data.name || next.name,
             imageUri: remoteClub.data.image_url || next.imageUri,
             coverUri: remoteClub.data.cover_image_url || next.coverUri,
-            bio: remoteClub.data.bio || next.bio,
           });
         }
       }
@@ -1228,7 +1226,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
               host: displayName,
                 hostId: uid || item.hostId,
               hostImageUri: next.imageUri,
-              hostBio: next.bio || undefined,
                 hostContact: undefined,
                 hostSnsUrl: next.snsLinks[0]?.url,
                 hostSnsLinks: next.snsLinks,
@@ -1246,7 +1243,6 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             hostId: uid,
             hostName: displayName,
             hostImageUri: next.imageUri,
-            hostBio: next.bio,
             hostSnsLinks: next.snsLinks,
           });
           if (!remote.ok) {
@@ -1266,7 +1262,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
             name: displayName,
             imageUrl: next.imageUri ?? null,
             coverImageUrl: next.coverUri ?? null,
-            bio: next.bio,
+            snsLinks: next.snsLinks,
           });
           if (!clubRemote.ok && __DEV__) {
             console.warn('[organizer] clubs upsert', clubRemote.error);

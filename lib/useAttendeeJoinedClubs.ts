@@ -141,7 +141,6 @@ export function useAttendeeJoinedClubs(options: {
         name: stub.name,
         imageUri: stub.coverUri,
         coverUri: stub.coverUri,
-        bio: stub.bio || '',
         tag: stub.tag,
         hostName: stub.name,
         members: [],

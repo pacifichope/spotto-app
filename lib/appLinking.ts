@@ -4,7 +4,8 @@ import * as Linking from 'expo-linking';
 import { readPublicEnv } from '@/lib/env';
 
 export const APP_SCHEME = 'spotto';
-export const WEB_HOST = 'spotto.fun';
+/** Web アプリ（Vercel カスタムドメイン） */
+export const WEB_HOST = 'app.spotto.fun';
 const DEFAULT_WEB_ORIGIN = `https://${WEB_HOST}`;
 
 function webOrigin() {
@@ -43,7 +44,7 @@ export function createAppDeepLink(path: string) {
   return `${APP_SCHEME}://${normalized}`;
 }
 
-/** https://spotto.fun/event/{id} */
+/** https://app.spotto.fun/event/{id} */
 export function createEventWebUrl(eventId: string) {
   return `${webOrigin()}/event/${encodeURIComponent(eventId)}`;
 }
@@ -53,9 +54,9 @@ export function createEventDeepLink(eventId: string) {
   return createAppDeepLink(`event/${eventId}`);
 }
 
-/** https://spotto.fun/club/{id} */
+/** https://app.spotto.fun/clubs/{id}（Web Next のルートに合わせる） */
 export function createClubWebUrl(clubId: string) {
-  return `${webOrigin()}/club/${encodeURIComponent(clubId)}`;
+  return `${webOrigin()}/clubs/${encodeURIComponent(clubId)}`;
 }
 
 export function createClubDeepLink(clubId: string) {

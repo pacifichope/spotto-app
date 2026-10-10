@@ -30,6 +30,8 @@ export type EventParticipantRow = {
   display_name?: string | null;
   /** 参加登録時点のアバター URL スナップショット */
   avatar_url?: string | null;
+  /** 参加登録時点の性別スナップショット */
+  gender?: string | null;
   profiles?: {
     display_name?: string | null;
     nickname?: string | null;
@@ -92,10 +94,13 @@ function resolveAvatarUri(raw: string | null | undefined): string | undefined {
 async function ensureJoinerProfileSnapshot(userId: string): Promise<{
   displayName: string;
   avatarUrl: string | null;
+  gender: '男性' | '女性' | null;
   profileOk: boolean;
 }> {
   const local = getUserProfile();
   const displayName = local.name.trim();
+  const gender =
+    local.gender === '男性' || local.gender === '女性' ? local.gender : null;
   const push = await pushProfileToRemote(userId, local);
   if (!push.ok) {
     console.warn('[eventParticipants] ensureJoinerProfile failed', {
@@ -119,6 +124,7 @@ async function ensureJoinerProfileSnapshot(userId: string): Promise<{
   return {
     displayName,
     avatarUrl,
+    gender,
     profileOk: push.ok,
   };
 }
@@ -224,7 +230,7 @@ export function participantRowToAttendee(
     id: row.user_id,
     name: name || '名前未設定',
     imageUri,
-    gender: asGender(profile?.gender),
+    gender: asGender(profile?.gender) || asGender(row.gender),
     self: Boolean(currentUserId && row.user_id === currentUserId),
     ticketQuantity: Math.max(1, Math.floor(Number(row.ticket_quantity) || 1)),
     clubIds: options?.clubIds,
@@ -435,6 +441,8 @@ async function fetchParticipantProfiles(
 }
 
 const PARTICIPANT_SELECT_WITH_SNAPSHOT =
+  'id, event_id, user_id, status, created_at, ticket_quantity, display_name, avatar_url, gender';
+const PARTICIPANT_SELECT_SNAPSHOT_NO_GENDER =
   'id, event_id, user_id, status, created_at, ticket_quantity, display_name, avatar_url';
 const PARTICIPANT_SELECT_BASE =
   'id, event_id, user_id, status, created_at, ticket_quantity';
@@ -511,6 +519,19 @@ export async function fetchEventParticipants(
       .order('created_at', { ascending: true });
     data = withSnapshot.data as EventParticipantRow[] | null;
     error = withSnapshot.error;
+
+    if (
+      error &&
+      (error.message?.includes('gender') || error.code === '42703')
+    ) {
+      const noGender = await client
+        .from('event_participants')
+        .select(PARTICIPANT_SELECT_SNAPSHOT_NO_GENDER)
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: true });
+      data = noGender.data as EventParticipantRow[] | null;
+      error = noGender.error;
+    }
 
     if (
       error &&
@@ -657,6 +678,19 @@ export async function fetchEventParticipantsBatch(
       .order('created_at', { ascending: true });
     data = withSnapshot.data as EventParticipantRow[] | null;
     error = withSnapshot.error;
+
+    if (
+      error &&
+      (error.message?.includes('gender') || error.code === '42703')
+    ) {
+      const noGender = await client
+        .from('event_participants')
+        .select(PARTICIPANT_SELECT_SNAPSHOT_NO_GENDER)
+        .in('event_id', ids)
+        .order('created_at', { ascending: true });
+      data = noGender.data as EventParticipantRow[] | null;
+      error = noGender.error;
+    }
 
     if (
       error &&
@@ -835,6 +869,7 @@ export async function joinEventRemote(
     ticket_quantity: ticketQuantity,
     display_name: snapshot.displayName || null,
     avatar_url: snapshot.avatarUrl,
+    gender: snapshot.gender,
   };
 
   console.log('[eventParticipants] join payload', {
@@ -886,6 +921,7 @@ export async function joinEventRemote(
       (error.message?.includes('ticket_quantity') ||
         error.message?.includes('display_name') ||
         error.message?.includes('avatar_url') ||
+        error.message?.includes('gender') ||
         error.code === '42703')
     ) {
       const slim: Record<string, unknown> = {
@@ -910,6 +946,12 @@ export async function joinEventRemote(
         payload.avatar_url != null
       ) {
         slim.avatar_url = payload.avatar_url;
+      }
+      if (
+        !error.message?.includes('gender') &&
+        payload.gender != null
+      ) {
+        slim.gender = payload.gender;
       }
       const retry = await client
         .from('event_participants')
@@ -1049,6 +1091,7 @@ export async function ensureHostParticipant(
     status: 'joined' as const,
     display_name: snapshot.displayName || null,
     avatar_url: snapshot.avatarUrl,
+    gender: snapshot.gender,
   };
   console.log('[eventParticipants] ensureHost payload', {
     ...payload,

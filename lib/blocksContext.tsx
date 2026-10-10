@@ -160,7 +160,6 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
           id,
           name,
           imageUri: input.imageUri?.trim() || undefined,
-          bio: input.bio?.trim() || undefined,
           blockedAt: Date.now(),
         },
         ...blockedUsers.filter((item) => item.id !== id),

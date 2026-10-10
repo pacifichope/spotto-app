@@ -840,8 +840,7 @@ export default function ChatRoomScreen({
             id: person.id,
             name: person.name,
             imageUri: person.imageUri,
-            bio: person.bio,
-          });
+              });
           setProfileTarget(null);
         });
       }}

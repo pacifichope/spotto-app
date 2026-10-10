@@ -25,7 +25,7 @@ export function getEventDeepLink(eventId: string) {
 /**
  * 共有用の Web URL。
  * EXPO_PUBLIC_WEB_BASE_URL があれば優先（末尾スラッシュ除去）。
- * 未設定時は spotto.fun（利用規約・プライバシーと同ドメイン）。
+ * 未設定時は https://app.spotto.fun 。
  */
 export function getEventWebUrl(eventId: string) {
   return createEventWebUrl(eventId);

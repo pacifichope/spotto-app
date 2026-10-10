@@ -3,13 +3,14 @@
  * ネイティブ認可シートが例外やハングで戻らなくても、ボタンの loading を必ず解除する。
  */
 import type { AuthResult, SocialProvider } from '@/lib/auth';
+import { waitForNativeAuthPresenter } from '@/lib/nativeAuthPresenter';
 import {
   SOCIAL_LOGIN_USER_ERRORS,
   userFacingSocialLoginError,
 } from '@/lib/socialLoginErrors';
 
 /** システム認可 UI を操作中でも、これ以上戻らなければボタンを復帰させる */
-export const SOCIAL_SIGN_IN_UI_TIMEOUT_MS = 60_000;
+export const SOCIAL_SIGN_IN_UI_TIMEOUT_MS = 90_000;
 
 type RunGuardedSocialSignInParams = {
   provider: SocialProvider;
@@ -59,6 +60,8 @@ export async function runGuardedSocialSignIn({
     if (beforeNativePrompt) {
       await beforeNativePrompt();
     }
+    // iPad ではオーバーレイ描画直後の present が失敗しやすい
+    await waitForNativeAuthPresenter();
     const result = await signIn(provider);
     if (timedOut) return { ignored: false, result };
     if (!result.ok && !result.cancelled) {

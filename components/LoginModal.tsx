@@ -70,8 +70,9 @@ export default function LoginModal({
 
   const hideSheetForNativeAuth = useCallback(() => {
     // オーバーレイは別の ViewController を作らないので、隠さずに認可シートを出せる。
-    // 隠すと iPad で画面が空のまま固まり、戻ったあともタッチが死ぬ。
-    if (Platform.OS === 'web' || presentation === 'overlay') {
+    // iPad では RN Modal を隠すと画面が空のまま固まり、戻ったあともタッチが死ぬ。
+    // → web / overlay / iPad では絶対にシートを消さない。
+    if (Platform.OS === 'web' || presentation === 'overlay' || ipad) {
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
@@ -81,7 +82,7 @@ export default function LoginModal({
         settled = true;
         resolve();
       };
-      const fallbackMs = ipad ? 700 : 500;
+      const fallbackMs = 500;
       const timer = setTimeout(finish, fallbackMs);
       dismissListeners.current.push(() => {
         clearTimeout(timer);
@@ -143,11 +144,13 @@ export default function LoginModal({
         accessibilityElementsHidden
         disabled={submitting}
         importantForAccessibility="no"
+        pointerEvents={submitting ? 'none' : 'auto'}
         style={styles.backdrop}
         onPress={submitting ? undefined : onClose}
       />
       <View
         collapsable={false}
+        // シート全体で背面 backdrop のタッチを遮断（iPad でボタン無反応対策）
         pointerEvents="auto"
         style={[
           styles.sheet,
@@ -157,6 +160,8 @@ export default function LoginModal({
             paddingBottom: Math.max(insets.bottom, 16),
             width: '100%',
             maxWidth: centerSheet ? 480 : undefined,
+            zIndex: 10,
+            elevation: 24,
           },
         ]}
       >

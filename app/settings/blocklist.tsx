@@ -53,7 +53,6 @@ export default function BlocklistScreen() {
                     {user.name}
                   </Text>
                   <Text style={styles.meta} numberOfLines={1}>
-                    {user.bio?.trim() || t('settings.blockedLabel')}
                   </Text>
                 </View>
                 <Pressable

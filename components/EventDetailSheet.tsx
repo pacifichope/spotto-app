@@ -812,7 +812,6 @@ export default function EventDetailSheet({
         id: person.id,
         name: person.name,
         imageUri: person.imageUri,
-        bio: person.bio,
       });
       closeAttendeeOverlay();
     });

@@ -24,7 +24,6 @@ create table if not exists public.events (
   joined_count integer not null default 1 check (joined_count >= 0),
   host_name text not null default '主催者',
   host_image_uri text,
-  host_bio text,
   host_sns_links jsonb not null default '[]'::jsonb,
   vibe text not null default '',
   description text not null default '',

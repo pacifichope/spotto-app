@@ -10,7 +10,6 @@ export type BlockedUser = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
   blockedAt: number;
 };
 
@@ -18,7 +17,6 @@ export type BlockUserInput = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
 };
 
 export type BlocksSnapshot = {
@@ -77,10 +75,6 @@ export function parseBlockedUsers(raw: unknown): BlockedUser[] {
       imageUri:
         typeof record.imageUri === 'string' && record.imageUri.trim()
           ? record.imageUri
-          : undefined,
-      bio:
-        typeof record.bio === 'string' && record.bio.trim()
-          ? record.bio
           : undefined,
       blockedAt:
         typeof record.blockedAt === 'number' && Number.isFinite(record.blockedAt)
