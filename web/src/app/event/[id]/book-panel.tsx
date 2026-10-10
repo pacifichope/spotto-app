@@ -161,16 +161,20 @@ function BookControls({
     }
   }
 
-  const label = ended
+  const priceLabel = formatPrice(event.priceYen, t);
+  const joinLabel = ended
     ? t('event.ended')
     : busy
       ? t('event.processing')
       : event.priceYen > 0
-        ? t('event.payToJoin')
+        ? t('event.joinForPrice', { price: priceLabel })
         : t('event.join');
 
+  const primaryBtnClass =
+    'flex h-14 w-full items-center justify-center rounded-2xl text-[15px] font-extrabold tracking-tight shadow-lg shadow-[#12B8D0]/25 disabled:cursor-not-allowed disabled:opacity-70';
+
   return (
-    <div className="glass fixed inset-x-0 bottom-[72px] z-30 px-4 py-3 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:p-5">
+    <div className="glass fixed inset-x-0 bottom-[72px] z-30 border-t border-[#E4EBEE]/80 px-4 py-3.5 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:border lg:p-5 lg:shadow-xl">
       <p
         className={`mb-1 hidden text-xs font-extrabold lg:block ${
           ended ? 'text-[#8A9199]' : 'text-[#12B8D0]'
@@ -179,14 +183,14 @@ function BookControls({
         {ended ? t('event.closed') : t('event.join')}
       </p>
       <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">
-        {formatPrice(event.priceYen, t)}
+        {priceLabel}
       </p>
       {user ? (
         <div className="flex flex-col gap-2">
           {joined ? (
             <Link
               href={ticketHref(event.id)}
-              className="brand-gradient flex h-12 w-full items-center justify-center rounded-full text-sm font-extrabold"
+              className={`brand-gradient ${primaryBtnClass}`}
             >
               {t('ticket.viewTicket')}
             </Link>
@@ -195,40 +199,45 @@ function BookControls({
               type="button"
               disabled={busy || ended}
               onClick={() => void reserve()}
-              className={`h-12 w-full rounded-full text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-70 ${
+              className={
                 ended
-                  ? 'bg-[#94A3B8] text-white'
-                  : 'brand-gradient disabled:opacity-60'
-              }`}
+                  ? `${primaryBtnClass} bg-[#94A3B8] text-white shadow-none`
+                  : `brand-gradient ${primaryBtnClass}`
+              }
             >
-              {label}
+              {joinLabel}
             </button>
           )}
-          <Link
-            href={chatHref(event.id, 'group')}
-            className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
-          >
-            {t('event.groupChat')}
-          </Link>
-          {event.hostId && event.hostId !== user.uid ? (
+          <div className="hidden flex-col gap-2 lg:flex">
             <Link
-              href={chatHref(event.id, 'host', event.hostId)}
-              className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
+              href={chatHref(event.id, 'group')}
+              className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
             >
-              {t('event.messageHost')}
+              {t('event.groupChat')}
             </Link>
-          ) : null}
+            {event.hostId && event.hostId !== user.uid ? (
+              <Link
+                href={chatHref(event.id, 'host', event.hostId)}
+                className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
+              >
+                {t('event.messageHost')}
+              </Link>
+            ) : null}
+          </div>
         </div>
       ) : ended ? (
         <button
           type="button"
           disabled
-          className="h-12 w-full cursor-not-allowed rounded-full bg-[#94A3B8] text-sm font-extrabold text-white opacity-70"
+          className={`${primaryBtnClass} cursor-not-allowed bg-[#94A3B8] text-white shadow-none opacity-70`}
         >
           {t('event.ended')}
         </button>
       ) : (
         <div className="flex flex-col gap-2">
+          <p className="mb-1 text-center text-xs font-bold text-[#5B6B75] lg:hidden">
+            {t('event.joinForPrice', { price: priceLabel })}
+          </p>
           <button
             type="button"
             disabled={busy}

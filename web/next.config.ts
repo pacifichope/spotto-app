@@ -86,7 +86,8 @@ const publicEnv = {
     'NEXT_PUBLIC_API_BASE_URL',
     'EXPO_PUBLIC_API_BASE_URL_REMOTE',
   ),
-  NEXT_PUBLIC_SITE_URL: resolvePublicEnv('NEXT_PUBLIC_SITE_URL') || 'https://spotto.fun',
+  NEXT_PUBLIC_SITE_URL:
+    resolvePublicEnv('NEXT_PUBLIC_SITE_URL') || 'https://app.spotto.fun',
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: resolvePublicEnv(
     'NEXT_PUBLIC_GOOGLE_MAPS_API_KEY',
     'EXPO_PUBLIC_GOOGLE_MAPS_API_KEY',

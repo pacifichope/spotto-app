@@ -39,7 +39,7 @@ export function formatAuthError(error: unknown, fallback = 'ログインに失�
     return [
       `このドメイン（${host || 'unknown'}）は Firebase の承認済みドメインに含まれていません。`,
       'Firebase Console → Authentication → Settings → Authorized domains に、',
-      `ホスト名だけを追加してください（例: ${host || 'your-app.vercel.app'}）。`,
+      `ホスト名だけを追加してください（例: ${host || 'app.spotto.fun'}）。`,
       'https:// やパスは付けないでください。',
       'ローカルなら localhost（127.0.0.1 や LAN IP ではない）でアクセスしてください。',
     ].join('');

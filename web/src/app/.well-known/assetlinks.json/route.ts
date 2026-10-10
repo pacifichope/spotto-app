@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
 /**
- * https://spotto.fun/.well-known/assetlinks.json
- * Android App Links（host spotto.fun, pathPrefix /event）と対になる。
+ * https://app.spotto.fun/.well-known/assetlinks.json
+ * Android App Links（host app.spotto.fun, pathPrefix /event）と対になる。
  */
 export function GET() {
   const fingerprints = (process.env.ANDROID_SHA256_CERT_FINGERPRINTS || '')

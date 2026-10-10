@@ -21,8 +21,10 @@ import {
 import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import {
+  canonicalThreadId,
   fetchRoomMessages,
   formatBubbleTime,
+  markThreadRead,
   parseChatMode,
   sendRoomMessage,
   type ChatMode,
@@ -162,6 +164,31 @@ export function ChatRoomScreen() {
     const id = window.setInterval(() => void reload({ silent: true }), 12_000);
     return () => window.clearInterval(id);
   }, [user, reload]);
+
+  // キャッシュ表示のままでも開いた時点で既読にする（バッジが残る不具合の防止）
+  useEffect(() => {
+    if (!user || !eventId) return;
+    const lastAt = messages[messages.length - 1]?.at ?? Date.now();
+    const key = canonicalThreadId({
+      eventId,
+      mode,
+      userId: user.uid,
+      hostId: event?.hostId,
+      dmUserId: resolvedDm ?? dmFromQuery,
+    });
+    markThreadRead(key, lastAt, {
+      userId: user.uid,
+      getIdToken: async () => idTokenWithAuthenticatedRole(user),
+    });
+  }, [
+    user,
+    eventId,
+    mode,
+    event?.hostId,
+    resolvedDm,
+    dmFromQuery,
+    messages,
+  ]);
 
   const visibleMessages = useMemo(
     () =>

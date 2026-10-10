@@ -1,23 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { BookPanel } from '@/app/event/[id]/book-panel';
-import { EventAttendeesSection } from '@/components/EventAttendeesSection';
-import { EventBackLink } from '@/components/EventBackLink';
-import { sportCover } from '@/constants/theme';
+import { EventDetailView } from '@/components/EventDetailView';
 import { getPublicEvent, listPublicEvents } from '@/lib/events';
-import {
-  absoluteImageUrl,
-  eventAnswer,
-  eventJsonLd,
-  eventMetadata,
-  formatPrice,
-  formatWhen,
-} from '@/lib/eventSeo';
+import { eventJsonLd, eventMetadata } from '@/lib/eventSeo';
 import { getServerT } from '@/lib/i18n/server';
-import { eventStatusMessageKey, getEventStatus } from '@/lib/types';
 
 /** 5分ごとにサーバーで HTML を作り直す。リクエストのたびに動的描画はしない。 */
 export const revalidate = 300;
@@ -53,106 +41,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function EventPage({ params }: PageProps) {
   const { id } = await params;
   const event = await getPublicEvent(id);
-  const t = await getServerT();
 
   if (!event) notFound();
 
   const jsonLd = JSON.stringify(eventJsonLd(event)).replace(/</g, '\\u003c');
-  const photo = absoluteImageUrl(event.imageUri);
-  const gallery = photo
-    ? [photo, sportCover(event.sport)].filter(
-        (src, index, all) => all.indexOf(src) === index,
-      )
-    : [sportCover(event.sport)];
-  const status = getEventStatus(event);
 
   return (
-    <main className="page-main pb-36 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.9fr)] lg:items-start lg:gap-6 lg:pb-4">
+    <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <article>
-        <nav aria-label={t('event.breadcrumb')} className="mb-3">
-          <EventBackLink />
-        </nav>
-
-        <div className="flex gap-3 overflow-x-auto [scrollbar-width:none] lg:grid lg:grid-cols-2 lg:overflow-visible">
-          {gallery.map((src) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={src}
-              src={src}
-              alt={event.title}
-              className="hero card-shadow h-56 w-[86%] shrink-0 rounded-3xl lg:h-72 lg:w-full"
-            />
-          ))}
-        </div>
-
-        <div className="pt-4">
-          <p className="text-xs font-extrabold text-[#12B8D0]">
-            <Link href="/" className="hover:underline">
-              {t('event.list')}
-            </Link>
-            {event.sport ? (
-              <>
-                <span className="mx-1.5 text-[#8A9199]" aria-hidden>
-                  /
-                </span>
-                <span>{event.sport}</span>
-              </>
-            ) : null}
-          </p>
-          <div className="mt-2 flex items-start justify-between gap-3">
-            <h1 className="text-2xl font-extrabold tracking-tight">{event.title}</h1>
-            <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold text-white ${
-                status === 'open'
-                  ? 'brand-gradient'
-                  : status === 'ended'
-                    ? 'bg-[#94A3B8]'
-                    : 'bg-[#8A9199]'
-              }`}
-            >
-              {t(eventStatusMessageKey(status))}
-            </span>
-          </div>
-
-          <section aria-label={t('event.highlights')} className="card-shadow mt-4 p-4">
-            <p className="answer">{eventAnswer(event)}</p>
-            <dl className="facts">
-              <div>
-                <dt>{t('event.when')}</dt>
-                <dd>{formatWhen(event.eventDate, event.eventTime, t)}</dd>
-              </div>
-              <div>
-                <dt>{t('event.where')}</dt>
-                <dd>{event.location || t('event.placeUnknown')}</dd>
-              </div>
-              <div>
-                <dt>{t('event.price')}</dt>
-                <dd>{formatPrice(event.priceYen, t)}</dd>
-              </div>
-              <div>
-                <dt>{t('event.level')}</dt>
-                <dd>{event.level || t('event.levelAny')}</dd>
-              </div>
-            </dl>
-          </section>
-
-          {event.description ? (
-            <p className="mt-4 text-sm font-medium leading-7 text-[#5B6B75]">{event.description}</p>
-          ) : null}
-
-          <EventAttendeesSection
-            eventId={event.id}
-            hostId={event.hostId}
-            hostName={event.hostName}
-            capacity={event.capacity}
-            joinedCountFallback={event.joinedCount}
-          />
-        </div>
-      </article>
-      <Suspense fallback={null}>
-        <BookPanel event={event} />
+      <Suspense fallback={<EventDetailFallback />}>
+        <EventDetailView event={event} />
       </Suspense>
+    </>
+  );
+}
+
+function EventDetailFallback() {
+  return (
+    <main className="page-main pb-36 pt-0">
+      <div className="-mx-4 h-64 animate-pulse bg-[#E4EBEE] md:-mx-7 md:h-80" />
+      <div className="mt-6 space-y-3 px-1">
+        <div className="h-4 w-2/3 rounded-full bg-[#E4EBEE]" />
+        <div className="h-4 w-1/2 rounded-full bg-[#E4EBEE]" />
+        <div className="h-4 w-3/4 rounded-full bg-[#E4EBEE]" />
+      </div>
     </main>
   );
 }

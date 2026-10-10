@@ -11,6 +11,7 @@ import { useHiddenUserIds } from '@/hooks/useHiddenUserIds';
 import { useAuth } from '@/lib/auth-context';
 import { useT } from '@/lib/i18n/locale-context';
 import {
+  applyReadsToInboxThreads,
   chatHref,
   fetchInboxThreads,
   formatChatListTime,
@@ -24,6 +25,7 @@ import {
   isQueryCacheFresh,
   peekQueryCache,
   QUERY_FRESH_MS,
+  setQueryCache,
 } from '@/lib/queryCache';
 import { sportCover } from '@/constants/theme';
 
@@ -86,7 +88,10 @@ export function MessagesScreen() {
     const key = inboxCacheKey(user.uid);
     const cached = peekQueryCache<InboxThread[]>(key);
     if (cached) {
-      setThreads(cached);
+      // ルーム既読後に戻ったとき、キャッシュの未読バッジを即補正
+      const patched = applyReadsToInboxThreads(cached);
+      setThreads(patched);
+      setQueryCache(key, patched);
       setLoading(false);
       if (isQueryCacheFresh(key, QUERY_FRESH_MS)) return;
       void reload({ silent: true });
@@ -97,8 +102,28 @@ export function MessagesScreen() {
 
   useEffect(() => {
     if (!user) return;
+    const syncReads = () => {
+      setThreads((prev) => {
+        const patched = applyReadsToInboxThreads(prev);
+        setQueryCache(inboxCacheKey(user.uid), patched);
+        return patched;
+      });
+    };
+    const onFocus = () => {
+      syncReads();
+      void reload({ silent: true });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') onFocus();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
     const id = window.setInterval(() => void reload({ silent: true }), 30_000);
-    return () => window.clearInterval(id);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(id);
+    };
   }, [user, reload]);
 
   const visibleThreads = threads.filter((thread) => {

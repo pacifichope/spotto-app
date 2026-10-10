@@ -260,7 +260,11 @@ function SportPin({
           strokeOpacity="0.35"
         />
       </svg>
-      <span className="pointer-events-none absolute top-[10px] text-[15px] leading-none">
+      {/* 白丸の中心 (cx=24, cy=21.5) に絵文字を完全中央配置 */}
+      <span
+        className="pointer-events-none absolute left-1/2 top-[21.5px] flex h-[26px] w-[26px] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-[15px] leading-none"
+        aria-hidden
+      >
         {sportEmoji(sport)}
       </span>
     </div>

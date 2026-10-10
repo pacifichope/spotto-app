@@ -49,8 +49,21 @@ export function apiBaseUrl() {
   return readPublic(process.env.NEXT_PUBLIC_API_BASE_URL).replace(/\/+$/, '');
 }
 
+/** Web アプリ本番オリジン（カスタムドメイン） */
+export const DEFAULT_SITE_URL = 'https://app.spotto.fun';
+
 export function siteUrl() {
-  return (readPublic(process.env.NEXT_PUBLIC_SITE_URL) || 'https://spotto.fun').replace(/\/+$/, '');
+  const explicit = readPublic(process.env.NEXT_PUBLIC_SITE_URL);
+  if (explicit) return explicit.replace(/\/+$/, '');
+  // プレビュー／開発デプロイのみ Vercel ホストを使う（本番は常にカスタムドメイン）
+  const vercelEnv = readPublic(process.env.VERCEL_ENV);
+  const vercelHost = readPublic(process.env.VERCEL_URL)
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+  if (vercelHost && vercelEnv && vercelEnv !== 'production') {
+    return `https://${vercelHost}`;
+  }
+  return DEFAULT_SITE_URL;
 }
 
 export function googleMapsApiKey() {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
 /**
- * https://spotto.fun/.well-known/apple-app-site-association
- * アプリ側の associatedDomains（applinks:spotto.fun）と対になる。
- * インストール済みの iOS は /event/* をアプリで開く。
+ * https://app.spotto.fun/.well-known/apple-app-site-association
+ * アプリ側の associatedDomains（applinks:app.spotto.fun）と対になる。
+ * インストール済みの iOS は /event/*・/clubs/* をアプリで開く。
  */
 export function GET() {
   const teamId = (process.env.APPLE_TEAM_ID || '').trim();
@@ -13,7 +13,11 @@ export function GET() {
       details: [
         {
           appIDs: [`${teamId}.com.taiki.spotto`],
-          components: [{ '/': '/event/*' }],
+          components: [
+            { '/': '/event/*' },
+            { '/': '/clubs/*' },
+            { '/': '/club/*' },
+          ],
         },
       ],
     },
