@@ -19,16 +19,27 @@ import {
 } from '@/lib/i18n/labels';
 import { useLocale, useT } from '@/lib/i18n/locale-context';
 
+export type LevelFilterId = 'all' | 'beginner' | 'intermediate' | 'advanced';
+
+const LEVEL_OPTIONS: { id: LevelFilterId; labelKey: string }[] = [
+  { id: 'all', labelKey: 'home.levelAll' },
+  { id: 'beginner', labelKey: 'home.levelBeginner' },
+  { id: 'intermediate', labelKey: 'home.levelIntermediate' },
+  { id: 'advanced', labelKey: 'home.levelAdvanced' },
+];
+
 type HeaderProps = {
   area: string;
   /** 表示用ラベル（取得中など）。未指定時は area を表示 */
   areaLabel?: string;
   query: string;
   category: CategoryId;
+  level: LevelFilterId;
   priceRange: PriceRange;
   onArea: (area: string) => void;
   onQuery: (query: string) => void;
   onCategory: (category: CategoryId) => void;
+  onLevel: (level: LevelFilterId) => void;
   onPriceRange: (range: PriceRange) => void;
 };
 
@@ -37,10 +48,12 @@ export function Header({
   areaLabel,
   query,
   category,
+  level,
   priceRange,
   onArea,
   onQuery,
   onCategory,
+  onLevel,
   onPriceRange,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
@@ -168,6 +181,28 @@ export function Header({
               }
             >
               {translateCategory(item.id as string, t)}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mb-2 mt-4 text-xs font-extrabold text-[#5B6B75]">
+        {t('home.level')}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {LEVEL_OPTIONS.map((item) => {
+          const active = item.id === level;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={active}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-extrabold ${
+                active ? 'brand-gradient' : 'bg-white/70 text-[#5B6B75]'
+              }`}
+              onClick={() => onLevel(active && item.id !== 'all' ? 'all' : item.id)}
+            >
+              {t(item.labelKey)}
             </button>
           );
         })}

@@ -7,7 +7,7 @@ import { List, Map as MapIcon } from 'lucide-react';
 import { DateTimeline } from '@/components/DateTimeline';
 import { EventCard } from '@/components/EventCard';
 import { EventMap } from '@/components/EventMap';
-import { Header } from '@/components/Header';
+import { Header, type LevelFilterId } from '@/components/Header';
 import {
   DEFAULT_PRICE_RANGE,
   matchesPriceRange,
@@ -46,6 +46,21 @@ function areaMapCenter(area: string): { lat: number; lng: number } | null {
   return prefectureCenter(area);
 }
 
+function matchesLevelFilter(level: string, filter: LevelFilterId) {
+  if (filter === 'all') return true;
+  const raw = level.trim();
+  if (filter === 'beginner') {
+    return (
+      raw === '初心者' ||
+      raw === '初心者歓迎' ||
+      raw === '初級' ||
+      raw === '誰でも歓迎'
+    );
+  }
+  if (filter === 'intermediate') return raw === '中級';
+  return raw === '上級';
+}
+
 function applyCommonFilters(
   source: PublicEvent[],
   input: {
@@ -53,6 +68,7 @@ function applyCommonFilters(
     date: string | null;
     priceRange: PriceRange;
     category: CategoryId;
+    level: LevelFilterId;
     query: string;
   },
 ) {
@@ -64,6 +80,7 @@ function applyCommonFilters(
     if (!eventMatchesCategory(event.sport, event.joinedCount, input.category)) {
       return false;
     }
+    if (!matchesLevelFilter(event.level, input.level)) return false;
     if (!needle) return true;
     return `${event.title} ${event.sport} ${event.location} ${event.level}`
       .toLowerCase()
@@ -91,6 +108,7 @@ export function HomeScreen({
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<string>(NEARBY_AREA);
   const [category, setCategory] = useState<CategoryId>('all');
+  const [level, setLevel] = useState<LevelFilterId>('all');
   const [priceRange, setPriceRange] = useState<PriceRange>(DEFAULT_PRICE_RANGE);
   const [date, setDate] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -220,8 +238,8 @@ export function HomeScreen({
   }, [t]);
 
   const filterInput = useMemo(
-    () => ({ hiddenIds, date, priceRange, category, query }),
-    [hiddenIds, date, priceRange, category, query],
+    () => ({ hiddenIds, date, priceRange, category, level, query }),
+    [hiddenIds, date, priceRange, category, level, query],
   );
 
   const listVisible = useMemo(() => {
@@ -289,10 +307,12 @@ export function HomeScreen({
             areaLabel={areaLabel}
             query={query}
             category={category}
+            level={level}
             priceRange={priceRange}
             onArea={handleArea}
             onQuery={setQuery}
             onCategory={setCategory}
+            onLevel={setLevel}
             onPriceRange={setPriceRange}
           />
           <div className="mt-5">

@@ -18,7 +18,11 @@ export type PublicEvent = {
   hostImageUri: string | null;
   description: string;
   imageUri: string | null;
+  /** ギャラリー用（先頭以外も含む） */
+  imageUris: string[];
   priceYen: number;
+  seriesId: string | null;
+  cancelPolicy: string | null;
 };
 
 export type EventRow = {
@@ -42,13 +46,16 @@ export type EventRow = {
   /** list / inbox 取得では省略可 */
   description?: string | null;
   image_uri: string | null;
+  image_uris?: string[] | null;
   price_yen: number | null;
   cancelled_at: string | null;
+  series_id?: string | null;
+  cancel_policy?: string | null;
 };
 
 /** 詳細・予約など description が必要な場面 */
 const EVENT_COLUMNS =
-  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_id, host_name, host_image_uri, description, image_uri, price_yen, cancelled_at';
+  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_id, host_name, host_image_uri, description, image_uri, image_uris, price_yen, cancelled_at, series_id, cancel_policy';
 
 /** ホーム一覧・マップ（description は載せない） */
 const EVENT_LIST_COLUMNS =
@@ -96,8 +103,23 @@ export function mapEventRow(row: EventRow): PublicEvent | null {
     hostImageUri: row.host_image_uri?.trim() || null,
     description: row.description?.trim() || '', // list 取得時は空でも可
     imageUri: row.image_uri?.trim() || null,
+    imageUris: normalizeImageUris(row.image_uris, row.image_uri),
     priceYen: Math.max(0, Math.floor(Number(row.price_yen) || 0)),
+    seriesId: row.series_id?.trim() || null,
+    cancelPolicy: row.cancel_policy?.trim() || null,
   };
+}
+
+function normalizeImageUris(
+  uris: string[] | null | undefined,
+  fallback: string | null | undefined,
+): string[] {
+  const list = Array.isArray(uris)
+    ? uris.map((uri) => String(uri || '').trim()).filter(Boolean)
+    : [];
+  const primary = String(fallback || '').trim();
+  if (primary && !list.includes(primary)) list.unshift(primary);
+  return [...new Set(list)];
 }
 
 /** 終了日時が過去なら true（終了日が無ければ開始日時で判定） */

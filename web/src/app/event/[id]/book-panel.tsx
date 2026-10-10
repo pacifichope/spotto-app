@@ -12,7 +12,7 @@ import {
   LineSpeechMark,
 } from '@/components/socialBrandMarks';
 import { useAuth } from '@/lib/auth-context';
-import { joinEvent } from '@/lib/booking';
+import { joinEvent, leaveEvent } from '@/lib/booking';
 import { chatHref } from '@/lib/chatsWeb';
 import {
   beginLineLogin,
@@ -190,6 +190,29 @@ function BookControls({
     }
   }
 
+  async function cancelJoin() {
+    if (!user || !joined || ended) return;
+    const ok = window.confirm(t('event.cancelConfirmTitle'));
+    if (!ok) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      await leaveEvent({
+        eventId: event.id,
+        userId: user.uid,
+        getIdToken: async () => idTokenWithAuthenticatedRole(user),
+      });
+      setJoined(false);
+      setMessageTone('ok');
+      setMessage(t('event.leaveDone'));
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : t('event.leaveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const priceLabel = formatPrice(event.priceYen, t);
   const joinLabel = ended
     ? t('event.ended')
@@ -240,6 +263,16 @@ function BookControls({
                   </button>
                 )}
               </div>
+              {joined && !ended ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void cancelJoin()}
+                  className="text-center text-xs font-extrabold text-[#EF4444] disabled:opacity-60"
+                >
+                  {busy ? t('event.processing') : t('event.cancelJoin')}
+                </button>
+              ) : null}
               {!joined && event.hostId && event.hostId !== user.uid ? (
                 <Link
                   href={chatHref(event.id, 'host', event.hostId)}

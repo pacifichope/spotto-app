@@ -3,7 +3,11 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { EventDetailView } from '@/components/EventDetailView';
-import { getPublicEvent, listPublicEvents } from '@/lib/events';
+import {
+  getPublicEvent,
+  listEventScheduleOccurrences,
+  listPublicEvents,
+} from '@/lib/events';
 import { eventJsonLd, eventMetadata } from '@/lib/eventSeo';
 import { getServerT } from '@/lib/i18n/server';
 
@@ -44,13 +48,14 @@ export default async function EventPage({ params }: PageProps) {
 
   if (!event) notFound();
 
+  const occurrences = await listEventScheduleOccurrences(event);
   const jsonLd = JSON.stringify(eventJsonLd(event)).replace(/</g, '\\u003c');
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <Suspense fallback={<EventDetailFallback />}>
-        <EventDetailView event={event} />
+        <EventDetailView event={event} occurrenceEvents={occurrences} />
       </Suspense>
     </>
   );

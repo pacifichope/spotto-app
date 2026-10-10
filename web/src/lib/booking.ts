@@ -52,3 +52,18 @@ export async function joinEvent(input: JoinInput) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+/** 参加キャンセル（event_participants 行を削除） */
+export async function leaveEvent(input: {
+  eventId: string;
+  userId: string;
+  getIdToken: () => Promise<string | null>;
+}) {
+  const supabase = createAuthedSupabase(input.getIdToken);
+  const { error } = await supabase
+    .from('event_participants')
+    .delete()
+    .eq('event_id', input.eventId.trim().toLowerCase())
+    .eq('user_id', input.userId.trim());
+  if (error) throw new Error(error.message);
+}

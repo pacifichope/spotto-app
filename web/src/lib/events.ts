@@ -58,3 +58,52 @@ export const getPublicEvent = cache(async (id: string): Promise<PublicEvent | nu
   if (!clubImage) return event;
   return { ...event, hostImageUri: clubImage };
 });
+
+/** 同一シリーズ（または同一タイトル＋主催）の開催回一覧。日程ピッカー用。 */
+export const listEventScheduleOccurrences = cache(
+  async (event: PublicEvent): Promise<PublicEvent[]> => {
+    const supabase = createPublicSupabase();
+    const seriesId = event.seriesId?.trim();
+
+    if (seriesId) {
+      const { data, error } = await supabase
+        .from('events')
+        .select(eventColumns())
+        .eq('series_id', seriesId)
+        .is('cancelled_at', null)
+        .order('event_date', { ascending: true })
+        .order('event_time', { ascending: true })
+        .limit(40);
+      if (!error && data) {
+        const list = (data as unknown as EventRow[])
+          .flatMap((row) => {
+            const mapped = mapEventRow(row);
+            return mapped ? [mapped] : [];
+          })
+          .filter((item) => !event.title || item.title === event.title);
+        if (list.length > 1) return list;
+      }
+    }
+
+    if (!event.hostId || !event.title.trim()) return [event];
+
+    const { data, error } = await supabase
+      .from('events')
+      .select(eventColumns())
+      .eq('host_id', event.hostId)
+      .eq('title', event.title)
+      .is('cancelled_at', null)
+      .order('event_date', { ascending: true })
+      .order('event_time', { ascending: true })
+      .limit(40);
+    if (error || !data) return [event];
+
+    const peers = (data as unknown as EventRow[]).flatMap((row) => {
+      const mapped = mapEventRow(row);
+      return mapped ? [mapped] : [];
+    });
+    const dates = new Set(peers.map((item) => item.eventDate));
+    if (peers.length <= 1 || dates.size <= 1) return [event];
+    return peers;
+  },
+);
