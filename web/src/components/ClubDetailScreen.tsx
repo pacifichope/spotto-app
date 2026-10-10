@@ -356,14 +356,6 @@ export function ClubDetailScreen({ clubId }: { clubId: string }) {
               })}
               {club.sport ? ` · ${sportLabel(club.sport, t) || club.sport}` : ''}
             </p>
-            {club.bio ? (
-              <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-6 text-[#5B6B75]">
-                {club.bio}
-              </p>
-            ) : (
-              <p className="mt-3 text-sm font-bold text-[#8A9199]">{t('clubs.noBio')}</p>
-            )}
-
             {club.snsLinks.length > 0 ? (
               <div className="mt-5">
                 <p className="text-xs font-extrabold text-[#8A9199]">

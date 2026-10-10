@@ -156,7 +156,7 @@ function BlocklistBody() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold">{item.name}</p>
                   <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
-                    {item.bio?.trim() || t('blocklist.blocked')}
+                    {t('blocklist.blocked')}
                   </p>
                 </div>
                 <button

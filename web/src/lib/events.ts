@@ -42,5 +42,19 @@ export const getPublicEvent = cache(async (id: string): Promise<PublicEvent | nu
 
   if (error) throw new Error(error.message);
   if (!data) return null;
-  return mapEventRow(data as unknown as EventRow);
+  const event = mapEventRow(data as unknown as EventRow);
+  if (!event) return null;
+
+  // クラブプロフィール画像（clubs.image_url）を優先し、なければ events.host_image_uri
+  if (!event.hostId) return event;
+  const { data: club } = await supabase
+    .from('clubs')
+    .select('image_url')
+    .eq('id', event.hostId)
+    .maybeSingle();
+  const clubImage = String(
+    (club as { image_url?: string | null } | null)?.image_url || '',
+  ).trim();
+  if (!clubImage) return event;
+  return { ...event, hostImageUri: clubImage };
 });

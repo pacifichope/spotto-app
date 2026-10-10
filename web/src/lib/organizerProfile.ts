@@ -10,7 +10,6 @@ export type WebOrganizerProfile = {
   imageUri?: string;
   /** クラブカバー写真（ヘッダー画像） */
   coverUri?: string;
-  bio: string;
   /** 複数 SNS / Web リンク */
   snsLinks: SnsLink[];
 };
@@ -19,7 +18,6 @@ export const EMPTY_ORGANIZER_PROFILE: WebOrganizerProfile = {
   name: '',
   imageUri: undefined,
   coverUri: undefined,
-  bio: '',
   snsLinks: [],
 };
 
@@ -45,7 +43,6 @@ function normalizeProfile(raw: Partial<WebOrganizerProfile> | null | undefined):
     name: normalizeOrganizerName(raw?.name || ''),
     imageUri: String(raw?.imageUri || '').trim() || undefined,
     coverUri: String(raw?.coverUri || '').trim() || undefined,
-    bio: String(raw?.bio || '').trim().slice(0, 500),
     snsLinks: sanitizeSnsLinks(raw?.snsLinks),
   };
 }
@@ -76,7 +73,6 @@ export function saveOrganizerProfileLocal(
   const next = normalizeProfile({
     ...profile,
     name,
-    bio: String(profile.bio || '').trim().slice(0, 500),
   });
   try {
     window.localStorage.setItem(key(uid), JSON.stringify(next));
@@ -104,14 +100,14 @@ export async function fetchOrganizerClubProfile(input: {
   const supabase = createAuthedSupabase(input.getIdToken);
   const { data, error } = await supabase
     .from('clubs')
-    .select('id, name, image_url, cover_image_url, bio, sns_links')
+    .select('id, name, image_url, cover_image_url, sns_links')
     .eq('id', uid)
     .maybeSingle();
   if (error) {
     // sns_links 未適用時はフォールバック
     const fallback = await supabase
       .from('clubs')
-      .select('id, name, image_url, cover_image_url, bio')
+      .select('id, name, image_url, cover_image_url')
       .eq('id', uid)
       .maybeSingle();
     if (fallback.error || !fallback.data) return null;
@@ -124,7 +120,6 @@ export async function fetchOrganizerClubProfile(input: {
         String(
           (fallback.data as { cover_image_url?: string }).cover_image_url || '',
         ) || undefined,
-      bio: String((fallback.data as { bio?: string }).bio || ''),
       snsLinks: [],
     });
   }
@@ -133,14 +128,12 @@ export async function fetchOrganizerClubProfile(input: {
     name?: string;
     image_url?: string | null;
     cover_image_url?: string | null;
-    bio?: string;
     sns_links?: unknown;
   };
   return normalizeProfile({
     name: String(row.name || ''),
     imageUri: String(row.image_url || '').trim() || undefined,
     coverUri: String(row.cover_image_url || '').trim() || undefined,
-    bio: String(row.bio || ''),
     snsLinks: sanitizeSnsLinks(row.sns_links),
   });
 }
@@ -159,7 +152,6 @@ export function mergeOrganizerProfiles(
     name: remote.name || local.name,
     imageUri: preferUri(remote.imageUri, local.imageUri),
     coverUri: preferUri(remote.coverUri, local.coverUri),
-    bio: remote.bio || local.bio,
     snsLinks:
       remote.snsLinks.length > 0 ? remote.snsLinks : local.snsLinks,
   });
@@ -182,7 +174,6 @@ export async function persistOrganizerProfile(input: {
   const clubPayload: Record<string, unknown> = {
     id: uid,
     name: next.name,
-    bio: next.bio,
     image_url: next.imageUri ?? null,
     cover_image_url: next.coverUri ?? null,
     sns_links: next.snsLinks,
@@ -213,7 +204,6 @@ export async function persistOrganizerProfile(input: {
     .update({
       host_name: next.name,
       host_image_uri: next.imageUri ?? null,
-      host_bio: next.bio || null,
       host_sns_links: next.snsLinks,
       updated_at: new Date().toISOString(),
     })

@@ -19,7 +19,6 @@ export type JoinedClub = {
   name: string;
   imageUri?: string;
   sport?: string;
-  bio?: string;
 };
 
 export type ClubMember = {
@@ -37,7 +36,6 @@ export type ClubDetail = {
   imageUri?: string;
   coverUri?: string;
   sport?: string;
-  bio?: string;
   snsLinks: SnsLink[];
   events: PublicEvent[];
   members: ClubMember[];
@@ -133,7 +131,6 @@ export async function fetchJoinedClubs(input: {
   const byHost = new Map<string, JoinedClub>();
 
   if (eventIds.length > 0) {
-    // チャンクで軽量カラムのみ取得（bio は clubs 詳細で読む）
     const chunkSize = 60;
     for (let i = 0; i < eventIds.length; i += chunkSize) {
       const chunk = eventIds.slice(i, i + chunkSize);
@@ -195,14 +192,14 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   const [eventsRes, clubRes, profileRes] = await Promise.all([
     supabase
       .from('events')
-      .select(`${eventListColumns()}, host_image_uri, host_bio`)
+      .select(`${eventListColumns()}, host_image_uri`)
       .eq('host_id', id)
       .is('cancelled_at', null)
       .order('event_date', { ascending: true })
       .limit(48),
     supabase
       .from('clubs')
-      .select('id, name, image_url, cover_image_url, bio, sns_links')
+      .select('id, name, image_url, cover_image_url, sns_links')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -219,7 +216,6 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     name?: string;
     image_url?: string | null;
     cover_image_url?: string | null;
-    bio?: string;
     sns_links?: unknown;
   };
   let clubRow: ClubRowLoose | null = clubRes.error
@@ -228,7 +224,7 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   if (clubRes.error && /sns_links/i.test(clubRes.error.message || '')) {
     const fallback = await supabase
       .from('clubs')
-      .select('id, name, image_url, cover_image_url, bio')
+      .select('id, name, image_url, cover_image_url')
       .eq('id', id)
       .maybeSingle();
     clubRow = fallback.error
@@ -240,7 +236,6 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   const eventRows = (eventsRes.data ?? []) as unknown as Array<
     EventRow & {
       host_image_uri?: string | null;
-      host_bio?: string | null;
     }
   >;
   const events = eventRows.flatMap((row) => {
@@ -277,11 +272,6 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     absoluteImageUrl(sample?.image_uri) ||
     undefined;
 
-  const bio =
-    String(clubRow?.bio || '').trim() ||
-    String(sample?.host_bio || '').trim() ||
-    undefined;
-
   const sport =
     [...new Set(events.map((event) => event.sport).filter(Boolean))][0] ||
     undefined;
@@ -308,7 +298,6 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     imageUri,
     coverUri,
     sport,
-    bio,
     snsLinks,
     events,
     members,

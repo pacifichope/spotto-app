@@ -5,7 +5,6 @@ export type BlockedUser = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
   blockedAt: number;
 };
 

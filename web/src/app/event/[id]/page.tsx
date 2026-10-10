@@ -58,12 +58,14 @@ export default async function EventPage({ params }: PageProps) {
 
 function EventDetailFallback() {
   return (
-    <main className="page-main pb-36 pt-0">
-      <div className="-mx-4 h-64 animate-pulse bg-[#E4EBEE] md:-mx-7 md:h-80" />
-      <div className="mt-6 space-y-3 px-1">
-        <div className="h-4 w-2/3 rounded-full bg-[#E4EBEE]" />
-        <div className="h-4 w-1/2 rounded-full bg-[#E4EBEE]" />
-        <div className="h-4 w-3/4 rounded-full bg-[#E4EBEE]" />
+    <main className="page-main mx-auto w-full max-w-[520px] pb-36 pt-0">
+      <div className="overflow-hidden md:rounded-[28px] md:ring-1 md:ring-[#E4EBEE]">
+        <div className="h-56 animate-pulse bg-[#E4EBEE] sm:h-72" />
+        <div className="space-y-3 px-4 py-6">
+          <div className="h-6 w-3/4 rounded-full bg-[#E4EBEE]" />
+          <div className="h-4 w-1/2 rounded-full bg-[#E4EBEE]" />
+          <div className="h-4 w-2/3 rounded-full bg-[#E4EBEE]" />
+        </div>
       </div>
     </main>
   );

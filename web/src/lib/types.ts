@@ -14,6 +14,8 @@ export type PublicEvent = {
   joinedCount: number;
   hostId: string;
   hostName: string;
+  /** 主催者/クラブ画像（events.host_image_uri または clubs.image_url） */
+  hostImageUri: string | null;
   description: string;
   imageUri: string | null;
   priceYen: number;
@@ -36,6 +38,8 @@ export type EventRow = {
   host_id: string | null;
   host_name: string | null;
   /** list / inbox 取得では省略可 */
+  host_image_uri?: string | null;
+  /** list / inbox 取得では省略可 */
   description?: string | null;
   image_uri: string | null;
   price_yen: number | null;
@@ -44,7 +48,7 @@ export type EventRow = {
 
 /** 詳細・予約など description が必要な場面 */
 const EVENT_COLUMNS =
-  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_id, host_name, description, image_uri, price_yen, cancelled_at';
+  'id, title, sport, location, event_date, event_time, end_date, end_time, level, latitude, longitude, capacity, joined_count, host_id, host_name, host_image_uri, description, image_uri, price_yen, cancelled_at';
 
 /** ホーム一覧・マップ（description は載せない） */
 const EVENT_LIST_COLUMNS =
@@ -89,6 +93,7 @@ export function mapEventRow(row: EventRow): PublicEvent | null {
     joinedCount: Number(row.joined_count) || 0,
     hostId: row.host_id?.trim() || '',
     hostName: row.host_name?.trim() || '',
+    hostImageUri: row.host_image_uri?.trim() || null,
     description: row.description?.trim() || '', // list 取得時は空でも可
     imageUri: row.image_uri?.trim() || null,
     priceYen: Math.max(0, Math.floor(Number(row.price_yen) || 0)),

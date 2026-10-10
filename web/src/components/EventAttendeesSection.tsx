@@ -18,6 +18,7 @@ type Props = {
   eventId: string;
   hostId?: string;
   hostName?: string;
+  hostImageUri?: string | null;
   capacity: number;
   joinedCountFallback: number;
 };
@@ -68,6 +69,7 @@ export function EventAttendeesSection({
   eventId,
   hostId,
   hostName,
+  hostImageUri,
   capacity,
   joinedCountFallback,
 }: Props) {
@@ -88,6 +90,7 @@ export function EventAttendeesSection({
       eventId,
       hostId,
       hostName,
+      hostImageUri,
       currentUserId: user?.uid,
       getIdToken: user
         ? async () => idTokenWithAuthenticatedRole(user)
@@ -105,7 +108,7 @@ export function EventAttendeesSection({
     return () => {
       cancelled = true;
     };
-  }, [eventId, hostId, hostName, user]);
+  }, [eventId, hostId, hostName, hostImageUri, user]);
 
   useEffect(() => {
     if (!listOpen && !selected) return;
@@ -299,15 +302,6 @@ export function EventAttendeesSection({
                         </span>
                       ) : null}
                     </div>
-                    {selected.bio ? (
-                      <p className="mt-4 text-sm font-bold leading-6 text-[#5B6B75]">
-                        {selected.bio}
-                      </p>
-                    ) : (
-                      <p className="mt-4 text-sm font-bold text-[#8A9199]">
-                        {t('attendees.noBio')}
-                      </p>
-                    )}
                     {(selected.ticketQuantity ?? 1) > 1 ? (
                       <p className="mt-3 text-xs font-bold text-[#5B6B75]">
                         {t('attendees.ticketSlots', { count: selected.ticketQuantity ?? 1 })}

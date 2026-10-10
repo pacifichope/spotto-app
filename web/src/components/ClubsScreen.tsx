@@ -151,8 +151,7 @@ export function ClubsScreen() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-extrabold">{club.name}</p>
                   <p className="mt-0.5 truncate text-xs font-bold text-[#8A9199]">
-                    {[club.sport, club.bio].filter(Boolean).join(' · ') ||
-                      t('clubs.fallback')}
+                    {club.sport || t('clubs.fallback')}
                   </p>
                 </div>
                 <ChevronRight

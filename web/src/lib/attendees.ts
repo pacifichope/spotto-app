@@ -5,7 +5,6 @@ export type EventAttendee = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
   gender?: '男性' | '女性';
   self?: boolean;
   isHost?: boolean;
@@ -17,6 +16,7 @@ type ParticipantRow = {
   status?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;
+  gender?: string | null;
   ticket_quantity?: number | null;
 };
 
@@ -39,9 +39,43 @@ function asGender(raw: string | null | undefined): '男性' | '女性' | undefin
   return undefined;
 }
 
+async function loadAttendeeProfiles(
+  client: ReturnType<typeof createPublicSupabase>,
+  eventId: string,
+  userIds: string[],
+): Promise<Map<string, ProfileRow>> {
+  const profileById = new Map<string, ProfileRow>();
+  if (userIds.length === 0) return profileById;
+
+  // ゲストでも読める SECURITY DEFINER RPC（氏名・アバター・性別のみ）
+  const { data: rpcRows, error: rpcError } = await client.rpc(
+    'profiles_for_event_attendees',
+    { p_event_id: eventId },
+  );
+
+  if (!rpcError && Array.isArray(rpcRows)) {
+    for (const profile of rpcRows as ProfileRow[]) {
+      const id = String(profile.id || '').trim();
+      if (id) profileById.set(id, profile);
+    }
+    return profileById;
+  }
+
+  // RPC 未適用環境向けフォールバック（authenticated のみ成功する想定）
+  const { data: profiles } = await client
+    .from('profiles')
+    .select('id, display_name, nickname, avatar_url, gender')
+    .in('id', userIds);
+  for (const profile of (profiles ?? []) as ProfileRow[]) {
+    const id = String(profile.id || '').trim();
+    if (id) profileById.set(id, profile);
+  }
+  return profileById;
+}
+
 /**
  * イベント参加者を取得（スナップショット + profiles を結合）。
- * ゲストでも event_participants の公開 SELECT で読める想定。profiles は認証時に補強。
+ * ゲストでも event_participants の公開 SELECT と profiles_for_event_attendees RPC で性別まで読める。
  */
 export async function fetchEventAttendees(input: {
   eventId: string;
@@ -62,18 +96,28 @@ export async function fetchEventAttendees(input: {
   let rows: ParticipantRow[] = [];
   const withSnapshot = await client
     .from('event_participants')
-    .select('user_id, status, display_name, avatar_url, ticket_quantity, created_at')
+    .select('user_id, status, display_name, avatar_url, gender, ticket_quantity, created_at')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
   if (withSnapshot.error) {
+    // gender 列未適用・スナップショット列なし環境向け
     const legacy = await client
       .from('event_participants')
-      .select('user_id, status, created_at')
+      .select('user_id, status, display_name, avatar_url, ticket_quantity, created_at')
       .eq('event_id', eventId)
       .order('created_at', { ascending: true });
-    if (legacy.error) throw new Error(legacy.error.message);
-    rows = (legacy.data ?? []) as ParticipantRow[];
+    if (legacy.error) {
+      const minimal = await client
+        .from('event_participants')
+        .select('user_id, status, created_at')
+        .eq('event_id', eventId)
+        .order('created_at', { ascending: true });
+      if (minimal.error) throw new Error(minimal.error.message);
+      rows = (minimal.data ?? []) as ParticipantRow[];
+    } else {
+      rows = (legacy.data ?? []) as ParticipantRow[];
+    }
   } else {
     rows = (withSnapshot.data ?? []) as ParticipantRow[];
   }
@@ -91,17 +135,7 @@ export async function fetchEventAttendees(input: {
     ),
   ];
 
-  const profileById = new Map<string, ProfileRow>();
-  if (userIds.length > 0) {
-    const { data: profiles } = await client
-      .from('profiles')
-      .select('id, display_name, nickname, avatar_url, gender')
-      .in('id', userIds);
-    for (const profile of (profiles ?? []) as ProfileRow[]) {
-      const id = String(profile.id || '').trim();
-      if (id) profileById.set(id, profile);
-    }
-  }
+  const profileById = await loadAttendeeProfiles(client, eventId, userIds);
 
   const attendees: EventAttendee[] = joined.map((row) => {
     const userId = String(row.user_id || '').trim();
@@ -115,7 +149,7 @@ export async function fetchEventAttendees(input: {
       id: userId,
       name,
       imageUri,
-      gender: asGender(profile?.gender),
+      gender: asGender(profile?.gender) || asGender(row.gender),
       self: Boolean(input.currentUserId && userId === input.currentUserId),
       isHost: Boolean(input.hostId && userId === input.hostId),
       ticketQuantity: Math.max(1, Math.floor(Number(row.ticket_quantity) || 1)),

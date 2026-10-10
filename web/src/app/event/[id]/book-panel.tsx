@@ -1,5 +1,6 @@
 'use client';
 
+import { MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
@@ -22,6 +23,7 @@ import {
 import { formatPrice } from '@/lib/eventSeo';
 import { useT } from '@/lib/i18n/locale-context';
 import { confirmHostedCheckout, createHostedCheckout } from '@/lib/payments';
+import { createAuthedSupabase } from '@/lib/supabase';
 import { fetchMyParticipantTicket, ticketHref } from '@/lib/ticket';
 import { isEventPast, type PublicEvent } from '@/lib/types';
 
@@ -143,11 +145,38 @@ function BookControls({
         }
       }
 
+      let displayName = user.displayName || '';
+      let avatarUrl = user.photoURL;
+      let gender: '男性' | '女性' | null = null;
+      try {
+        const profileClient = createAuthedSupabase(async () => token);
+        const { data: profile } = await profileClient
+          .from('profiles')
+          .select('display_name, nickname, avatar_url, gender')
+          .eq('id', user.uid)
+          .maybeSingle();
+        const row = profile as {
+          display_name?: string | null;
+          nickname?: string | null;
+          avatar_url?: string | null;
+          gender?: string | null;
+        } | null;
+        displayName =
+          String(row?.display_name || row?.nickname || '').trim() || displayName;
+        avatarUrl = String(row?.avatar_url || '').trim() || avatarUrl;
+        if (row?.gender === '男性' || row?.gender === '女性') {
+          gender = row.gender;
+        }
+      } catch {
+        /* スナップショット用。失敗しても参加自体は続行 */
+      }
+
       await joinEvent({
         event,
         userId: user.uid,
-        displayName: user.displayName || '',
-        avatarUrl: user.photoURL,
+        displayName,
+        avatarUrl,
+        gender,
         getIdToken,
       });
       setJoined(true);
@@ -171,111 +200,110 @@ function BookControls({
         : t('event.join');
 
   const primaryBtnClass =
-    'flex h-14 w-full items-center justify-center rounded-2xl text-[15px] font-extrabold tracking-tight shadow-lg shadow-[#12B8D0]/25 disabled:cursor-not-allowed disabled:opacity-70';
+    'flex h-12 min-w-[8.5rem] flex-1 items-center justify-center rounded-2xl px-4 text-sm font-extrabold tracking-tight shadow-md shadow-[#12B8D0]/20 disabled:cursor-not-allowed disabled:opacity-70 sm:h-14 sm:min-w-[10rem] sm:text-[15px]';
 
   return (
-    <div className="glass fixed inset-x-0 bottom-[72px] z-30 border-t border-[#E4EBEE]/80 px-4 py-3.5 lg:sticky lg:inset-auto lg:bottom-auto lg:top-24 lg:rounded-3xl lg:border lg:p-5 lg:shadow-xl">
-      <p
-        className={`mb-1 hidden text-xs font-extrabold lg:block ${
-          ended ? 'text-[#8A9199]' : 'text-[#12B8D0]'
-        }`}
-      >
-        {ended ? t('event.closed') : t('event.join')}
-      </p>
-      <p className="mb-4 hidden text-2xl font-extrabold tracking-tight lg:block">
-        {priceLabel}
-      </p>
-      {user ? (
-        <div className="flex flex-col gap-2">
-          {joined ? (
-            <Link
-              href={ticketHref(event.id)}
-              className={`brand-gradient ${primaryBtnClass}`}
-            >
-              {t('ticket.viewTicket')}
-            </Link>
-          ) : (
+    <div className="pointer-events-none fixed inset-x-0 bottom-[72px] z-30 md:bottom-5">
+      <div className="pointer-events-auto mx-auto w-full max-w-[520px] px-3 md:px-0">
+        <div className="glass rounded-[22px] border border-[#E4EBEE]/90 px-3.5 py-3 shadow-[0_12px_36px_rgba(11,26,34,0.14)] sm:px-4 sm:py-3.5">
+          {user ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2.5">
+                {joined ? (
+                  <>
+                    <Link
+                      href={chatHref(event.id, 'group')}
+                      aria-label={t('event.groupChat')}
+                      className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-[#12B8D0] ring-1 ring-[#E4EBEE] sm:h-14 sm:w-14"
+                    >
+                      <MessageCircle size={22} strokeWidth={2.4} aria-hidden />
+                    </Link>
+                    <Link
+                      href={ticketHref(event.id)}
+                      className={`brand-gradient ${primaryBtnClass}`}
+                    >
+                      {t('ticket.viewTicket')}
+                    </Link>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy || ended}
+                    onClick={() => void reserve()}
+                    className={
+                      ended
+                        ? `${primaryBtnClass} w-full bg-[#94A3B8] text-white shadow-none`
+                        : `brand-gradient ${primaryBtnClass} w-full`
+                    }
+                  >
+                    {joinLabel}
+                  </button>
+                )}
+              </div>
+              {!joined && event.hostId && event.hostId !== user.uid ? (
+                <Link
+                  href={chatHref(event.id, 'host', event.hostId)}
+                  className="text-center text-xs font-extrabold text-[#12B8D0]"
+                >
+                  {t('event.messageHost')}
+                </Link>
+              ) : null}
+            </div>
+          ) : ended ? (
             <button
               type="button"
-              disabled={busy || ended}
-              onClick={() => void reserve()}
-              className={
-                ended
-                  ? `${primaryBtnClass} bg-[#94A3B8] text-white shadow-none`
-                  : `brand-gradient ${primaryBtnClass}`
-              }
+              disabled
+              className={`${primaryBtnClass} w-full cursor-not-allowed bg-[#94A3B8] text-white shadow-none opacity-70`}
             >
-              {joinLabel}
+              {t('event.ended')}
             </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-center text-xs font-extrabold text-[#5B6B75]">
+                {t('event.joinForPrice', { price: priceLabel })}
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signIn('google')}
+                  className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
+                >
+                  <GoogleGMark size={20} />
+                  <span>{t('auth.google')}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signIn('apple')}
+                  className={`${socialButtonClass} bg-[#111111] text-white`}
+                >
+                  <AppleLogoMark size={18} color="#FFFFFF" />
+                  <span>{t('auth.apple')}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signIn('line')}
+                  className={`${socialButtonClass} bg-[#06C755] text-white`}
+                >
+                  <LineSpeechMark size={22} color="#FFFFFF" />
+                  <span>{t('auth.line')}</span>
+                </button>
+              </div>
+            </div>
           )}
-          <div className="hidden flex-col gap-2 lg:flex">
-            <Link
-              href={chatHref(event.id, 'group')}
-              className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE]"
+          {message ? (
+            <p
+              className={`mt-2 text-center text-xs font-bold ${
+                messageTone === 'error' ? 'text-[#EF4444]' : 'text-[#5B6B75]'
+              }`}
             >
-              {t('event.groupChat')}
-            </Link>
-            {event.hostId && event.hostId !== user.uid ? (
-              <Link
-                href={chatHref(event.id, 'host', event.hostId)}
-                className="flex h-11 w-full items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE]"
-              >
-                {t('event.messageHost')}
-              </Link>
-            ) : null}
-          </div>
+              {message}
+            </p>
+          ) : null}
         </div>
-      ) : ended ? (
-        <button
-          type="button"
-          disabled
-          className={`${primaryBtnClass} cursor-not-allowed bg-[#94A3B8] text-white shadow-none opacity-70`}
-        >
-          {t('event.ended')}
-        </button>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <p className="mb-1 text-center text-xs font-bold text-[#5B6B75] lg:hidden">
-            {t('event.joinForPrice', { price: priceLabel })}
-          </p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void signIn('google')}
-            className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
-          >
-            <GoogleGMark size={20} />
-            <span>{t('auth.google')}</span>
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void signIn('apple')}
-            className={`${socialButtonClass} bg-[#111111] text-white`}
-          >
-            <AppleLogoMark size={18} color="#FFFFFF" />
-            <span>{t('auth.apple')}</span>
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void signIn('line')}
-            className={`${socialButtonClass} bg-[#06C755] text-white`}
-          >
-            <LineSpeechMark size={22} color="#FFFFFF" />
-            <span>{t('auth.line')}</span>
-          </button>
-        </div>
-      )}
-      {message ? (
-        <p
-          className={`mt-2 text-center text-xs font-bold ${
-            messageTone === 'error' ? 'text-[#EF4444]' : 'text-[#5B6B75]'
-          }`}
-        >
-          {message}
-        </p>
-      ) : null}
+      </div>
     </div>
   );
 }

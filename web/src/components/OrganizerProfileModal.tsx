@@ -279,21 +279,6 @@ export function OrganizerProfileModal({
             />
           </label>
 
-          <label className="mt-4 block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">{t('profile.bio')}</span>
-            <textarea
-              value={draft.bio}
-              maxLength={500}
-              disabled={busy}
-              rows={4}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, bio: event.target.value }))
-              }
-              placeholder={t('profile.bioPlaceholder')}
-              className="mt-2 w-full resize-none rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 py-3 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
-            />
-          </label>
-
           <div className="mt-5">
             <p className="text-xs font-extrabold text-[#5B6B75]">
               {t('profile.snsOptional')}

@@ -13,7 +13,6 @@ export type ProfilePerson = {
   id: string;
   name: string;
   imageUri?: string;
-  bio?: string;
   gender?: '男性' | '女性';
   self?: boolean;
   isHost?: boolean;
@@ -174,15 +173,6 @@ export function UserProfileModal({ open, person, onClose, onBlocked }: Props) {
                 </span>
               ) : null}
             </div>
-            {person.bio ? (
-              <p className="mt-4 text-sm font-bold leading-6 text-[#5B6B75]">
-                {person.bio}
-              </p>
-            ) : (
-              <p className="mt-4 text-sm font-bold text-[#8A9199]">
-                {t('profile.noBio')}
-              </p>
-            )}
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ export type JoinInput = {
   userId: string;
   displayName: string;
   avatarUrl?: string | null;
+  gender?: '男性' | '女性' | '' | null;
   ticketQuantity?: number;
   getIdToken: () => Promise<string | null>;
 };
@@ -17,21 +18,36 @@ export type JoinInput = {
 export async function joinEvent(input: JoinInput) {
   const supabase = createAuthedSupabase(input.getIdToken);
   const ticketQuantity = Math.max(1, Math.floor(input.ticketQuantity || 1));
-  const { data, error } = await supabase
+  const gender =
+    input.gender === '男性' || input.gender === '女性' ? input.gender : null;
+  const payload: Record<string, unknown> = {
+    event_id: input.event.id.trim().toLowerCase(),
+    user_id: input.userId.trim(),
+    status: 'joined',
+    ticket_quantity: ticketQuantity,
+    display_name: input.displayName || null,
+    avatar_url: input.avatarUrl || null,
+    gender,
+  };
+
+  let { data, error } = await supabase
     .from('event_participants')
-    .upsert(
-      {
-        event_id: input.event.id.trim().toLowerCase(),
-        user_id: input.userId.trim(),
-        status: 'joined',
-        ticket_quantity: ticketQuantity,
-        display_name: input.displayName || null,
-        avatar_url: input.avatarUrl || null,
-      },
-      { onConflict: 'event_id,user_id' },
-    )
+    .upsert(payload, { onConflict: 'event_id,user_id' })
     .select('event_id, user_id, status, ticket_quantity')
     .maybeSingle();
+
+  // gender 列未適用環境向けフォールバック
+  if (
+    error &&
+    (error.message?.includes('gender') || error.code === '42703')
+  ) {
+    delete payload.gender;
+    ({ data, error } = await supabase
+      .from('event_participants')
+      .upsert(payload, { onConflict: 'event_id,user_id' })
+      .select('event_id, user_id, status, ticket_quantity')
+      .maybeSingle());
+  }
 
   if (error) throw new Error(error.message);
   return data;
