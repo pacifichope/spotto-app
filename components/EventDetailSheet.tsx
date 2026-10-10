@@ -2203,6 +2203,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.colors.border,
+    // Web: 親に高さがないと iframe 地図が 0 高さでグレーになる
+    ...(Platform.OS === 'web'
+      ? { height: 200, minHeight: 200, width: '100%' as const }
+      : null),
   },
   sectionTitle: {
     fontSize: 16,

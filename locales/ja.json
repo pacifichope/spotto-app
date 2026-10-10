@@ -1961,7 +1961,9 @@
     "backToDetail": "詳細に戻る",
     "tapToBack": "タップして詳細に戻る",
     "photoFullscreen": "写真 {{n}}を全画面表示",
-    "photoFullscreenSimple": "写真を全画面表示"
+    "photoFullscreenSimple": "写真を全画面表示",
+    "prev": "前の写真",
+    "next": "次の写真"
   },
   "sns": {
     "openFailedTitle": "開けませんでした",

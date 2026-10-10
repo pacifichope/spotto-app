@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -68,28 +69,56 @@ function Dots({
   count,
   index,
   accent = '#FFFFFF',
+  onPressDot,
 }: {
   count: number;
   index: number;
   accent?: string;
+  onPressDot?: (i: number) => void;
 }) {
   if (count <= 1) return null;
+  const interactive = typeof onPressDot === 'function';
   return (
     <View
       style={styles.dots}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      pointerEvents={interactive ? 'box-none' : 'none'}
+      accessibilityElementsHidden={!interactive}
+      importantForAccessibility={
+        interactive ? 'yes' : 'no-hide-descendants'
+      }
     >
-      {Array.from({ length: count }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.dot,
-            i === index && [styles.dotActive, { backgroundColor: accent }],
-          ]}
-        />
-      ))}
+      {Array.from({ length: count }, (_, i) => {
+        const active = i === index;
+        if (!interactive) {
+          return (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                active && [styles.dotActive, { backgroundColor: accent }],
+              ]}
+            />
+          );
+        }
+        return (
+          <Pressable
+            key={i}
+            onPress={() => onPressDot(i)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${i + 1} / ${count}`}
+            style={styles.dotHit}
+          >
+            <View
+              style={[
+                styles.dot,
+                active && [styles.dotActive, { backgroundColor: accent }],
+              ]}
+            />
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -134,7 +163,6 @@ function KenBurnsPhoto({
   const zoomStyle = useAnimatedStyle(() => {
     const ken = 1 + progress.value * (KEN_BURNS_SCALE - 1);
     const y = scrollY?.value ?? 0;
-    // 縮小中は少し寄り気味にして切れ目を出さない
     const collapseBoost = interpolate(
       y,
       [0, collapseRange],
@@ -206,6 +234,14 @@ function EventImageFullscreen({
     });
   };
 
+  const goTo = (next: number) => {
+    if (width <= 0 || uris.length <= 1) return;
+    const clamped = Math.max(0, Math.min(uris.length - 1, next));
+    setIndex(clamped);
+    onIndexChange?.(clamped);
+    scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
+  };
+
   if (!visible) return null;
 
   return (
@@ -236,6 +272,8 @@ function EventImageFullscreen({
           ref={scrollRef}
           horizontal
           pagingEnabled
+          nestedScrollEnabled
+          directionalLockEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={(e) =>
             syncIndex(e.nativeEvent.contentOffset.x)
@@ -260,14 +298,51 @@ function EventImageFullscreen({
             </Pressable>
           ))}
         </ScrollView>
+        {uris.length > 1 ? (
+          <>
+            <Pressable
+              style={[
+                styles.arrowBtn,
+                styles.arrowBtnLeft,
+                styles.fullscreenArrow,
+                index <= 0 && styles.arrowBtnDisabled,
+              ]}
+              onPress={() => goTo(index - 1)}
+              disabled={index <= 0}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.prev')}
+            >
+              <Text style={styles.arrowText}>‹</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.arrowBtn,
+                styles.arrowBtnRight,
+                styles.fullscreenArrow,
+                index >= uris.length - 1 && styles.arrowBtnDisabled,
+              ]}
+              onPress={() => goTo(index + 1)}
+              disabled={index >= uris.length - 1}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.next')}
+            >
+              <Text style={styles.arrowText}>›</Text>
+            </Pressable>
+          </>
+        ) : null}
         <View
           style={[
             styles.fullscreenDotsWrap,
             { paddingBottom: Math.max(insets.bottom, 16) },
           ]}
-          pointerEvents="none"
+          pointerEvents="box-none"
         >
-          <Dots count={uris.length} index={index} accent={theme.colors.primary} />
+          <Dots
+            count={uris.length}
+            index={index}
+            accent={theme.colors.primary}
+            onPressDot={goTo}
+          />
         </View>
       </View>
     </AppModal>
@@ -313,6 +388,7 @@ export default function EventImageGallery({
   }, [uris, fallbackUri, sport]);
 
   const urisKey = useMemo(() => safeUris.join('\0'), [safeUris]);
+  const multi = safeUris.length > 1;
 
   useEffect(() => {
     indexRef.current = 0;
@@ -333,16 +409,18 @@ export default function EventImageGallery({
   }, []);
 
   const goToIndex = useCallback(
-    (next: number, animated: boolean) => {
+    (next: number, animated: boolean, wrap = false) => {
       const w = widthRef.current;
       if (w <= 0 || safeUris.length <= 1) return;
-      const clamped =
-        ((next % safeUris.length) + safeUris.length) % safeUris.length;
+      const clamped = wrap
+        ? ((next % safeUris.length) + safeUris.length) % safeUris.length
+        : Math.max(0, Math.min(safeUris.length - 1, next));
       indexRef.current = clamped;
       setIndex(clamped);
       scrollRef.current?.scrollTo({ x: clamped * w, animated });
+      resetAutoPlay();
     },
-    [safeUris.length],
+    [safeUris.length, resetAutoPlay],
   );
 
   useEffect(() => {
@@ -357,7 +435,7 @@ export default function EventImageGallery({
     }
     const timer = setInterval(() => {
       if (userTouchingRef.current) return;
-      goToIndex(indexRef.current + 1, true);
+      goToIndex(indexRef.current + 1, true, true);
     }, AUTO_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [
@@ -417,8 +495,16 @@ export default function EventImageGallery({
         onLayout={(e) => {
           const w = e.nativeEvent.layout.width || windowWidth;
           if (w > 0 && w !== widthRef.current) {
+            const prevW = widthRef.current;
             widthRef.current = w;
             setWidth(w);
+            // 幅変化後も現在ページを維持
+            if (prevW > 0) {
+              const i = indexRef.current;
+              requestAnimationFrame(() => {
+                scrollRef.current?.scrollTo({ x: i * w, animated: false });
+              });
+            }
           }
         }}
       >
@@ -427,7 +513,16 @@ export default function EventImageGallery({
             ref={scrollRef}
             horizontal
             pagingEnabled
+            nestedScrollEnabled
+            directionalLockEnabled
+            disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
+            bounces={multi}
+            overScrollMode="never"
+            style={[
+              StyleSheet.absoluteFill,
+              Platform.OS === 'web' ? styles.webPager : null,
+            ]}
             onScrollBeginDrag={() => {
               userTouchingRef.current = true;
               setPaused(true);
@@ -441,7 +536,6 @@ export default function EventImageGallery({
             }}
             scrollEventThrottle={16}
             decelerationRate="fast"
-            style={StyleSheet.absoluteFill}
           >
             {safeUris.map((uri, i) => (
               <Pressable
@@ -480,10 +574,47 @@ export default function EventImageGallery({
 
         <View style={styles.bannerTopShade} pointerEvents="none" />
         <View style={styles.bannerBottomShade} pointerEvents="none" />
+
+        {multi ? (
+          <>
+            <Pressable
+              style={[
+                styles.arrowBtn,
+                styles.arrowBtnLeft,
+                index <= 0 && styles.arrowBtnDisabled,
+              ]}
+              onPress={() => goToIndex(index - 1, true, false)}
+              disabled={index <= 0}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.prev')}
+            >
+              <Text style={styles.arrowText}>‹</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.arrowBtn,
+                styles.arrowBtnRight,
+                index >= safeUris.length - 1 && styles.arrowBtnDisabled,
+              ]}
+              onPress={() => goToIndex(index + 1, true, false)}
+              disabled={index >= safeUris.length - 1}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('gallery.next')}
+            >
+              <Text style={styles.arrowText}>›</Text>
+            </Pressable>
+          </>
+        ) : null}
+
         <Dots
           count={safeUris.length}
           index={index}
           accent={theme.colors.primary}
+          onPressDot={
+            multi ? (i) => goToIndex(i, true, false) : undefined
+          }
         />
 
         <View style={styles.overlaySlot} pointerEvents="box-none">
@@ -518,6 +649,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     overflow: 'hidden',
   },
+  webPager: {
+    // RN-web: 横スワイプを許可（親の縦スクロールと共存）
+    ...(Platform.OS === 'web'
+      ? ({ touchAction: 'pan-x pinch-zoom' } as object)
+      : null),
+  },
   kenBurnsWrap: {
     ...StyleSheet.absoluteFill,
     width: '100%',
@@ -549,6 +686,37 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     zIndex: 5,
   },
+  arrowBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -20,
+    zIndex: 6,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowBtnLeft: {
+    left: 10,
+  },
+  arrowBtnRight: {
+    right: 10,
+  },
+  arrowBtnDisabled: {
+    opacity: 0.28,
+  },
+  arrowText: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '300',
+    lineHeight: 30,
+    marginTop: -2,
+  },
+  fullscreenArrow: {
+    zIndex: 12,
+  },
   dots: {
     position: 'absolute',
     left: 0,
@@ -557,8 +725,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 5,
-    zIndex: 3,
+    gap: 4,
+    zIndex: 6,
+  },
+  dotHit: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dot: {
     width: 6,
@@ -605,5 +779,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    zIndex: 12,
   },
 });

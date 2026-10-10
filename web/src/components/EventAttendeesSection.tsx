@@ -287,13 +287,13 @@ export function EventAttendeesSection({
                           {t('attendees.hostBadge')}
                         </span>
                       ) : null}
-                      {selected.gender ? (
-                        <span className="rounded-full bg-[#F4F7F8] px-2.5 py-1 text-[11px] font-extrabold text-[#5B6B75]">
-                          {selected.gender === '男性'
-                            ? t('common.male')
-                            : selected.gender === '女性'
-                              ? t('common.female')
-                              : selected.gender}
+                      {selected.gender === '男性' ? (
+                        <span className="rounded-full bg-[#E0F2FE] px-2.5 py-1 text-[11px] font-extrabold text-[#0284C7]">
+                          ♂ {t('common.male')}
+                        </span>
+                      ) : selected.gender === '女性' ? (
+                        <span className="rounded-full bg-[#FCE7F3] px-2.5 py-1 text-[11px] font-extrabold text-[#DB2777]">
+                          ♀ {t('common.female')}
                         </span>
                       ) : null}
                       {selected.self ? (
@@ -347,10 +347,19 @@ export function EventAttendeesSection({
                         >
                           <AvatarBubble person={person} size={44} />
                           <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
+                            <span className="flex flex-wrap items-center gap-2">
                               <span className="truncate text-sm font-extrabold">
                                 {person.name}
                               </span>
+                              {person.gender === '男性' ? (
+                                <span className="shrink-0 rounded-full bg-[#E0F2FE] px-2 py-0.5 text-[10px] font-extrabold text-[#0284C7]">
+                                  ♂ {t('common.male')}
+                                </span>
+                              ) : person.gender === '女性' ? (
+                                <span className="shrink-0 rounded-full bg-[#FCE7F3] px-2 py-0.5 text-[10px] font-extrabold text-[#DB2777]">
+                                  ♀ {t('common.female')}
+                                </span>
+                              ) : null}
                               {person.isHost ? (
                                 <span className="shrink-0 rounded-full bg-[#E5F9FC] px-2 py-0.5 text-[10px] font-extrabold text-[#12B8D0]">
                                   {t('attendees.hostShort')}
@@ -363,14 +372,9 @@ export function EventAttendeesSection({
                               ) : null}
                             </span>
                             <span className="mt-0.5 block truncate text-xs font-bold text-[#5B6B75]">
-                              {(person.gender === '男性'
-                                ? t('common.male')
-                                : person.gender === '女性'
-                                  ? t('common.female')
-                                  : person.gender) ||
-                                (person.isHost
-                                  ? t('attendees.eventHost')
-                                  : t('attendees.participant'))}
+                              {person.isHost
+                                ? t('attendees.eventHost')
+                                : t('attendees.participant')}
                               {(person.ticketQuantity ?? 1) > 1
                                 ? t('attendees.ticketSlotsInline', {
                                     count: person.ticketQuantity ?? 1,

@@ -15,18 +15,26 @@ export type PaymentSession = {
 export async function createHostedCheckout(input: {
   eventId: string;
   title: string;
+  /** 合計金額（単価 × 枚数） */
   amountYen: number;
+  quantity?: number;
+  /** 省略時は参加・購入確認ページへ戻す */
+  returnUrl?: string;
 }): Promise<PaymentSession> {
   const base = apiBaseUrl();
   if (!base) throw new Error('NEXT_PUBLIC_API_BASE_URL が未設定です');
-  const returnUrl = `${siteUrl()}/event/${input.eventId}`;
+  const eventId = input.eventId.trim();
+  const returnUrl =
+    input.returnUrl?.trim() ||
+    `${siteUrl()}/event/${eventId}/checkout`;
   const response = await fetch(`${base}/payments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      eventId: input.eventId,
+      eventId,
       title: input.title,
-      amountYen: input.amountYen,
+      amountYen: Math.max(0, Math.floor(input.amountYen || 0)),
+      quantity: Math.max(1, Math.floor(input.quantity || 1)),
       currency: 'jpy',
       returnUrl,
       preferHostedCheckout: true,
@@ -61,4 +69,3 @@ export async function confirmHostedCheckout(sessionId: string): Promise<{
     paymentIntentId: data.paymentIntentId?.trim() || '',
   };
 }
-

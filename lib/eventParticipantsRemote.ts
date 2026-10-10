@@ -388,53 +388,130 @@ export async function fetchMyParticipantTicket(
   }
 }
 
+type ParticipantProfileRow = {
+  display_name?: string | null;
+  nickname?: string | null;
+  avatar_url?: string | null;
+  gender?: string | null;
+};
+
+function putProfileRow(
+  profileById: Map<string, ParticipantProfileRow>,
+  profile: ParticipantProfileRow & { id?: string | null },
+) {
+  const id = String(profile.id ?? '').trim();
+  if (!id) return;
+  const prev = profileById.get(id);
+  profileById.set(id, {
+    display_name: profile.display_name ?? prev?.display_name ?? null,
+    nickname: profile.nickname ?? prev?.nickname ?? null,
+    avatar_url: profile.avatar_url ?? prev?.avatar_url ?? null,
+    // 性別は後勝ちではなく、どちらか一方でも入っていれば残す
+    gender: asGender(profile.gender) || asGender(prev?.gender) || profile.gender || prev?.gender || null,
+  });
+}
+
+/**
+ * 参加者の profiles（氏名・アバター・性別）。
+ * 1) SECURITY DEFINER RPC（ゲストでも性別まで読める）
+ * 2) profiles 直接 SELECT（RLS が通る場合の補完）
+ */
 async function fetchParticipantProfiles(
   client: NonNullable<ReturnType<typeof getSupabaseClient>>,
   userIds: string[],
+  options?: { eventId?: string; eventIds?: string[] },
 ) {
-  const profileById = new Map<
-    string,
-    {
-      display_name?: string | null;
-      nickname?: string | null;
-      avatar_url?: string | null;
-      gender?: string | null;
-    }
-  >();
+  const profileById = new Map<string, ParticipantProfileRow>();
   if (userIds.length === 0) return profileById;
-  const { data: profiles, error } = await client
-    .from('profiles')
-    .select('id, display_name, nickname, avatar_url, gender')
-    .in('id', userIds);
-  if (error) {
-    console.warn('[eventParticipants] profiles fetch failed', {
-      code: error.code,
-      message: error.message,
-      hint: error.hint,
-      requested: userIds.length,
-      note:
-        'profiles_select_authenticated が無いと他ユーザーが読めません。' +
-        ' supabase/apply_profiles_select_attendees.sql を実行してください。',
-    });
-    return profileById;
+
+  const eventIds = [
+    ...new Set(
+      [
+        ...(options?.eventId ? [options.eventId] : []),
+        ...(options?.eventIds ?? []),
+      ]
+        .map((id) => String(id || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (eventIds.length > 0) {
+    const rpcResults = await Promise.all(
+      eventIds.map(async (eventId) => {
+        const { data, error } = await client.rpc(
+          'profiles_for_event_attendees',
+          { p_event_id: eventId },
+        );
+        if (error) {
+          if (__DEV__) {
+            console.warn('[eventParticipants] profiles RPC failed', {
+              eventId,
+              code: error.code,
+              message: error.message,
+              note:
+                'supabase/apply_profiles_for_event_attendees.sql を適用すると' +
+                ' ゲストでも性別が読めます。',
+            });
+          }
+          return [] as ParticipantProfileRow[];
+        }
+        return (Array.isArray(data) ? data : []) as (ParticipantProfileRow & {
+          id?: string | null;
+        })[];
+      }),
+    );
+    for (const rows of rpcResults) {
+      for (const profile of rows) putProfileRow(profileById, profile);
+    }
   }
-  for (const profile of profiles ?? []) {
-    const id = String((profile as { id?: string }).id ?? '');
-    if (!id) continue;
-    profileById.set(id, profile as {
-      display_name?: string | null;
-      nickname?: string | null;
-      avatar_url?: string | null;
-      gender?: string | null;
-    });
+
+  const missing = userIds.filter((id) => !profileById.has(id));
+  const selectIds = missing.length > 0 ? missing : userIds;
+  // RPC で揃っていても gender 欠損分を直接 SELECT で補完
+  const needsGenderFill = userIds.some((id) => {
+    const row = profileById.get(id);
+    return row && !asGender(row.gender);
+  });
+  if (selectIds.length > 0 || needsGenderFill) {
+    const { data: profiles, error } = await client
+      .from('profiles')
+      .select('id, display_name, nickname, avatar_url, gender')
+      .in('id', needsGenderFill ? userIds : selectIds);
+    if (error) {
+      if (profileById.size === 0) {
+        console.warn('[eventParticipants] profiles fetch failed', {
+          code: error.code,
+          message: error.message,
+          hint: error.hint,
+          requested: userIds.length,
+          note:
+            'profiles_select_authenticated が無いと他ユーザーが読めません。' +
+            ' supabase/apply_profiles_select_attendees.sql または' +
+            ' apply_profiles_for_event_attendees.sql を実行してください。',
+        });
+      }
+    } else {
+      for (const profile of profiles ?? []) {
+        putProfileRow(
+          profileById,
+          profile as ParticipantProfileRow & { id?: string | null },
+        );
+      }
+    }
   }
+
   if (__DEV__) {
-    const missing = userIds.filter((id) => !profileById.has(id));
+    const missingAfter = userIds.filter((id) => !profileById.has(id));
+    const withGender = userIds.filter((id) =>
+      asGender(profileById.get(id)?.gender),
+    ).length;
     console.log('[eventParticipants] profiles joined', {
       requested: userIds.length,
       fetched: profileById.size,
-      missingCount: missing.length,
-      missingSample: missing.slice(0, 5),
+      withGender,
+      rpcEvents: eventIds.length,
+      missingCount: missingAfter.length,
+      missingSample: missingAfter.slice(0, 5),
     });
   }
   return profileById;
@@ -456,10 +533,12 @@ async function mapJoinedAttendees(
 ) {
   const joinedRows = rows.filter((row) => row.status === 'joined' || !row.status);
   const userIds = [...new Set(joinedRows.map((row) => row.user_id).filter(Boolean))];
-  const profileById = await fetchParticipantProfiles(client, userIds);
+  const eid = String(eventId || '').trim();
+  const profileById = await fetchParticipantProfiles(client, userIds, {
+    eventId: eid || undefined,
+  });
 
   let clubIds: string[] | undefined;
-  const eid = String(eventId || '').trim();
   if (eid && isRemoteEventId(eid)) {
     const { data: eventRow } = await client
       .from('events')
@@ -486,6 +565,7 @@ async function mapJoinedAttendees(
       attendees: attendees.length,
       named: attendees.filter((a) => a.name && a.name !== '名前未設定').length,
       withAvatar: attendees.filter((a) => Boolean(a.imageUri)).length,
+      withGender: attendees.filter((a) => Boolean(a.gender)).length,
       clubIds,
     });
   }
@@ -754,7 +834,9 @@ export async function fetchEventParticipantsBatch(
     const userIds = [
       ...new Set(rows.map((row) => row.user_id).filter(Boolean)),
     ];
-    const profileById = await fetchParticipantProfiles(client, userIds);
+    const profileById = await fetchParticipantProfiles(client, userIds, {
+      eventIds: ids,
+    });
 
     const byEvent: Record<string, EventParticipantRow[]> = {};
     for (const id of ids) byEvent[id] = [];

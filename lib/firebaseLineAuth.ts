@@ -74,6 +74,15 @@ function lineChannelId() {
   return readPublicEnv('EXPO_PUBLIC_LINE_CHANNEL_ID');
 }
 
+/** Web SSR / Node では window が無く LINE SDK が即落ちる */
+function canInitializeLineSdk(): boolean {
+  if (Platform.OS !== 'web') return true;
+  return (
+    typeof globalThis !== 'undefined' &&
+    typeof (globalThis as { window?: unknown }).window !== 'undefined'
+  );
+}
+
 function authApiBaseUrl() {
   // AUTH 専用 → API ベース（開発時は LAN 置換、本番はそのまま）
   return (
@@ -216,6 +225,9 @@ async function exchangeLineForFirebaseCustomToken(params: {
 }
 
 function loadLineSdk() {
+  if (!canInitializeLineSdk()) {
+    throw new Error('LINE SDK unavailable (no window / SSR)');
+  }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('@xmartlabs/react-native-line') as typeof import('@xmartlabs/react-native-line');
 }
@@ -284,6 +296,11 @@ function clearWebLineSessionBackup() {
  * 未設定・失敗時は false。ログアウトやトークン操作はこの後にだけ行う。
  */
 export async function ensureLineSdkReady(): Promise<boolean> {
+  if (!canInitializeLineSdk()) {
+    // expo start の Web SSR や Node 評価時はスキップ（ブラウザ／実機で再実行）
+    return false;
+  }
+
   const channelId = lineChannelId();
   if (!channelId) {
     if (__DEV__) {
@@ -308,7 +325,13 @@ export async function ensureLineSdkReady(): Promise<boolean> {
     await lineSetupPromise;
     return true;
   } catch (error) {
-    if (__DEV__) {
+    const message =
+      error instanceof Error ? error.message : String(error || '');
+    // SSR / 非ブラウザでの window 参照は想定内。ノイズを抑える
+    if (
+      __DEV__ &&
+      !/window is not defined|LINE SDK unavailable/i.test(message)
+    ) {
       console.warn('[auth] LINE SDK setup', error);
     }
     return false;

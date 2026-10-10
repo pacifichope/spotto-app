@@ -153,10 +153,13 @@ function mapGoogleError(error: unknown): FirebaseGoogleSignInResult {
     const webClientId = googleWebClientId();
     console.warn(
       '[auth] Google DEVELOPER_ERROR (code 10): OAuth クライアント設定不一致です。\n' +
-        '  1) EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID は google-services.json の client_type=3（Web）と同一か\n' +
-        '  2) Android / iOS の package・Bundle ID は com.taiki.spotto か\n' +
-        '  3) 署名 SHA-1（debug / EAS release / Play App Signing）を Firebase Android アプリに登録したか\n' +
-        '  → npm run check:firebase および docs/AUTH_TROUBLESHOOTING.md を参照\n' +
+        '  【最頻出】この端末ビルドの署名 SHA-1 が Firebase に未登録です。\n' +
+        '  1) npm run check:firebase で登録済み SHA とローカル debug.keystore を照合\n' +
+        '  2) debug が無い場合は初回 `npx expo run:android` 後に keytool で SHA-1 を取得\n' +
+        '  3) EAS ビルドなら `eas credentials -p android` の SHA-1 も Firebase に追加\n' +
+        '  4) EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = google-services.json の client_type=3\n' +
+        '  5) package は com.taiki.spotto。JSON を再配置後に Dev Client を再ビルド\n' +
+        '  → docs/AUTH_TROUBLESHOOTING.md\n' +
         `  webClientIdPrefix=${webClientId ? webClientId.split('-')[0] : '(unset)'} code=${code}`,
     );
     return {

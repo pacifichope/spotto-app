@@ -21,6 +21,33 @@ export type UpsertClubInput = {
   snsLinks?: unknown;
 };
 
+/** スキーマ未適用時の警告を 1 セッション 1 回に抑える */
+let clubsTableMissingWarned = false;
+
+export function isClubsTableMissingError(error: {
+  code?: string;
+  message?: string;
+} | null | undefined): boolean {
+  if (!error) return false;
+  const message = String(error.message || '');
+  return (
+    error.code === 'PGRST205' ||
+    error.code === '42P01' ||
+    /Could not find the table ['"]?public\.clubs/i.test(message) ||
+    (/schema cache/i.test(message) && /clubs/i.test(message))
+  );
+}
+
+function warnClubsTableMissingOnce(context: string) {
+  if (clubsTableMissingWarned) return;
+  clubsTableMissingWarned = true;
+  console.warn(
+    `[clubsTable] public.clubs が未作成です（${context}）。` +
+      ' supabase/apply_clubs.sql を SQL Editor で実行すると解消します。' +
+      ' それまでクラブカバーはローカル／イベント情報にフォールバックします。',
+  );
+}
+
 function mapRow(raw: Record<string, unknown> | null | undefined): ClubRow | null {
   if (!raw) return null;
   const id = String(raw.id ?? '').trim();
@@ -40,7 +67,7 @@ function mapRow(raw: Record<string, unknown> | null | undefined): ClubRow | null
   };
 }
 
-/** 公開: クラブ行を id で取得 */
+/** 公開: クラブ行を id で取得（テーブル未作成時は null で成功扱い） */
 export async function fetchClubRow(
   clubId: string,
 ): Promise<ClubsTableResult<ClubRow | null>> {
@@ -71,6 +98,10 @@ export async function fetchClubRow(
     }
 
     if (error) {
+      if (isClubsTableMissingError(error)) {
+        warnClubsTableMissingOnce('fetch');
+        return { ok: true, data: null };
+      }
       console.warn('[clubsTable] fetch failed', {
         id,
         code: error.code,
@@ -124,6 +155,14 @@ export async function upsertClubRow(
       .single();
 
     if (error) {
+      if (isClubsTableMissingError(error)) {
+        warnClubsTableMissingOnce('upsert');
+        return {
+          ok: false,
+          error:
+            'clubs テーブルが未作成です。supabase/apply_clubs.sql を適用してください。',
+        };
+      }
       console.warn('[clubsTable] upsert failed', {
         id,
         code: error.code,

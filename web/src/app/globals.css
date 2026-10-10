@@ -53,21 +53,28 @@ input {
 }
 
 .app-shell--compact {
-  max-width: 48rem; /* ≈ max-w-3xl */
+  max-width: 48rem; /* ≈ max-w-3xl · 設定など */
 }
 
 .app-shell--wide {
-  max-width: min(100%, 90rem); /* ≈ max-w-7xl+ ゆとり */
+  max-width: min(100%, 90rem);
 }
 
 @media (min-width: 768px) {
   .app-shell {
-    padding: 24px 28px 48px;
+    padding: 20px 28px 48px;
   }
 
   .app-shell--wide {
     padding-left: 32px;
     padding-right: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    /* PC: 下部タブが無いので下余白を抑える */
+    padding-bottom: 40px;
   }
 }
 

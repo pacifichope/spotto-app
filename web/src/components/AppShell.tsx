@@ -3,9 +3,12 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
-/** イベント一覧・マップなど横幅を活かしたいルート */
+/** 横幅を活かすルート（ホーム・イベント詳細など） */
 function isWideLayout(pathname: string) {
-  return pathname === '/';
+  if (pathname === '/') return true;
+  if (pathname.startsWith('/event/')) return true;
+  if (pathname.startsWith('/clubs')) return true;
+  return false;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -4,6 +4,7 @@ import {
   resolveClub,
   type Club,
 } from '@/lib/clubs';
+import { isClubsTableMissingError } from '@/lib/clubsTableRemote';
 import { ensureFirebaseAuthenticatedClaim } from '@/lib/firebaseEnsureClaims';
 import { SPORT_IMAGE_PRESETS, type SportEvent } from '@/lib/events';
 import type { OrganizerProfile } from '@/lib/organizerProfile';
@@ -189,14 +190,20 @@ export async function fetchJoinedClubsForUser(
       }
     }
 
-    // clubs テーブルのカバー／名前で上書き
+    // clubs テーブルのカバー／名前で上書き（未作成ならスキップ）
     const hostIds = [...byHost.keys()];
     if (hostIds.length > 0) {
-      const { data: clubRows } = await client
+      const { data: clubRows, error: clubsError } = await client
         .from('clubs')
         .select('id, name, cover_image_url, image_url')
         .in('id', hostIds);
-      for (const row of clubRows ?? []) {
+      if (clubsError && !isClubsTableMissingError(clubsError)) {
+        console.warn('[clubsRemote] clubs overlay fetch failed', {
+          code: clubsError.code,
+          message: clubsError.message,
+        });
+      }
+      for (const row of clubsError ? [] : clubRows ?? []) {
         const id = String((row as { id?: string }).id ?? '').trim();
         if (!id) continue;
         const existing = byHost.get(id);

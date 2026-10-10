@@ -266,18 +266,6 @@ export default function AttendeeProfileOverlay({
                             <Text style={styles.rowName} numberOfLines={1}>
                               {person.name}
                             </Text>
-                            {female || male ? (
-                              <Text
-                                style={[
-                                  styles.gender,
-                                  female
-                                    ? styles.genderFemale
-                                    : styles.genderMale,
-                                ]}
-                              >
-                                {female ? '♀' : '♂'}
-                              </Text>
-                            ) : null}
                             {person.self ? (
                               <View style={styles.selfChip}>
                                 <Text style={styles.selfChipText}>{t('events.attendeeSelf')}</Text>
@@ -298,6 +286,21 @@ export default function AttendeeProfileOverlay({
                               </View>
                             ) : null}
                           </View>
+                          {female || male ? (
+                            <Text
+                              style={[
+                                styles.genderLine,
+                                female
+                                  ? styles.genderFemale
+                                  : styles.genderMale,
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {female
+                                ? `♀ ${t('events.gender.female')}`
+                                : `♂ ${t('events.gender.male')}`}
+                            </Text>
+                          ) : null}
                         </View>
                       </Pressable>
                       {hostMode ? (
@@ -721,9 +724,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: theme.colors.text,
   },
-  gender: {
-    fontSize: 14,
-    fontWeight: '800',
+  genderLine: {
+    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
   },
   genderMale: {
     color: theme.colors.genderMale,

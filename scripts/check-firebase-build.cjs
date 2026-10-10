@@ -181,12 +181,15 @@ if (debugSha) {
   hints.push(`ローカル debug.keystore SHA-1: ${formatSha1(debugSha)}`);
   if (androidHashes.length > 0 && !androidHashes.includes(debugSha)) {
     issues.push(
-      'debug.keystore の SHA-1 が google-services.json にありません。Firebase Console → プロジェクト設定 → Android アプリに debug SHA-1 を追加し、google-services.json を再配置してください。',
+      'debug.keystore の SHA-1 が google-services.json にありません。Firebase Console → プロジェクト設定 → Android アプリに debug SHA-1 を追加し、google-services.json を再配置してください。' +
+        '（未登録のままだと Android で DEVELOPER_ERROR / code 10 になります）',
     );
   }
 } else {
   hints.push(
-    'debug.keystore の SHA-1 を取得できませんでした（未生成 or keytool 無し）。debug ビルド前に確認してください。',
+    '【Android DEVELOPER_ERROR 注意】~/.android/debug.keystore が無い／SHA-1 未取得です。' +
+      '`npx expo run:android` 後に keytool で SHA-1 を取り、Firebase（com.taiki.spotto）へ登録してください。' +
+      'EAS は `eas credentials -p android`。詳細: docs/AUTH_TROUBLESHOOTING.md',
   );
 }
 

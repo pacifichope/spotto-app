@@ -62,9 +62,16 @@ Android のほぼすべてが **OAuth クライアントとアプリ署名の不
 npm run check:firebase
 ```
 
+### DEVELOPER_ERROR (code 10) が出たとき（Android）
+
+ほぼ確実に **署名 SHA-1 未登録**です。`npm run check:firebase` が「debug.keystore が無い」と出る場合も同根です。
+
 debug 署名の SHA-1:
 
 ```bash
+# 初回は debug.keystore が無いことがある → 一度実機ビルドしてから
+npx expo run:android --device
+
 keytool -list -v \
   -keystore ~/.android/debug.keystore \
   -alias androiddebugkey \
@@ -77,7 +84,7 @@ EAS / 本番署名:
 eas credentials -p android
 ```
 
-表示された SHA-1 を **Firebase Console → プロジェクト設定 → マイアプリ（Android）→ SHA 証明書フィンガープリント** に追加し、`google-services.json` を再ダウンロードしてプロジェクトルートへ置き直す。その後 Dev Client / EAS を再ビルド。
+表示された SHA-1 を **Firebase Console → プロジェクト設定 → マイアプリ（Android / com.taiki.spotto）→ SHA 証明書フィンガープリント** に追加し、`google-services.json` を再ダウンロードしてプロジェクトルートへ置き直す。その後 Dev Client / EAS を再ビルド。
 
 ### よくある誤り
 

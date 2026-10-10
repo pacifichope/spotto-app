@@ -13,11 +13,25 @@ type MiniMapProps = {
   placeLabel?: string;
 };
 
+/** Web 埋め込み地図の固定高さ（% 指定だと親経由で 0 になりグレー表示になる） */
+const MAP_HEIGHT_PX = 200;
+
+function embedSrc(lat: number, lng: number) {
+  // OpenStreetMap: API キー不要・iframe 埋め込みが安定（Google embed は環境によってグレーになる）
+  const delta = 0.012;
+  const bbox = [
+    lng - delta,
+    lat - delta,
+    lng + delta,
+    lat + delta,
+  ].join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lng}`)}`;
+}
+
 /**
  * Expo Web / react-native-web 向けミニマップ。
- * react-native-maps / Static Maps API は使わず、Google Maps の embed iframe で
- * タイルを確実に表示する（EventsMap.web と同じ方式）。
- * タップで外部 Google Maps を開く。
+ * react-native-maps は使わず iframe で地図タイルを表示する。
+ * 高さはすべて px で明示し、タップで Google Maps 等を外部オープンする。
  */
 export default function MiniMap({ event }: MiniMapProps) {
   const { t } = useTranslation();
@@ -25,10 +39,10 @@ export default function MiniMap({ event }: MiniMapProps) {
   const lng = Number(event.longitude);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-  const mapSrc = useMemo(() => {
-    if (!hasCoords) return null;
-    return `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed&hl=ja`;
-  }, [hasCoords, lat, lng]);
+  const mapSrc = useMemo(
+    () => (hasCoords ? embedSrc(lat, lng) : null),
+    [hasCoords, lat, lng],
+  );
 
   const openMaps = () => {
     void openEventInMaps(event);
@@ -38,19 +52,23 @@ export default function MiniMap({ event }: MiniMapProps) {
     ? createElement('iframe', {
         title: t('join.openMapA11y'),
         src: mapSrc,
-        style: {
-          border: 0,
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          // 親 Pressable がタップを受け取る
-          pointerEvents: 'none',
-        },
+        width: '100%',
+        height: String(MAP_HEIGHT_PX),
+        frameBorder: '0',
         loading: 'lazy',
         referrerPolicy: 'no-referrer-when-downgrade',
         allowFullScreen: true,
+        style: {
+          display: 'block',
+          width: '100%',
+          height: `${MAP_HEIGHT_PX}px`,
+          minHeight: `${MAP_HEIGHT_PX}px`,
+          border: 0,
+          margin: 0,
+          padding: 0,
+          // 親 Pressable がタップを受け取る
+          pointerEvents: 'none',
+        },
       })
     : null;
 
@@ -75,7 +93,7 @@ export default function MiniMap({ event }: MiniMapProps) {
           </View>
         </View>
       ) : (
-        <View style={[styles.mapImage, styles.fallback]}>
+        <View style={[styles.mapLayer, styles.fallback]}>
           <EventMapPin
             sport={event.sport || 'その他'}
             compact
@@ -91,26 +109,30 @@ export default function MiniMap({ event }: MiniMapProps) {
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    height: 168,
+    height: MAP_HEIGHT_PX,
+    minHeight: MAP_HEIGHT_PX,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: theme.colors.surfaceAlt,
   },
   mapLayer: {
     width: '100%',
-    height: '100%',
+    height: MAP_HEIGHT_PX,
+    minHeight: MAP_HEIGHT_PX,
     position: 'relative',
   },
   iframeHost: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  mapImage: {
     width: '100%',
-    height: '100%',
+    height: MAP_HEIGHT_PX,
+    minHeight: MAP_HEIGHT_PX,
+    overflow: 'hidden',
   },
-  /** ピン先端が地図中心に来るよう、コンパクトピンを少し上にずらす */
   pinOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ translateY: -10 }],

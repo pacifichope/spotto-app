@@ -2005,7 +2005,9 @@
     "backToDetail": "Back to details",
     "tapToBack": "Tap to return to details",
     "photoFullscreen": "View photo {{n}} fullscreen",
-    "photoFullscreenSimple": "View photo fullscreen"
+    "photoFullscreenSimple": "View photo fullscreen",
+    "prev": "Previous photo",
+    "next": "Next photo"
   },
   "sns": {
     "openFailedTitle": "Couldn’t open",

@@ -11,7 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -23,9 +23,6 @@ import { theme } from '@/constants/theme';
 import { ensureLineSdkReady } from '@/lib/firebaseLineAuth';
 import { useNotificationDeepLinks } from '@/lib/notificationDeepLink';
 import { useSettledWindow } from '@/lib/useSettledWindow';
-
-// 画面やログアウトより先に LineSDK を初期化する（未初期化の AccessTokenStore は落ちる）
-void ensureLineSdkReady();
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -48,6 +45,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (error) throw error;
   }, [error]);
+
+  // モジュール評価時ではなくマウント後に初期化（Web SSR の window 未定義を避ける）
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window === 'undefined') return;
+    void ensureLineSdkReady();
+  }, []);
 
   useEffect(() => {
     if (loaded) {
