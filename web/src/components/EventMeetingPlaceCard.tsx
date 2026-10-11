@@ -19,13 +19,16 @@ function mapsHref(event: PublicEvent) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
 
-/** API キー不要の Google マップ埋め込み（座標ピン付き） */
-function googleIframeSrc(lat: number, lng: number, hl: string) {
-  return `https://maps.google.com/maps?q=${lat},${lng}&z=15&hl=${hl}&output=embed`;
-}
-
-function googleIframeSrcQuery(query: string, hl: string) {
-  return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&hl=${hl}&output=embed`;
+/** Google Maps Embed API（ピン付き。Maps JavaScript API キーが Embed にも有効な想定） */
+function googleEmbedApiSrc(query: string, apiKey: string, language: string) {
+  const params = new URLSearchParams({
+    key: apiKey,
+    q: query,
+    zoom: '15',
+    language,
+    maptype: 'roadmap',
+  });
+  return `https://www.google.com/maps/embed/v1/place?${params.toString()}`;
 }
 
 function MeetingPlaceGoogleMap({
@@ -93,31 +96,28 @@ export function EventMeetingPlaceCard({ event }: { event: PublicEvent }) {
   const { locale } = useLocale();
   const href = mapsHref(event);
   const apiKey = googleMapsApiKey();
-  const hl = locale === 'en' ? 'en' : 'ja';
+  const language = locale === 'en' ? 'en' : 'ja';
   const hasCoords = event.latitude != null && event.longitude != null;
   const locationQuery = event.location.trim();
 
   let mapBody: ReactNode = null;
   if (hasCoords && apiKey) {
+    // アプリ版と同様: Google Maps JavaScript API + ピン
     mapBody = (
       <MeetingPlaceGoogleMap
         lat={event.latitude!}
         lng={event.longitude!}
         apiKey={apiKey}
-        language={hl}
+        language={language}
       />
     );
-  } else if (hasCoords) {
+  } else if (apiKey && (hasCoords || locationQuery)) {
+    const q = hasCoords
+      ? `${event.latitude},${event.longitude}`
+      : locationQuery;
     mapBody = (
       <MeetingPlaceGoogleIframe
-        src={googleIframeSrc(event.latitude!, event.longitude!, hl)}
-        title={t('event.openMapAria')}
-      />
-    );
-  } else if (locationQuery) {
-    mapBody = (
-      <MeetingPlaceGoogleIframe
-        src={googleIframeSrcQuery(locationQuery, hl)}
+        src={googleEmbedApiSrc(q, apiKey, language)}
         title={t('event.openMapAria')}
       />
     );
@@ -167,10 +167,10 @@ export function EventMeetingPlaceCard({ event }: { event: PublicEvent }) {
             </div>
           ) : (
             <div
-              className="grid place-items-center text-sm font-extrabold text-[#12B8D0]"
+              className="grid place-items-center px-4 text-center text-sm font-extrabold text-[#12B8D0]"
               style={{ height: MAP_HEIGHT_PX }}
             >
-              {t('event.tapToOpenMap')}
+              {apiKey ? t('event.tapToOpenMap') : t('map.missingKey')}
             </div>
           )}
         </a>
