@@ -1,9 +1,9 @@
 'use client';
 
-import { ChevronLeft, Heart, Share2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronUp, Heart, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { BookPanel } from '@/app/event/[id]/book-panel';
 import { EventAttendeesSection } from '@/components/EventAttendeesSection';
@@ -62,6 +62,84 @@ function cancelPolicyLabel(event: PublicEvent, fallback: string) {
   return raw;
 }
 
+/** 折りたたみ行数（初期表示） */
+const DESC_CLAMP_LINES = 4;
+
+function EventDescriptionSection({ text }: { text: string }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [needsExpand, setNeedsExpand] = useState(false);
+  const bodyRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [text]);
+
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const measure = () => {
+      // 展開中は line-clamp が外れ判定できないので、折りたたみ時だけ測る
+      if (open) return;
+      const overflowing = el.scrollHeight > el.clientHeight + 2;
+      setNeedsExpand(
+        overflowing ||
+          text.length > 160 ||
+          text.split('\n').length > DESC_CLAMP_LINES,
+      );
+    };
+    measure();
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(measure)
+        : null;
+    ro?.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [text, open]);
+
+  const showToggle = needsExpand || open;
+
+  return (
+    <section className="rounded-3xl bg-white p-4 ring-1 ring-[#E4EBEE] sm:p-5">
+      <h2 className="text-base font-extrabold tracking-tight">
+        {t('event.description')}
+      </h2>
+      <p
+        ref={bodyRef}
+        className={`mt-2 whitespace-pre-wrap text-sm font-medium leading-7 text-[#5B6B75] ${
+          open ? '' : 'line-clamp-4'
+        }`}
+      >
+        {text}
+      </p>
+      {showToggle ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="mt-2 inline-flex items-center gap-1 text-sm font-extrabold text-[#12B8D0] transition hover:text-[#0E9BB0]"
+        >
+          {open ? (
+            <>
+              {t('event.readLess')}
+              <ChevronUp size={16} strokeWidth={2.6} aria-hidden />
+            </>
+          ) : (
+            <>
+              {t('event.readMore')}
+              <ChevronDown size={16} strokeWidth={2.6} aria-hidden />
+            </>
+          )}
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 function StatusPill({
   status,
   spotsLeft,
@@ -99,7 +177,6 @@ export function EventDetailView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const [descOpen, setDescOpen] = useState(false);
   const [activeEvent, setActiveEvent] = useState(event);
   const [favorited, setFavorited] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
@@ -123,9 +200,6 @@ export function EventDetailView({
   const priceLabel = formatPrice(activeEvent.priceYen, t);
 
   const description = activeEvent.description.trim();
-  const descLong = description.length > 220;
-  const descShown =
-    descOpen || !descLong ? description : `${description.slice(0, 220).trim()}…`;
 
   const tags = [
     sport ? `${emoji} ${sport}` : null,
@@ -263,23 +337,7 @@ export function EventDetailView({
     ) : null;
 
   const descriptionCard = description ? (
-    <section className="rounded-3xl bg-white p-4 ring-1 ring-[#E4EBEE] sm:p-5">
-      <h2 className="text-base font-extrabold tracking-tight">
-        {t('event.description')}
-      </h2>
-      <p className="mt-2 text-sm font-medium leading-7 text-[#5B6B75]">
-        {descShown}
-      </p>
-      {descLong ? (
-        <button
-          type="button"
-          onClick={() => setDescOpen((v) => !v)}
-          className="mt-1 text-sm font-extrabold text-[#12B8D0]"
-        >
-          {descOpen ? t('event.readLess') : t('event.readMore')}
-        </button>
-      ) : null}
-    </section>
+    <EventDescriptionSection text={description} />
   ) : null;
 
   const toolbar = (
@@ -325,7 +383,7 @@ export function EventDetailView({
   );
 
   return (
-    <main className="page-main relative pb-36 lg:pb-8">
+    <main className="page-main relative pb-52 lg:pb-8">
       {favoriteMsg ? (
         <p className="mb-3 text-center text-xs font-bold text-[#EF4444] lg:text-left">
           {favoriteMsg}

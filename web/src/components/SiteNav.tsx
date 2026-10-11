@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { useWideLayout } from '@/components/AppShell';
-import { HeaderAccountButton } from '@/components/AuthControls';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { useAuth } from '@/lib/auth-context';
 import { prefetchInboxThreads } from '@/lib/chatsWeb';
@@ -22,9 +21,11 @@ export function SiteHeader() {
   const wide = useWideLayout();
   const t = useT();
 
+  /** PC ヘッダー用（マイページはモバイルでは下部タブのみ） */
   const tabs = [
     { href: '/', label: t('nav.home'), icon: Home },
     { href: '/messages', label: t('nav.messages'), icon: MessageCircle },
+    { href: '/mypage', label: t('nav.mypage'), icon: UserRound },
   ] as const;
 
   const prefetchMessages = () => {
@@ -38,14 +39,14 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-md">
       <div
-        className={`mx-auto flex h-14 w-full flex-nowrap items-center justify-between gap-4 px-4 md:h-16 md:gap-6 md:px-7 xl:px-10 ${
+        className={`mx-auto flex h-14 w-full flex-nowrap items-center justify-between gap-3 px-4 md:h-16 md:gap-6 md:px-7 xl:px-10 ${
           wide ? 'max-w-[90rem]' : 'max-w-3xl'
         }`}
       >
-        <Link
-          href="/"
-          className="shrink-0 transition-opacity hover:opacity-85"
-          aria-label="spotto"
+        <a
+          href="https://spotto.fun/"
+          className="min-w-0 shrink transition-opacity hover:opacity-85"
+          aria-label="Spotto LP"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -53,15 +54,15 @@ export function SiteHeader() {
             alt="Spotto"
             width={148}
             height={32}
-            className="h-7 w-auto max-w-[7.5rem] object-contain object-left md:h-8 md:max-w-[9rem]"
+            className="h-7 w-auto max-w-[7rem] object-contain object-left md:h-8 md:max-w-[9rem]"
             decoding="async"
           />
-        </Link>
+        </a>
 
-        <div className="flex shrink-0 flex-nowrap items-center gap-2 sm:gap-2.5 md:gap-3">
+        <div className="flex shrink-0 flex-nowrap items-center gap-2 md:gap-3">
           {ready ? (
             <span
-              className={`hidden whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-extrabold sm:inline ${
+              className={`hidden whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-extrabold md:inline ${
                 user ? 'bg-[#E5F9FC] text-[#12B8D0]' : 'bg-[#F4F7F8] text-[#8A9199]'
               }`}
             >
@@ -91,8 +92,8 @@ export function SiteHeader() {
               );
             })}
           </nav>
+          {/* 右端: 言語切り替え（マイページは下部タブへ） */}
           <LanguageSwitcher placement="header" />
-          <HeaderAccountButton />
         </div>
       </div>
     </header>
@@ -120,9 +121,6 @@ export function BottomNav() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 md:hidden">
-      <div className="flex justify-center px-3 pb-1">
-        <LanguageSwitcher placement="footer" />
-      </div>
       <nav className="glass flex justify-around px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         {tabs.map((tab) => {
           const active = isActive(pathname, tab.href);

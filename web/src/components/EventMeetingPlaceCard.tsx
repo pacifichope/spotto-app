@@ -2,9 +2,10 @@
 
 import { MapPin } from 'lucide-react';
 
-import { googleMapsApiKey } from '@/lib/env';
 import { useT } from '@/lib/i18n/locale-context';
 import type { PublicEvent } from '@/lib/types';
+
+const MAP_HEIGHT_PX = 168;
 
 function mapsHref(event: PublicEvent) {
   if (event.latitude != null && event.longitude != null) {
@@ -15,28 +16,22 @@ function mapsHref(event: PublicEvent) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 }
 
-/** マーカー無し。CSS ピンを中央オーバーレイして先端位置を揃える */
-function staticMapSrc(lat: number, lng: number, key: string) {
-  const params = new URLSearchParams({
-    center: `${lat},${lng}`,
-    zoom: '15',
-    size: '640x296',
-    scale: '2',
-    maptype: 'roadmap',
-    key,
-  });
-  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+/**
+ * OpenStreetMap 埋め込み（API キー不要）。
+ * Google Static Maps はキー制限・Static Maps API 未有効で白紙になるため使わない。
+ */
+function osmEmbedSrc(lat: number, lng: number) {
+  const delta = 0.012;
+  const bbox = [lng - delta, lat - delta, lng + delta, lat + delta].join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lng}`)}`;
 }
 
 export function EventMeetingPlaceCard({ event }: { event: PublicEvent }) {
   const t = useT();
   const href = mapsHref(event);
-  const key = googleMapsApiKey();
   const hasCoords = event.latitude != null && event.longitude != null;
   const mapSrc =
-    hasCoords && key
-      ? staticMapSrc(event.latitude!, event.longitude!, key)
-      : null;
+    hasCoords ? osmEmbedSrc(event.latitude!, event.longitude!) : null;
 
   return (
     <section className="rounded-3xl bg-white p-4 ring-1 ring-[#E4EBEE] sm:p-5">
@@ -71,14 +66,26 @@ export function EventMeetingPlaceCard({ event }: { event: PublicEvent }) {
           rel="noopener noreferrer"
           className="mt-4 block overflow-hidden rounded-2xl ring-1 ring-[#E4EBEE]"
           aria-label={t('event.openMapAria')}
+          style={{ height: MAP_HEIGHT_PX }}
         >
           {mapSrc ? (
-            <div className="relative h-[168px] w-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+            <div
+              className="relative w-full overflow-hidden bg-[#E5F9FC]"
+              style={{ height: MAP_HEIGHT_PX, minHeight: MAP_HEIGHT_PX }}
+            >
+              <iframe
+                title={t('event.openMapAria')}
                 src={mapSrc}
-                alt=""
-                className="h-full w-full object-cover"
+                width="100%"
+                height={MAP_HEIGHT_PX}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="pointer-events-none block border-0"
+                style={{
+                  width: '100%',
+                  height: MAP_HEIGHT_PX,
+                  minHeight: MAP_HEIGHT_PX,
+                }}
               />
               <span
                 className="pointer-events-none absolute left-1/2 top-1/2 grid h-10 w-10 -translate-x-1/2 -translate-y-[70%] place-items-center rounded-full bg-[#12B8D0] text-white shadow-md ring-2 ring-white"
@@ -88,7 +95,10 @@ export function EventMeetingPlaceCard({ event }: { event: PublicEvent }) {
               </span>
             </div>
           ) : (
-            <div className="grid h-[168px] place-items-center bg-[#E5F9FC] text-sm font-extrabold text-[#12B8D0]">
+            <div
+              className="grid place-items-center bg-[#E5F9FC] text-sm font-extrabold text-[#12B8D0]"
+              style={{ height: MAP_HEIGHT_PX }}
+            >
               {t('event.tapToOpenMap')}
             </div>
           )}

@@ -1,5 +1,13 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import {
+  Component,
+  useEffect,
+  useMemo,
+  useState,
+  type ErrorInfo,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FlatList,
@@ -98,9 +106,13 @@ function TimelineCard({
   const { filterAttendees } = useBlocks();
   if (!event?.id) return null;
 
+  let title = t('events.untitled');
+  try {
+    title = localizedEventTitle(event).trim() || title;
+  } catch {
+    title = String(event.title || '').trim() || title;
+  }
   const hostName = String(event.host || '').trim() || t('events.hostFallback');
-  const title =
-    localizedEventTitle(event).trim() || t('events.untitled');
   const sport = sportLabel(event.sport);
   const level = levelLabel(event.level);
   const joinedCount = Math.max(
@@ -329,44 +341,109 @@ function TimelineCard({
 
 function EventPhotoRow({ event }: { event: SportEvent }) {
   const registered = eventPreviewUris(event, PHOTO_MAX);
-  const fallback = sportFallbackUri(event.sport);
+  const fallback =
+    sportFallbackUri(event.sport) || sportFallbackUri('default') || '';
   const [failed, setFailed] = useState<Record<string, true>>({});
   const loaded = registered.filter((uri) => !failed[uri]);
-  const photos = loaded.length > 0 ? loaded : fallback ? [fallback] : [];
-  if (photos.length === 0) return null;
+  // 登録画像が全滅してもスポーツ／default フォールバックで必ず 1 枚以上出す
+  const photos =
+    loaded.length > 0
+      ? loaded
+      : fallback && !failed[fallback]
+        ? [fallback]
+        : fallback
+          ? [fallback]
+          : [];
 
   const hideIfBroken = (uri: string) => {
     setFailed((prev) => {
       if (prev[uri]) return prev;
-      const next = { ...prev, [uri]: true as const };
-      const remaining = registered.filter((item) => !next[item]);
-      if (remaining.length === 0 && uri === fallback) return prev;
-      return next;
+      return { ...prev, [uri]: true as const };
     });
   };
 
   return (
     <View style={styles.gallery}>
-      {photos.map((uri, index) => (
-        <View key={`${event.id}-${uri}-${index}`} style={styles.galleryTile}>
-          {Platform.OS === 'web' ? (
-            <img
-              src={uri}
-              alt=""
-              onError={() => hideIfBroken(uri)}
-              style={webGalleryImg}
-            />
-          ) : (
-            <Image
-              source={{ uri }}
-              style={styles.galleryImage}
-              resizeMode="cover"
-              onError={() => hideIfBroken(uri)}
-            />
-          )}
+      {photos.length > 0 ? (
+        photos.map((uri, index) => (
+          <View key={`${event.id}-${uri}-${index}`} style={styles.galleryTile}>
+            {Platform.OS === 'web' ? (
+              <img
+                src={uri}
+                alt=""
+                onError={() => hideIfBroken(uri)}
+                style={webGalleryImg}
+              />
+            ) : (
+              <Image
+                source={{ uri }}
+                style={styles.galleryImage}
+                resizeMode="cover"
+                onError={() => hideIfBroken(uri)}
+              />
+            )}
+          </View>
+        ))
+      ) : (
+        <View style={[styles.galleryTile, styles.galleryPlaceholder]}>
+          <Text style={styles.galleryPlaceholderText}>spotto</Text>
         </View>
-      ))}
+      )}
     </View>
+  );
+}
+
+/** 1 カードの描画例外でリスト全体を壊さない */
+class TimelineCardErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    if (__DEV__) {
+      console.warn('[EventList] TimelineCard render failed', error, info.componentStack);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+function TimelineCardFallback({
+  event,
+  onPress,
+}: {
+  event: SportEvent;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const title =
+    String(event?.title || '').trim() || t('events.untitled');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.card}
+    >
+      <View style={styles.body}>
+        <Text style={styles.title} numberOfLines={2}>
+          {title}
+        </Text>
+        <View style={styles.gallery}>
+          <View style={[styles.galleryTile, styles.galleryPlaceholder]}>
+            <Text style={styles.galleryPlaceholderText}>spotto</Text>
+          </View>
+        </View>
+        <Text style={styles.metaText}>{t('events.cardA11yHint')}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -440,7 +517,8 @@ export default function EventList({
       initialNumToRender={8}
       maxToRenderPerBatch={8}
       windowSize={7}
-      removeClippedSubviews
+      // Android/iOS でセルが真っ白になる既知不具合があるため無効化
+      removeClippedSubviews={false}
       updateCellsBatchingPeriod={50}
       ListHeaderComponent={ListHeaderComponent}
       ListFooterComponent={ListFooterComponent}
@@ -458,22 +536,28 @@ export default function EventList({
           participantsForEvent(item.id),
           hasParticipantsLoaded(item.id),
         );
+        const open = () => {
+          onSelect?.(item);
+          if (onOpenEvent) {
+            onOpenEvent(item);
+            return;
+          }
+          router.push(`/event/${item.id}`);
+        };
         return (
-          <TimelineCard
-            event={item}
-            selected={item.id === selectedId}
-            joined={safeJoinedIds.has(item.id)}
-            now={safeNow}
-            attendees={attendees}
-            onPress={() => {
-              onSelect?.(item);
-              if (onOpenEvent) {
-                onOpenEvent(item);
-                return;
-              }
-              router.push(`/event/${item.id}`);
-            }}
-          />
+          <TimelineCardErrorBoundary
+            key={item.id}
+            fallback={<TimelineCardFallback event={item} onPress={open} />}
+          >
+            <TimelineCard
+              event={item}
+              selected={item.id === selectedId}
+              joined={safeJoinedIds.has(item.id)}
+              now={safeNow}
+              attendees={attendees}
+              onPress={open}
+            />
+          </TimelineCardErrorBoundary>
         );
       }}
       ListEmptyComponent={
@@ -511,6 +595,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: 22,
     overflow: 'hidden',
+    // コンテンツ欠損時もカードが潰れて見えなくならないようにする
+    minHeight: 168,
     shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
@@ -628,9 +714,20 @@ const styles = StyleSheet.create({
   galleryTile: {
     flex: 1,
     height: PHOTO_HEIGHT,
+    minHeight: PHOTO_HEIGHT,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: theme.colors.surfaceAlt,
+  },
+  galleryPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryPlaceholderText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.colors.textMuted,
+    letterSpacing: 0.4,
   },
   galleryImage: {
     width: '100%',

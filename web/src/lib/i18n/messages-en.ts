@@ -182,6 +182,7 @@ export const messagesEn: MessageTree = {
     joinForPrice: 'Join game for {price}',
     closed: 'Closed',
     groupChat: 'Group chat',
+    groupChatLocked: 'Join the event to open the group chat',
     messageHost: 'Message host',
     paymentIncomplete: 'Payment was not completed',
     paymentUrlMissing: 'Payment URL is missing',
@@ -196,8 +197,9 @@ export const messagesEn: MessageTree = {
     startTime: 'Start',
     endTime: 'End',
     description: 'Description',
-    readMore: 'Read more',
+    readMore: 'Expand',
     readLess: 'Show less',
+    expand: 'Expand',
     organizedBy: 'Organized by {name}',
     learnMore: 'Learn more',
     scheduleLabel: 'Schedule',
@@ -245,6 +247,15 @@ export const messagesEn: MessageTree = {
     tableRate: 'Refund rate',
     tableAmount: 'Refund amount',
     tableFootnote: '* Refund amounts are based on your current total {total}',
+    disclaimerTitle: 'Disclaimer',
+    disclaimer1:
+      'This service is a platform for listing events and processing payments. Hosts are responsible for event content and safety.',
+    disclaimer2:
+      'Hosts set the fee and refund policy. Cancellations within the deadline are processed according to the table above.',
+    disclaimer3:
+      'If you are unwell or have a medical condition, please join at your own discretion. Injuries, accidents, and theft during the event are the responsibility of participants and hosts.',
+    disclaimer4:
+      'Cancellations due to host decisions or weather follow each event’s refund policy and host guidance. We are not liable beyond what the law requires.',
     ctaPay: 'Confirm & pay {amount}',
     ctaConfirm: 'Confirm registration',
     preparing: 'Preparing checkout…',

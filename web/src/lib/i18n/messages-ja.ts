@@ -183,6 +183,7 @@ export const messagesJa: MessageTree = {
     joinForPrice: '{price}で参加する',
     closed: '受付終了',
     groupChat: 'グループチャット',
+    groupChatLocked: '参加後にグループチャットを開けます',
     messageHost: '主催者にメッセージ',
     paymentIncomplete: '決済が完了していません',
     paymentUrlMissing: '決済 URL がありません',
@@ -197,8 +198,9 @@ export const messagesJa: MessageTree = {
     startTime: '開始',
     endTime: '終了',
     description: '説明',
-    readMore: '続きを読む',
+    readMore: 'もっと見る',
     readLess: '閉じる',
+    expand: 'Expand',
     organizedBy: '主催: {name}',
     learnMore: '詳しく見る',
     scheduleLabel: '活動時間',
@@ -246,6 +248,15 @@ export const messagesJa: MessageTree = {
     tableRate: '返金率',
     tableAmount: '返金額',
     tableFootnote: '※返金額は現在の選択合計 {total} に基づきます',
+    disclaimerTitle: '免責事項',
+    disclaimer1:
+      '本サービスはイベント掲載・決済のプラットフォームです。開催内容・安全管理の責任は主催者にあります。',
+    disclaimer2:
+      '参加費の設定・返金ポリシーは主催者が定めます。期限内キャンセルは上記表に従い処理されます。',
+    disclaimer3:
+      '体調不良や持病がある場合は、自己判断のうえご参加ください。イベント中の怪我・事故・盗難等は参加者および主催者の責任範囲となります。',
+    disclaimer4:
+      '主催者都合や悪天候等による中止時の対応・返金は、各イベントのキャンセルポリシーおよび主催者の案内に従います。運営は法令上必要な範囲を超える責任を負いません。',
     ctaPay: '確認して支払う {amount}',
     ctaConfirm: '参加を確定する',
     preparing: '決済画面を準備中…',

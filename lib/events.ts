@@ -3,6 +3,7 @@ import type { EventAttendee } from '@/lib/attendees';
 import type { SnsLink } from '@/lib/snsLinks';
 import { shouldShowDemoEvents } from '@/lib/devTestFlags';
 import { compactLocationAddress } from '@/lib/formatLocationAddress';
+import { safeResolveDisplayImageUrl } from '@/lib/imageUrls';
 import i18n from '@/lib/i18n';
 
 export { compactLocationAddress };
@@ -363,15 +364,16 @@ export function sportFallbackUri(sport?: string) {
   return SPORT_IMAGE_PRESETS.default;
 }
 
-/** カード下部ギャラリー用。登録されている写真だけを左から最大 count 枚返す */
+/** カード下部ギャラリー用。表示可能な URL だけを左から最大 count 枚返す */
 export function eventPreviewUris(
   event: Pick<SportEvent, 'imageUri' | 'imageUris' | 'sport'>,
   count = 3,
 ) {
   const unique: string[] = [];
   for (const uri of [...(event.imageUris ?? []), event.imageUri]) {
-    if (!uri || unique.includes(uri)) continue;
-    unique.push(uri);
+    const resolved = safeResolveDisplayImageUrl(uri);
+    if (!resolved || unique.includes(resolved)) continue;
+    unique.push(resolved);
     if (unique.length >= count) break;
   }
   return unique;

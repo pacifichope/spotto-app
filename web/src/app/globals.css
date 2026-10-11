@@ -48,8 +48,8 @@ input {
 .app-shell {
   width: 100%;
   margin-inline: auto;
-  /* 下部ナビ + 言語切替の余白 */
-  padding: 12px 16px 132px;
+  /* 下部ナビ分の余白（言語フローティングは廃止） */
+  padding: 12px 16px 96px;
 }
 
 .app-shell--compact {

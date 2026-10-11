@@ -477,6 +477,39 @@ function CheckoutConfirmInner({ event }: Props) {
               </div>
             </>
           ) : null}
+
+          {/* 免責事項（アプリ PaymentCheckoutSheet と同内容） */}
+          <div className="h-px bg-[#E4EBEE]" />
+          <div className="space-y-3 bg-[#F7FBFC] px-4 py-5 sm:px-5">
+            <div className="flex items-center gap-2">
+              <span
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#E5F9FC] text-xs font-extrabold text-[#12B8D0] ring-1 ring-[#29D1E8]/35"
+                aria-hidden
+              >
+                !
+              </span>
+              <h3 className="text-sm font-extrabold text-[#12202A]">
+                {t('payment.disclaimerTitle')}
+              </h3>
+            </div>
+            <ul className="space-y-2 text-xs font-bold leading-5 text-[#5B6B75]">
+              {(
+                [
+                  t('payment.disclaimer1'),
+                  t('payment.disclaimer2'),
+                  t('payment.disclaimer3'),
+                  t('payment.disclaimer4'),
+                ] as string[]
+              ).map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span className="shrink-0 text-[#12B8D0]" aria-hidden>
+                    •
+                  </span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {/* 右カラム / 下部 CTA */}

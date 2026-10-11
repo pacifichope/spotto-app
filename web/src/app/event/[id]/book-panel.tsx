@@ -189,9 +189,14 @@ function BookControls({
         : t('event.join');
 
   const sidebar = variant === 'sidebar';
+  const isHost = Boolean(user && event.hostId && event.hostId === user.uid);
+  /** アプリ同様: 参加済み or 主催者ならグループチャットへ */
+  const canUseGroupChat = joined || isHost;
   const primaryBtnClass = sidebar
     ? 'flex h-12 w-full items-center justify-center rounded-2xl px-4 text-sm font-extrabold tracking-tight shadow-md shadow-[#12B8D0]/20 disabled:cursor-not-allowed disabled:opacity-70'
     : 'flex h-12 min-w-[8.5rem] flex-1 items-center justify-center rounded-2xl px-4 text-sm font-extrabold tracking-tight shadow-md shadow-[#12B8D0]/20 disabled:cursor-not-allowed disabled:opacity-70 sm:h-14 sm:min-w-[10rem] sm:text-[15px]';
+  const secondaryChatBtnClass =
+    'flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[#29D1E8] bg-white px-4 text-sm font-extrabold text-[#12B8D0] transition hover:bg-[#E5F9FC]';
 
   const panel = (
     <div
@@ -213,41 +218,60 @@ function BookControls({
       ) : null}
       {user ? (
         <div className="flex flex-col gap-2">
-          <div className={`flex items-center gap-2.5 ${sidebar ? 'flex-col' : ''}`}>
-            {joined ? (
-              <>
-                <div className={`flex w-full items-center gap-2.5 ${sidebar ? '' : ''}`}>
-                  <Link
-                    href={chatHref(event.id, 'group')}
-                    aria-label={t('event.groupChat')}
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-[#12B8D0] ring-1 ring-[#E4EBEE] sm:h-14 sm:w-14"
-                  >
-                    <MessageCircle size={22} strokeWidth={2.4} aria-hidden />
-                  </Link>
-                  <Link
-                    href={ticketHref(event.id)}
-                    className={`brand-gradient ${primaryBtnClass}`}
-                  >
-                    {t('ticket.viewTicket')}
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <button
-                type="button"
-                disabled={busy || ended}
-                onClick={() => void reserve()}
-                className={
-                  ended
-                    ? `${primaryBtnClass} w-full bg-[#94A3B8] text-white shadow-none`
-                    : `brand-gradient ${primaryBtnClass} w-full`
-                }
-              >
-                {joinLabel}
-              </button>
-            )}
-          </div>
-          {joined && !ended ? (
+          {joined ? (
+            <Link
+              href={ticketHref(event.id)}
+              className={`brand-gradient ${primaryBtnClass} w-full`}
+            >
+              {t('ticket.viewTicket')}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || ended}
+              onClick={() => void reserve()}
+              className={
+                ended
+                  ? `${primaryBtnClass} w-full bg-[#94A3B8] text-white shadow-none`
+                  : `brand-gradient ${primaryBtnClass} w-full`
+              }
+            >
+              {joinLabel}
+            </button>
+          )}
+
+          {canUseGroupChat ? (
+            <Link
+              href={chatHref(event.id, 'group')}
+              className={secondaryChatBtnClass}
+            >
+              <MessageCircle size={18} strokeWidth={2.4} aria-hidden />
+              {t('event.groupChat')}
+            </Link>
+          ) : !ended ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMessageTone('ok');
+                setMessage(t('event.groupChatLocked'));
+              }}
+              className={`${secondaryChatBtnClass} opacity-55`}
+            >
+              <MessageCircle size={18} strokeWidth={2.4} aria-hidden />
+              {t('event.groupChat')}
+            </button>
+          ) : null}
+
+          {event.hostId && event.hostId !== user.uid ? (
+            <Link
+              href={chatHref(event.id, 'host', event.hostId)}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#F4F7F8] px-4 text-xs font-extrabold text-[#12B8D0] transition hover:bg-[#E5F9FC]"
+            >
+              {t('event.messageHost')}
+            </Link>
+          ) : null}
+
+          {joined && !ended && !isHost ? (
             <button
               type="button"
               disabled={busy}
@@ -256,14 +280,6 @@ function BookControls({
             >
               {busy ? t('event.processing') : t('event.cancelJoin')}
             </button>
-          ) : null}
-          {!joined && event.hostId && event.hostId !== user.uid ? (
-            <Link
-              href={chatHref(event.id, 'host', event.hostId)}
-              className="text-center text-xs font-extrabold text-[#12B8D0]"
-            >
-              {t('event.messageHost')}
-            </Link>
           ) : null}
         </div>
       ) : ended ? (
