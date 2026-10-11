@@ -464,8 +464,8 @@ const config = {
   android: {
     // Google / LINE のコンソール登録と一致させる（iOS Bundle ID と同値）
     package: BUNDLE_ID,
-    // Play Store 提出用（前回 EAS remote が 4 → 今回 5）
-    versionCode: 5,
+    // Play Store 提出用（前回 5 → 今回 6）
+    versionCode: 6,
     // adjustResize 相当。キーボード表示時にウィンドウをリサイズし、
     // ChatRoom の KeyboardAvoidingView（Android: height）と併用して入力欄を隠さない。
     softwareKeyboardLayoutMode: 'resize',
