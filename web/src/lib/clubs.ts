@@ -33,6 +33,8 @@ export type ClubDetail = {
   id: string;
   name: string;
   hostName: string;
+  /** サークル紹介文 */
+  description?: string;
   imageUri?: string;
   coverUri?: string;
   sport?: string;
@@ -199,7 +201,7 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
       .limit(48),
     supabase
       .from('clubs')
-      .select('id, name, image_url, cover_image_url, sns_links')
+      .select('id, name, description, image_url, cover_image_url, sns_links')
       .eq('id', id)
       .maybeSingle(),
     supabase
@@ -211,25 +213,37 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
 
   if (eventsRes.error) throw new Error(eventsRes.error.message);
 
-  // clubs: sns_links 未適用時はフォールバック
+  // clubs: description / sns_links 未適用時はフォールバック
   type ClubRowLoose = {
     name?: string;
+    description?: string | null;
     image_url?: string | null;
     cover_image_url?: string | null;
     sns_links?: unknown;
   };
-  let clubRow: ClubRowLoose | null = clubRes.error
-    ? null
-    : ((clubRes.data as ClubRowLoose | null) ?? null);
-  if (clubRes.error && /sns_links/i.test(clubRes.error.message || '')) {
+  let clubRow: ClubRowLoose | null =
+    (clubRes.data as ClubRowLoose | null) ?? null;
+  let clubError = clubRes.error;
+  if (clubError && /description/i.test(clubError.message || '')) {
+    const fallback = await supabase
+      .from('clubs')
+      .select('id, name, image_url, cover_image_url, sns_links')
+      .eq('id', id)
+      .maybeSingle();
+    clubRow = (fallback.data as ClubRowLoose | null) ?? null;
+    clubError = fallback.error;
+  }
+  if (clubError && /sns_links/i.test(clubError.message || '')) {
     const fallback = await supabase
       .from('clubs')
       .select('id, name, image_url, cover_image_url')
       .eq('id', id)
       .maybeSingle();
-    clubRow = fallback.error
-      ? null
-      : ((fallback.data as ClubRowLoose | null) ?? null);
+    clubRow = (fallback.data as ClubRowLoose | null) ?? null;
+    clubError = fallback.error;
+  }
+  if (clubError) {
+    clubRow = null;
   }
   const profileRow = profileRes.error ? null : profileRes.data;
 
@@ -278,6 +292,8 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
 
   // SNS は clubs テーブルのみ（イベント行のネスト列は読まない）
   const snsLinks = sanitizeSnsLinks(clubRow?.sns_links);
+  const description =
+    String(clubRow?.description || '').trim() || undefined;
 
   if (!clubRow && !profileRow && events.length === 0) {
     return null;
@@ -295,6 +311,7 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
     id,
     name,
     hostName,
+    description,
     imageUri,
     coverUri,
     sport,

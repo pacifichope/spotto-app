@@ -87,6 +87,7 @@ function BookControls({
   const { user: authUser } = useAuth();
   const t = useT();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<'ok' | 'error'>('ok');
@@ -150,10 +151,20 @@ function BookControls({
 
   const ended = isEventPast(event);
 
-  /** アプリ同様、参加・購入確認画面へ */
+  /** アプリ同様、参加・購入確認画面へ（履歴に積まず replace で遷移） */
   function reserve() {
     if (!user || ended || joined) return;
-    router.push(`/event/${event.id}/checkout`);
+    const from = (searchParams.get('from') || '').trim();
+    const mode = (searchParams.get('mode') || '').trim();
+    const segment = (searchParams.get('segment') || '').trim();
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (mode) qs.set('mode', mode);
+    if (segment) qs.set('segment', segment);
+    const q = qs.toString();
+    router.replace(
+      q ? `/event/${event.id}/checkout?${q}` : `/event/${event.id}/checkout`,
+    );
   }
 
   async function cancelJoin() {

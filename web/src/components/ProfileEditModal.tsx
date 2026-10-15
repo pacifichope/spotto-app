@@ -38,11 +38,13 @@ export function ProfileEditModal({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     setDraft(profile);
     setSaving(false);
+    savingRef.current = false;
     setUploading(false);
     setError('');
   }, [open, profile]);
@@ -84,12 +86,13 @@ export function ProfileEditModal({
   }
 
   async function onSave() {
-    if (busy) return;
+    if (savingRef.current || busy) return;
     const name = draft.name.trim();
     if (!name) {
       setError(t('profile.nameRequired'));
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     setError('');
     try {
@@ -105,6 +108,7 @@ export function ProfileEditModal({
       onSaved(result.profile);
       onClose();
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }

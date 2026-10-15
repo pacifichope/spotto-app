@@ -4,8 +4,12 @@ import {
   type SnsLink,
 } from '@/lib/snsLinks';
 
+export const ORGANIZER_DESCRIPTION_MAX_LENGTH = 500;
+
 export type WebOrganizerProfile = {
   name: string;
+  /** サークル紹介文 */
+  description?: string;
   /** サークルアイコン／ロゴ */
   imageUri?: string;
   /** クラブカバー写真（ヘッダー画像） */
@@ -16,10 +20,18 @@ export type WebOrganizerProfile = {
 
 export const EMPTY_ORGANIZER_PROFILE: WebOrganizerProfile = {
   name: '',
+  description: undefined,
   imageUri: undefined,
   coverUri: undefined,
   snsLinks: [],
 };
+
+function normalizeDescription(value: string | null | undefined) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .trim()
+    .slice(0, ORGANIZER_DESCRIPTION_MAX_LENGTH);
+}
 
 const PREFIX = 'spotto:organizer-profile:';
 
@@ -39,8 +51,10 @@ export function hasOrganizerProfileReady(profile: WebOrganizerProfile) {
 }
 
 function normalizeProfile(raw: Partial<WebOrganizerProfile> | null | undefined): WebOrganizerProfile {
+  const description = normalizeDescription(raw?.description);
   return {
     name: normalizeOrganizerName(raw?.name || ''),
+    description: description || undefined,
     imageUri: String(raw?.imageUri || '').trim() || undefined,
     coverUri: String(raw?.coverUri || '').trim() || undefined,
     snsLinks: sanitizeSnsLinks(raw?.snsLinks),
@@ -98,11 +112,22 @@ export async function fetchOrganizerClubProfile(input: {
   const uid = input.userId.trim();
   if (!uid) return null;
   const supabase = createAuthedSupabase(input.getIdToken);
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('clubs')
-    .select('id, name, image_url, cover_image_url, sns_links')
+    .select('id, name, description, image_url, cover_image_url, sns_links')
     .eq('id', uid)
     .maybeSingle();
+
+  if (error && /description/i.test(error.message || '')) {
+    const retry = await supabase
+      .from('clubs')
+      .select('id, name, image_url, cover_image_url, sns_links')
+      .eq('id', uid)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+
   if (error) {
     // sns_links 未適用時はフォールバック
     const fallback = await supabase
@@ -126,12 +151,14 @@ export async function fetchOrganizerClubProfile(input: {
   if (!data) return null;
   const row = data as {
     name?: string;
+    description?: string | null;
     image_url?: string | null;
     cover_image_url?: string | null;
     sns_links?: unknown;
   };
   return normalizeProfile({
     name: String(row.name || ''),
+    description: String(row.description || '').trim() || undefined,
     imageUri: String(row.image_url || '').trim() || undefined,
     coverUri: String(row.cover_image_url || '').trim() || undefined,
     snsLinks: sanitizeSnsLinks(row.sns_links),
@@ -150,6 +177,7 @@ export function mergeOrganizerProfiles(
   if (!remote) return local;
   return normalizeProfile({
     name: remote.name || local.name,
+    description: remote.description || local.description,
     imageUri: preferUri(remote.imageUri, local.imageUri),
     coverUri: preferUri(remote.coverUri, local.coverUri),
     snsLinks:
@@ -174,6 +202,7 @@ export async function persistOrganizerProfile(input: {
   const clubPayload: Record<string, unknown> = {
     id: uid,
     name: next.name,
+    description: next.description ?? '',
     image_url: next.imageUri ?? null,
     cover_image_url: next.coverUri ?? null,
     sns_links: next.snsLinks,
@@ -183,6 +212,13 @@ export async function persistOrganizerProfile(input: {
   let clubError = (
     await supabase.from('clubs').upsert(clubPayload, { onConflict: 'id' })
   ).error;
+
+  if (clubError && /description/i.test(clubError.message || '')) {
+    delete clubPayload.description;
+    clubError = (
+      await supabase.from('clubs').upsert(clubPayload, { onConflict: 'id' })
+    ).error;
+  }
 
   if (clubError && /sns_links/i.test(clubError.message || '')) {
     delete clubPayload.sns_links;

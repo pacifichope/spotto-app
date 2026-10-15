@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronLeft, Minus, Plus } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
@@ -108,6 +107,22 @@ function CheckoutConfirmInner({ event }: Props) {
     Boolean(checkoutSessionId) &&
     returnStatus !== 'cancel' &&
     returnStatus !== 'cancelled';
+
+  /**
+   * 履歴 back / Link push だと決済↔詳細のループになる。
+   * 詳細へは replace、詳細の「戻る」は一覧（/）等の明示先へ進む。
+   */
+  function goBackFromCheckout() {
+    const from = (searchParams.get('from') || '').trim();
+    const mode = (searchParams.get('mode') || '').trim();
+    const segment = (searchParams.get('segment') || '').trim();
+    const qs = new URLSearchParams();
+    if (from) qs.set('from', from);
+    if (mode) qs.set('mode', mode);
+    if (segment) qs.set('segment', segment);
+    const q = qs.toString();
+    router.replace(q ? `/event/${event.id}?${q}` : `/event/${event.id}`);
+  }
 
   useEffect(() => {
     if (authUser) setUser(authUser);
@@ -277,13 +292,14 @@ function CheckoutConfirmInner({ event }: Props) {
   return (
     <main className="page-main mx-auto w-full max-w-3xl pb-36 lg:max-w-5xl lg:pb-12">
       <div className="mb-4 flex items-center gap-3">
-        <Link
-          href={`/event/${event.id}`}
+        <button
+          type="button"
+          onClick={goBackFromCheckout}
           className="grid h-10 w-10 place-items-center rounded-full bg-white text-[#12202A] ring-1 ring-[#E4EBEE] transition hover:bg-[#F7FBFC]"
           aria-label={t('common.back')}
         >
           <ChevronLeft size={22} strokeWidth={2.6} />
-        </Link>
+        </button>
         <h1 className="text-lg font-extrabold tracking-tight md:text-xl">
           {t('payment.title')}
         </h1>

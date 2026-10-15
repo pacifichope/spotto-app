@@ -7,6 +7,7 @@ import { SnsBrandIcon } from '@/components/SnsBrandIcon';
 import { uploadOrganizerAvatar } from '@/lib/eventCreate';
 import {
   hasOrganizerProfileReady,
+  ORGANIZER_DESCRIPTION_MAX_LENGTH,
   persistOrganizerProfile,
   uploadOrganizerCover,
   type WebOrganizerProfile,
@@ -55,6 +56,7 @@ export function OrganizerProfileModal({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [error, setError] = useState('');
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +64,7 @@ export function OrganizerProfileModal({
     setSnsDrafts(profile.snsLinks.length > 0 ? profile.snsLinks : []);
     setError('');
     setSaving(false);
+    savingRef.current = false;
     setUploadingAvatar(false);
     setUploadingCover(false);
   }, [open, profile]);
@@ -94,9 +97,7 @@ export function OrganizerProfileModal({
   };
 
   const handleSave = async () => {
-    if (busy) return;
-    setSaving(true);
-    setError('');
+    if (savingRef.current || busy) return;
     const links = snsDrafts
       .map((item) => ({
         ...item,
@@ -105,22 +106,28 @@ export function OrganizerProfileModal({
       .filter((item) => item.url.length > 0);
     const invalid = links.find((item) => !isValidHttpUrl(item.url));
     if (invalid) {
-      setSaving(false);
       setError(t('profile.invalidUrl'));
       return;
     }
-    const result = await persistOrganizerProfile({
-      userId,
-      getIdToken,
-      profile: { ...draft, snsLinks: links },
-    });
-    setSaving(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    savingRef.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      const result = await persistOrganizerProfile({
+        userId,
+        getIdToken,
+        profile: { ...draft, snsLinks: links },
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onSaved(result.profile);
+      onClose();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
-    onSaved(result.profile);
-    onClose();
   };
 
   return (
@@ -158,7 +165,7 @@ export function OrganizerProfileModal({
             className="text-sm font-extrabold text-[#12B8D0] disabled:opacity-60"
             onClick={() => void handleSave()}
           >
-            {t('common.save')}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
 
@@ -277,6 +284,35 @@ export function OrganizerProfileModal({
               placeholder={t('profile.clubNamePlaceholder')}
               className="mt-2 h-12 w-full rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
             />
+          </label>
+
+          <label className="mt-5 block">
+            <span className="text-xs font-extrabold text-[#5B6B75]">
+              {t('profile.clubDescription')}
+            </span>
+            <textarea
+              value={draft.description ?? ''}
+              maxLength={ORGANIZER_DESCRIPTION_MAX_LENGTH}
+              disabled={busy}
+              rows={4}
+              onChange={(event) =>
+                setDraft((prev) => ({
+                  ...prev,
+                  description: event.target.value.slice(
+                    0,
+                    ORGANIZER_DESCRIPTION_MAX_LENGTH,
+                  ),
+                }))
+              }
+              placeholder={t('profile.clubDescriptionPlaceholder')}
+              className="mt-2 w-full resize-y rounded-2xl border border-[#E4EBEE] bg-[#F4F7F8] px-4 py-3 text-sm font-bold leading-relaxed outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
+            />
+            <span className="mt-1.5 block text-[11px] font-bold text-[#8A9199]">
+              {t('profile.clubDescriptionMeta', {
+                len: (draft.description ?? '').length,
+                max: ORGANIZER_DESCRIPTION_MAX_LENGTH,
+              })}
+            </span>
           </label>
 
           <div className="mt-5">

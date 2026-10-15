@@ -2,42 +2,20 @@ import { createAuthedSupabase } from '@/lib/supabase';
 import type { WebOrganizerProfile } from '@/lib/organizerProfile';
 import { mapEventRow, type EventRow, type PublicEvent } from '@/lib/types';
 import { uploadProfileAvatar } from '@/lib/profile';
+import {
+  buildEventInsertRow,
+  occurrencesFromCreatePayload,
+  type CreateEventPayload,
+} from '@/lib/createEventModel';
 
-const SPORT_EMOJI: Record<string, string> = {
-  サッカー: '⚽',
-  フットサル: '⚽',
-  バスケットボール: '🏀',
-  テニス: '🎾',
-  ランニング: '🏃',
-  バドミントン: '🏸',
-  バレーボール: '🏐',
-  野球: '⚾',
-  その他: '🏅',
-};
-
-export type CreateEventInput = {
-  title: string;
-  sport: string;
-  level: string;
-  date: string;
-  time: string;
-  endDate: string;
-  endTime: string;
-  location: string;
-  locationNote?: string;
-  latitude: number;
-  longitude: number;
-  description: string;
-  capacity: number;
-  priceYen: number;
-  imageUri: string;
-};
+export type { CreateEventPayload };
+/** @deprecated CreateEventPayload を使う */
+export type CreateEventInput = CreateEventPayload;
 
 export async function uploadEventImage(input: {
   file: File;
   getIdToken: () => Promise<string | null>;
 }): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  // 同じ Storage バケット。フォルダだけ events にする
   try {
     if (!input.file.type.startsWith('image/')) {
       return { ok: false, error: '画像ファイルを選択してください' };
@@ -67,85 +45,112 @@ export async function uploadEventImage(input: {
 /** プロフィール用アップロードを流用したい場合のエイリアス */
 export { uploadProfileAvatar as uploadOrganizerAvatar };
 
+function validateCreatePayload(payload: CreateEventPayload): string | null {
+  const photos = (
+    payload.imageUris?.length
+      ? payload.imageUris
+      : payload.imageUri
+        ? [payload.imageUri]
+        : []
+  )
+    .map((uri) => String(uri || '').trim())
+    .filter(Boolean);
+  if (photos.length === 0) return '写真を1枚以上追加してください。';
+  if (!payload.title.trim()) return 'タイトルを入力してください';
+  if (!payload.location.trim()) return '場所を入力してください';
+  if (!payload.description.trim()) return '説明を入力してください';
+  if (
+    payload.scheduleType === 'recurring' &&
+    (!payload.sessions || payload.sessions.length === 0)
+  ) {
+    return '開催日時を1件以上指定してください。';
+  }
+  if (payload.scheduleType === 'single' && (!payload.date || !payload.time)) {
+    return '開催日時を入力してください';
+  }
+  if (payload.priceYen > 0 && !payload.cancelPolicy.trim()) {
+    return 'キャンセルポリシーを選択してください';
+  }
+  if (payload.priceYen > 0 && payload.priceYen < 1) {
+    return '有料の場合は参加費を入力してください';
+  }
+  return null;
+}
+
 export async function createWebEvent(input: {
   getIdToken: () => Promise<string | null>;
   hostId: string;
   organizer: WebOrganizerProfile;
-  payload: CreateEventInput;
-}): Promise<{ ok: true; event: PublicEvent } | { ok: false; error: string }> {
-  const title = input.payload.title.trim().slice(0, 80);
-  const location = input.payload.location.trim();
-  const imageUri = input.payload.imageUri.trim();
-  if (!title) return { ok: false, error: 'タイトルを入力してください' };
-  if (!location) return { ok: false, error: '場所を入力してください' };
-  if (!imageUri) return { ok: false, error: '写真を1枚以上追加してください' };
-  if (!input.payload.date || !input.payload.time) {
-    return { ok: false, error: '開催日時を入力してください' };
+  payload: CreateEventPayload;
+  sourceLang?: 'ja' | 'en';
+}): Promise<{ ok: true; event: PublicEvent; events: PublicEvent[] } | { ok: false; error: string }> {
+  const validationError = validateCreatePayload(input.payload);
+  if (validationError) return { ok: false, error: validationError };
+
+  const occurrences = occurrencesFromCreatePayload(input.payload);
+  if (occurrences.length === 0) {
+    return { ok: false, error: '開催日時を1件以上指定してください。' };
   }
 
-  const capacity = Math.max(1, Math.floor(input.payload.capacity) || 1);
-  const priceYen = Math.max(0, Math.floor(input.payload.priceYen) || 0);
-  const sport = input.payload.sport.trim() || 'その他';
-  const hostName = input.organizer.name.trim() || '主催者';
+  const seriesId =
+    occurrences.length > 1
+      ? globalThis.crypto?.randomUUID?.() ?? `series_${Date.now().toString(36)}`
+      : null;
 
-  const row = {
-    host_id: input.hostId,
-    title,
-    sport,
-    emoji: SPORT_EMOJI[sport] || '🏅',
-    location,
-    location_note: input.payload.locationNote?.trim() || null,
-    event_date: input.payload.date,
-    event_time: input.payload.time,
-    end_date: input.payload.endDate || input.payload.date,
-    end_time: input.payload.endTime || null,
-    schedule_type: 'single',
-    sessions: null,
-    series_id: null,
-    level: input.payload.level.trim() || '初心者歓迎',
-    latitude: input.payload.latitude,
-    longitude: input.payload.longitude,
-    capacity,
-    joined_count: 1,
-    host_name: hostName,
-    host_image_uri: input.organizer.imageUri?.trim() || null,
-    host_sns_links: input.organizer.snsLinks ?? [],
-    description: input.payload.description.trim() || null,
-    image_uri: imageUri,
-    image_uris: [imageUri],
-    price_yen: priceYen,
-    waitlist_enabled: false,
-    waitlist_count: 0,
-    enable_pre_questions: false,
-    pre_questions: null,
-  };
+  const rows = occurrences.map((occurrence) =>
+    buildEventInsertRow({
+      hostId: input.hostId,
+      payload: input.payload,
+      organizer: input.organizer,
+      occurrence,
+      seriesId,
+      sourceLang: input.sourceLang,
+    }),
+  );
+
+  const hostName = input.organizer.name.trim() || '主催者';
 
   try {
     const client = createAuthedSupabase(input.getIdToken);
-    const { data, error } = await client.from('events').insert(row).select('*').single();
-    if (error || !data) {
+    const { data, error } = await client.from('events').insert(rows).select('*');
+    if (error || !data || data.length === 0) {
       return { ok: false, error: error?.message || 'イベントの作成に失敗しました' };
     }
-    const event = mapEventRow(data as unknown as EventRow);
-    if (!event) return { ok: false, error: '作成結果の読み取りに失敗しました' };
+
+    const events = (data as unknown as EventRow[])
+      .map((row) => mapEventRow(row))
+      .filter((event): event is PublicEvent => Boolean(event));
+    if (events.length === 0) {
+      return { ok: false, error: '作成結果の読み取りに失敗しました' };
+    }
+
+    events.sort((a, b) =>
+      `${a.eventDate}T${a.eventTime}`.localeCompare(
+        `${b.eventDate}T${b.eventTime}`,
+      ),
+    );
 
     // 主催者自身を参加者として登録（失敗してもイベント自体は成功）
     try {
-      await client.from('event_participants').upsert(
-        {
-          event_id: event.id,
-          user_id: input.hostId,
-          status: 'joined',
-          display_name: hostName,
-          avatar_url: input.organizer.imageUri?.trim() || null,
-        },
-        { onConflict: 'event_id,user_id' },
+      await Promise.all(
+        events.map((event) =>
+          client.from('event_participants').upsert(
+            {
+              event_id: event.id,
+              user_id: input.hostId,
+              status: 'joined',
+              display_name: hostName,
+              avatar_url: input.organizer.imageUri?.trim() || null,
+            },
+            { onConflict: 'event_id,user_id' },
+          ),
+        ),
       );
     } catch {
       // ignore
     }
 
-    return { ok: true, event };
+    return { ok: true, event: events[0]!, events };
   } catch (error) {
     return {
       ok: false,
