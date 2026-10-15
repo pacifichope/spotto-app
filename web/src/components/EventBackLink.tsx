@@ -26,7 +26,7 @@ function EventBackLinkInner() {
   );
 }
 
-/** クエリの from に応じて戻る先を切り替える（履歴優先） */
+/** クエリの from に応じて戻る先を明示指定（履歴非依存） */
 export function EventBackLink() {
   const t = useT();
   return (

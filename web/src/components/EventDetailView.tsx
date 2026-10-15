@@ -344,7 +344,7 @@ export function EventDetailView({
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button
         type="button"
-        onClick={() => navigateBack(router, backNav.href)}
+        onClick={() => navigateBack(router, backNav.href, { replace: true })}
         className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-2 text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE] transition hover:bg-white"
       >
         <ChevronLeft size={18} strokeWidth={2.6} aria-hidden />
@@ -401,7 +401,7 @@ export function EventDetailView({
             <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-3 pt-3">
               <button
                 type="button"
-                onClick={() => navigateBack(router, backNav.href)}
+                onClick={() => navigateBack(router, backNav.href, { replace: true })}
                 aria-label={t('common.back')}
                 className="pointer-events-auto grid h-10 w-10 place-items-center rounded-full bg-black/35 text-white backdrop-blur-sm"
               >

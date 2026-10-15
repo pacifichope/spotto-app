@@ -96,7 +96,7 @@ export function TicketScreen() {
   }, [ready, user, eventId, t]);
 
   const fallbackHref = '/mypage?mode=participant&segment=joined';
-  const close = () => navigateBack(router, fallbackHref);
+  const close = () => navigateBack(router, fallbackHref, { replace: true });
 
   if (!ready || loading) {
     return (

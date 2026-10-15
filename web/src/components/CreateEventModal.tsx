@@ -1,14 +1,17 @@
 'use client';
 
-import { Camera, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Camera, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { LocationPickerModal } from '@/components/LocationPickerModal';
+import { MultiSessionCalendarModal } from '@/components/MultiSessionCalendarModal';
 import { createWebEvent, uploadEventImage } from '@/lib/eventCreate';
 import {
   CANCEL_POLICY_OPTIONS,
   createEmptyQuestion,
   DEFAULT_CANCEL_POLICY,
+  formatSessionRowLabel,
   LEVEL_OPTIONS,
   MAX_EVENT_PHOTOS,
   MAX_PRE_QUESTION_OPTIONS,
@@ -25,7 +28,6 @@ import {
   sortEventSessions,
   sportEmojiForLabel,
   type CreateEventPayload,
-  type EventSession,
   type FeeType,
   type PreQuestion,
   type RegistrationDeadlineOffset,
@@ -43,6 +45,7 @@ import {
   type WebOrganizerProfile,
 } from '@/lib/organizerProfile';
 import { useLocale, useT } from '@/lib/i18n/locale-context';
+import { findNgWordInCreatePayload, NG_WORD_ERROR_MESSAGE } from '@/lib/ngWords';
 
 type FormState = Omit<WebEventDraft, 'id' | 'updatedAt'>;
 
@@ -85,15 +88,9 @@ export function CreateEventModal({
   const [itemsBringDraft, setItemsBringDraft] = useState('');
   const [itemsIncludedDraft, setItemsIncludedDraft] = useState('');
   const [ageCustomDraft, setAgeCustomDraft] = useState('');
-  const [sessionDraft, setSessionDraft] = useState<EventSession>(() => {
-    const base = createEmptyDraftPartial();
-    return {
-      date: base.date,
-      time: base.time,
-      endDate: base.endDate,
-      endTime: base.endTime,
-    };
-  });
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [singleScheduleOpen, setSingleScheduleOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +105,9 @@ export function CreateEventModal({
     setItemsBringDraft('');
     setItemsIncludedDraft('');
     setAgeCustomDraft('');
+    setLocationPickerOpen(false);
+    setCalendarOpen(false);
+    setSingleScheduleOpen(false);
     setError('');
     setSaving(false);
     savingRef.current = false;
@@ -123,11 +123,49 @@ export function CreateEventModal({
     };
   }, [open]);
 
-  if (!open) return null;
-
   const busy = saving || uploading;
   const isOtherSport = form.sport === OTHER_SPORT_LABEL;
   const remainingSlots = MAX_EVENT_PHOTOS - form.imageUris.length;
+
+  const canPublish = useMemo(
+    () =>
+      form.imageUris.length > 0 &&
+      form.title.trim().length > 0 &&
+      form.description.trim().length > 0 &&
+      form.location.trim().length > 0 &&
+      Number(form.capacity) > 0 &&
+      (form.scheduleType !== 'recurring' || form.sessions.length > 0) &&
+      (form.scheduleType !== 'single' ||
+        (Boolean(form.date) && Boolean(form.time))),
+    [form],
+  );
+
+  const activityLabel = useMemo(() => {
+    if (form.scheduleType === 'recurring') {
+      if (form.sessions.length === 0) return '';
+      const sorted = sortEventSessions(form.sessions);
+      const first = formatSessionRowLabel(
+        sorted[0]!,
+        locale === 'en' ? 'en' : 'ja',
+      );
+      if (sorted.length === 1) return first;
+      return locale === 'en'
+        ? `${first} +${sorted.length - 1} more`
+        : `${first} ほか${sorted.length - 1}件`;
+    }
+    if (!form.date || !form.time) return '';
+    return formatSessionRowLabel(
+      {
+        date: form.date,
+        time: form.time,
+        endDate: form.endDate,
+        endTime: form.endTime,
+      },
+      locale === 'en' ? 'en' : 'ja',
+    );
+  }, [form, locale]);
+
+  if (!open) return null;
 
   function patch<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -167,6 +205,10 @@ export function CreateEventModal({
       setError(t('createEvent.alerts.cancelPolicyRequired'));
       return null;
     }
+    if (form.scheduleType === 'single' && (!form.date || !form.time)) {
+      setError(t('createEvent.alerts.sessionIncomplete'));
+      return null;
+    }
     const sportLabel = isOtherSport
       ? form.customSport.trim() || OTHER_SPORT_LABEL
       : form.sport;
@@ -183,7 +225,7 @@ export function CreateEventModal({
           ];
     const first = orderedSessions[0]!;
     const imageUris = form.imageUris.slice(0, MAX_EVENT_PHOTOS);
-    return {
+    const payload: CreateEventPayload = {
       title: form.title.trim().slice(0, TITLE_MAX_LENGTH),
       sport: sportLabel,
       emoji: sportEmojiForLabel(form.sport) || form.emoji || '🏅',
@@ -223,6 +265,11 @@ export function CreateEventModal({
         ageCustomDraft,
       ]),
     };
+    if (findNgWordInCreatePayload(payload)) {
+      setError(NG_WORD_ERROR_MESSAGE);
+      return null;
+    }
+    return payload;
   }
 
   function saveDraftLocal() {
@@ -324,18 +371,6 @@ export function CreateEventModal({
           : sanitizeTargetAgeGroups([...prev.targetAgeGroups, preset]),
       };
     });
-  }
-
-  function addSession() {
-    if (!sessionDraft.date || !sessionDraft.time) {
-      setError(t('createEvent.alerts.sessionIncomplete'));
-      return;
-    }
-    setForm((prev) => ({
-      ...prev,
-      sessions: sortEventSessions([...prev.sessions, { ...sessionDraft }]),
-    }));
-    setError('');
   }
 
   function updateQuestion(id: string, patchQ: Partial<PreQuestion>) {
@@ -516,183 +551,185 @@ export function CreateEventModal({
             </label>
           ) : null}
 
-          {/* Schedule type */}
-          <div>
-            <p className="text-xs font-extrabold text-[#5B6B75]">
-              {t('createEvent.scheduleType')}
-            </p>
-            <div className="mt-2 flex gap-2">
-              {(['single', 'recurring'] as ScheduleType[]).map((type) => (
+          {/* Schedule type tabs（アプリ版と同じ単発 / 定期・複数回） */}
+          <div className="grid grid-cols-2 gap-0 border-b border-[#E4EBEE]">
+            {([
+              {
+                type: 'single' as ScheduleType,
+                sub: t('createEvent.scheduleSingleSub'),
+              },
+              {
+                type: 'recurring' as ScheduleType,
+                sub: t('createEvent.scheduleRecurringSub'),
+              },
+            ]).map(({ type, sub }) => {
+              const active = form.scheduleType === type;
+              return (
                 <button
                   key={type}
                   type="button"
                   disabled={busy}
-                  onClick={() => patch('scheduleType', type)}
-                  className={`${chip} ${
-                    form.scheduleType === type
-                      ? 'bg-[#E5F9FC] text-[#12B8D0] ring-[#29D1E8]/40'
-                      : 'bg-white text-[#5B6B75] ring-[#E4EBEE]'
-                  }`}
+                  onClick={() => {
+                    patch('scheduleType', type);
+                    if (
+                      type === 'recurring' &&
+                      form.sessions.length === 0 &&
+                      form.date &&
+                      form.time
+                    ) {
+                      patch('sessions', [
+                        {
+                          date: form.date,
+                          time: form.time,
+                          endDate: form.endDate,
+                          endTime: form.endTime,
+                        },
+                      ]);
+                    }
+                  }}
+                  className="relative px-2 pb-3 pt-1 text-left disabled:opacity-60"
                 >
-                  {t(`createEvent.schedule.${type}`)}
+                  <span
+                    className={`block text-sm font-extrabold ${
+                      active ? 'text-[#12202A]' : 'text-[#8A9199]'
+                    }`}
+                  >
+                    {t(`createEvent.schedule.${type}`)}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-bold leading-snug text-[#8A9199]">
+                    {sub}
+                  </span>
+                  {active ? (
+                    <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-[#12B8D0]" />
+                  ) : null}
                 </button>
-              ))}
+              );
+            })}
+          </div>
+
+          <div className="overflow-hidden rounded-2xl ring-1 ring-[#E4EBEE]">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                form.scheduleType === 'recurring'
+                  ? setCalendarOpen(true)
+                  : setSingleScheduleOpen(true)
+              }
+              className="flex w-full items-center gap-3 bg-white px-4 py-3.5 text-left disabled:opacity-60"
+            >
+              <span className="shrink-0 text-xs font-extrabold text-[#5B6B75]">
+                <span className="text-[#EF4444]">*</span>{' '}
+                {t('createEvent.activityDateTime')}
+              </span>
+              <span
+                className={`min-w-0 flex-1 truncate text-right text-sm font-extrabold ${
+                  activityLabel ? 'text-[#12202A]' : 'text-[#8A9199]'
+                }`}
+              >
+                {activityLabel || t('createEvent.selectDateTime')}
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-[#C5CDD2]" />
+            </button>
+            <div className="h-px bg-[#E4EBEE]" />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setLocationPickerOpen(true)}
+              className="flex w-full items-center gap-3 bg-white px-4 py-3.5 text-left disabled:opacity-60"
+            >
+              <span className="shrink-0 text-xs font-extrabold text-[#5B6B75]">
+                <span className="text-[#EF4444]">*</span> {t('createEvent.place')}
+              </span>
+              <span
+                className={`min-w-0 flex-1 truncate text-right text-sm font-extrabold ${
+                  form.location.trim() ? 'text-[#12202A]' : 'text-[#8A9199]'
+                }`}
+              >
+                {form.location.trim() || t('createEvent.selectLocation')}
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-[#C5CDD2]" />
+            </button>
+            <div className="border-t border-[#E4EBEE] bg-white px-4 py-3">
+              <label className="block">
+                <span className="text-xs font-extrabold text-[#5B6B75]">
+                  {t('createEvent.placeMemo')}
+                </span>
+                <input
+                  className="mt-1.5 h-10 w-full rounded-xl border border-[#E4EBEE] bg-[#F4F7F8] px-3 text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-[#29D1E8]/35"
+                  value={form.locationNote}
+                  disabled={busy}
+                  maxLength={40}
+                  placeholder={t('createEvent.placeMemoPlaceholder')}
+                  onChange={(e) => patch('locationNote', e.target.value)}
+                />
+              </label>
             </div>
           </div>
 
-          {form.scheduleType === 'single' ? (
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-xs font-extrabold text-[#5B6B75]">
-                  {t('createEvent.startDate')}
-                </span>
-                <input
-                  type="date"
-                  className={field}
-                  value={form.date}
-                  disabled={busy}
-                  onChange={(e) => patch('date', e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-extrabold text-[#5B6B75]">
-                  {t('createEvent.startTime')}
-                </span>
-                <input
-                  type="time"
-                  className={field}
-                  value={form.time}
-                  disabled={busy}
-                  onChange={(e) => patch('time', e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-extrabold text-[#5B6B75]">
-                  {t('createEvent.endDate')}
-                </span>
-                <input
-                  type="date"
-                  className={field}
-                  value={form.endDate}
-                  disabled={busy}
-                  onChange={(e) => patch('endDate', e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-extrabold text-[#5B6B75]">
-                  {t('createEvent.endTime')}
-                </span>
-                <input
-                  type="time"
-                  className={field}
-                  value={form.endTime}
-                  disabled={busy}
-                  onChange={(e) => patch('endTime', e.target.value)}
-                />
-              </label>
-            </div>
-          ) : (
+          {form.scheduleType === 'single' && singleScheduleOpen ? (
             <div className="space-y-3 rounded-2xl border border-[#E4EBEE] bg-[#FAFCFD] p-3">
-              <p className="text-xs font-extrabold text-[#5B6B75]">
-                {t('createEvent.sessionsTitle', { count: form.sessions.length })}
-              </p>
-              {form.sessions.map((session, index) => (
-                <div
-                  key={`${session.date}-${session.time}-${index}`}
-                  className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs font-bold text-[#12202A] ring-1 ring-[#E4EBEE]"
-                >
-                  <span>
-                    {session.date} {session.time}
-                    {session.endTime ? ` – ${session.endDate || session.date} ${session.endTime}` : ''}
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs font-extrabold text-[#5B6B75]">
+                    {t('createEvent.startDate')}
                   </span>
-                  <button
-                    type="button"
+                  <input
+                    type="date"
+                    className={field}
+                    value={form.date}
                     disabled={busy}
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        sessions: prev.sessions.filter((_, i) => i !== index),
-                      }))
-                    }
-                    className="text-[#EF4444]"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  className={field}
-                  value={sessionDraft.date}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSessionDraft((prev) => ({ ...prev, date: e.target.value }))
-                  }
-                />
-                <input
-                  type="time"
-                  className={field}
-                  value={sessionDraft.time}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSessionDraft((prev) => ({ ...prev, time: e.target.value }))
-                  }
-                />
-                <input
-                  type="date"
-                  className={field}
-                  value={sessionDraft.endDate || ''}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSessionDraft((prev) => ({ ...prev, endDate: e.target.value }))
-                  }
-                />
-                <input
-                  type="time"
-                  className={field}
-                  value={sessionDraft.endTime || ''}
-                  disabled={busy}
-                  onChange={(e) =>
-                    setSessionDraft((prev) => ({ ...prev, endTime: e.target.value }))
-                  }
-                />
+                    onChange={(e) => patch('date', e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-extrabold text-[#5B6B75]">
+                    {t('createEvent.startTime')}
+                  </span>
+                  <input
+                    type="time"
+                    step={300}
+                    className={field}
+                    value={form.time}
+                    disabled={busy}
+                    onChange={(e) => patch('time', e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-extrabold text-[#5B6B75]">
+                    {t('createEvent.endDate')}
+                  </span>
+                  <input
+                    type="date"
+                    className={field}
+                    value={form.endDate}
+                    disabled={busy}
+                    onChange={(e) => patch('endDate', e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-extrabold text-[#5B6B75]">
+                    {t('createEvent.endTime')}
+                  </span>
+                  <input
+                    type="time"
+                    step={300}
+                    className={field}
+                    value={form.endTime}
+                    disabled={busy}
+                    onChange={(e) => patch('endTime', e.target.value)}
+                  />
+                </label>
               </div>
               <button
                 type="button"
-                disabled={busy}
-                onClick={addSession}
-                className="flex h-10 w-full items-center justify-center gap-1 rounded-full bg-white text-sm font-extrabold text-[#12B8D0] ring-1 ring-[#E4EBEE]"
+                className="text-xs font-extrabold text-[#12B8D0]"
+                onClick={() => setSingleScheduleOpen(false)}
               >
-                <Plus size={16} />
-                {t('createEvent.addSession')}
+                {t('common.done')}
               </button>
             </div>
-          )}
-
-          <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">
-              {t('createEvent.place')}
-            </span>
-            <input
-              className={field}
-              value={form.location}
-              disabled={busy}
-              onChange={(e) => patch('location', e.target.value)}
-              placeholder={t('createEvent.placePlaceholder')}
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-extrabold text-[#5B6B75]">
-              {t('createEvent.placeMemo')}
-            </span>
-            <input
-              className={field}
-              value={form.locationNote}
-              disabled={busy}
-              onChange={(e) => patch('locationNote', e.target.value)}
-            />
-          </label>
+          ) : null}
 
           <label className="block">
             <span className="text-xs font-extrabold text-[#5B6B75]">
@@ -712,6 +749,9 @@ export function CreateEventModal({
                 )
               }
             />
+            <span className="mt-1 block text-[11px] font-bold text-[#8A9199]">
+              {t('createEvent.capacityHint')}
+            </span>
           </label>
 
           {/* Fee */}
@@ -815,6 +855,7 @@ export function CreateEventModal({
               className={area}
               value={form.description}
               disabled={busy}
+              placeholder={t('createEvent.descriptionPlaceholder')}
               onChange={(e) => patch('description', e.target.value)}
             />
           </label>
@@ -1060,22 +1101,65 @@ export function CreateEventModal({
           <button
             type="button"
             disabled={busy}
-            onClick={onClose}
-            className="flex h-11 flex-1 items-center justify-center gap-1 rounded-full bg-white text-sm font-extrabold text-[#5B6B75] ring-1 ring-[#E4EBEE] disabled:opacity-60"
+            onClick={() => {
+              saveDraftLocal();
+              onClose();
+            }}
+            className="flex h-11 flex-1 items-center justify-center rounded-full bg-white text-sm font-extrabold text-[#12202A] ring-1 ring-[#E4EBEE] disabled:opacity-60"
           >
-            <X size={16} />
-            {t('common.cancel')}
+            {t('createEvent.saveDraft')}
           </button>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !canPublish}
             onClick={() => void publish()}
-            className="brand-gradient flex h-11 flex-1 items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-60"
+            className="brand-gradient flex h-11 flex-[1.2] items-center justify-center rounded-full text-sm font-extrabold disabled:opacity-45"
           >
-            {saving ? t('common.publishing') : t('common.publish')}
+            {saving ? t('common.publishing') : t('createEvent.publishEvent')}
           </button>
         </div>
       </div>
+
+      <LocationPickerModal
+        open={locationPickerOpen}
+        initial={{
+          latitude: form.latitude,
+          longitude: form.longitude,
+          label: form.location,
+        }}
+        onClose={() => setLocationPickerOpen(false)}
+        onConfirm={(picked) => {
+          setForm((prev) => ({
+            ...prev,
+            location: picked.label,
+            latitude: picked.latitude,
+            longitude: picked.longitude,
+          }));
+          setLocationPickerOpen(false);
+          setError('');
+        }}
+      />
+
+      <MultiSessionCalendarModal
+        open={calendarOpen}
+        initialSessions={form.sessions}
+        onClose={() => setCalendarOpen(false)}
+        onConfirm={(sessions) => {
+          const sorted = sortEventSessions(sessions);
+          const first = sorted[0];
+          setForm((prev) => ({
+            ...prev,
+            scheduleType: 'recurring',
+            sessions: sorted,
+            date: first?.date || prev.date,
+            time: first?.time || prev.time,
+            endDate: first?.endDate || prev.endDate,
+            endTime: first?.endTime || prev.endTime,
+          }));
+          setCalendarOpen(false);
+          setError('');
+        }}
+      />
     </div>
   );
 }

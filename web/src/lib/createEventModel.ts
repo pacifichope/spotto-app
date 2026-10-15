@@ -379,21 +379,77 @@ export function buildEventInsertRow(input: {
   };
 }
 
-export function defaultEventSchedule() {
-  const now = new Date();
-  const start = new Date(now.getTime() + 60 * 60 * 1000);
-  start.setMinutes(0, 0, 0);
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  const stamp = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const clock = (d: Date) =>
-    `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+export function formatDateStamp(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function formatTimeStamp(value: Date) {
+  const hour = String(value.getHours()).padStart(2, '0');
+  const minute = String(value.getMinutes()).padStart(2, '0');
+  return `${hour}:${minute}`;
+}
+
+export function addMinutesToEventTime(
+  date: string,
+  time: string,
+  minutes: number,
+) {
+  const [y, m, d] = date.split('-').map(Number);
+  const [hh, mm] = time.split(':').map(Number);
+  const next = new Date(y || 1970, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
+  next.setMinutes(next.getMinutes() + minutes);
   return {
-    date: stamp(start),
-    time: clock(start),
-    endDate: stamp(end),
-    endTime: clock(end),
+    date: formatDateStamp(next),
+    time: formatTimeStamp(next),
   };
+}
+
+/** アプリ版と同じく 5 分刻みに切り上げたデフォルト日程 */
+export function defaultEventSchedule(from = new Date()) {
+  const stepMs = 5 * 60 * 1000;
+  const start = new Date(Math.ceil(from.getTime() / stepMs) * stepMs);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  return {
+    date: formatDateStamp(start),
+    time: formatTimeStamp(start),
+    endDate: formatDateStamp(end),
+    endTime: formatTimeStamp(end),
+  };
+}
+
+export function defaultSessionForDate(date: string): EventSession {
+  const fallback = defaultEventSchedule();
+  const end = addMinutesToEventTime(date, fallback.time, 120);
+  const sameDay = end.date === date;
+  return {
+    date,
+    time: fallback.time,
+    endDate: sameDay ? end.date : date,
+    endTime: sameDay ? end.time : '23:55',
+  };
+}
+
+/** 一覧表示用（例: 10/15 (木) 12:35-14:35） */
+export function formatSessionRowLabel(
+  session: EventSession,
+  locale: 'ja' | 'en' = 'ja',
+) {
+  const [y, m, d] = session.date.split('-').map(Number);
+  const dt = new Date(y || 1970, (m || 1) - 1, d || 1);
+  const weekday =
+    locale === 'en'
+      ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()]
+      : ['日', '月', '火', '水', '木', '金', '土'][dt.getDay()];
+  const datePart = `${m}/${d}${locale === 'en' ? ` ${weekday}` : ` (${weekday})`}`;
+  if (!session.endTime) return `${datePart} ${session.time}`;
+  if (session.endDate && session.endDate !== session.date) {
+    const [, em, ed] = session.endDate.split('-').map(Number);
+    return `${datePart} ${session.time}-${em}/${ed} ${session.endTime}`;
+  }
+  return `${datePart} ${session.time}-${session.endTime}`;
 }
 
 export function sportEmojiForLabel(label: string) {

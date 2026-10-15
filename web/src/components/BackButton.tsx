@@ -6,35 +6,24 @@ import { useCallback, type ReactNode } from 'react';
 
 import { useT } from '@/lib/i18n/locale-context';
 
-function canUseHistoryBack() {
-  if (typeof window === 'undefined') return false;
-  try {
-    if (
-      document.referrer &&
-      new URL(document.referrer).origin === window.location.origin
-    ) {
-      return true;
-    }
-  } catch {
-    // ignore invalid referrer
-  }
-  return window.history.length > 1;
-}
-
-/** 履歴があれば戻り、なければ fallback へ遷移する */
+/**
+ * 履歴スタックには依存せず、指定の href へ必ず遷移する。
+ * （深いリンク直開きや決済↔詳細のループを避ける）
+ */
 export function navigateBack(
-  router: { back: () => void; push: (href: string) => void },
-  fallbackHref: string,
+  router: { push: (href: string) => void; replace?: (href: string) => void },
+  href: string,
+  options?: { replace?: boolean },
 ) {
-  if (canUseHistoryBack()) {
-    router.back();
+  if (options?.replace && typeof router.replace === 'function') {
+    router.replace(href);
     return;
   }
-  router.push(fallbackHref);
+  router.push(href);
 }
 
 type BackButtonProps = {
-  /** 履歴が使えないときの遷移先 */
+  /** 戻るボタン押下時の遷移先（必須・履歴非依存） */
   fallbackHref: string;
   /** 文言。未指定時は「← 戻る」 */
   label?: ReactNode;
@@ -43,6 +32,8 @@ type BackButtonProps = {
   className?: string;
   /** overlay 時の aria-label（未指定時は common.back） */
   'aria-label'?: string;
+  /** true のとき push ではなく replace（例: 決済後の戻り） */
+  replace?: boolean;
 };
 
 export function BackButton({
@@ -51,6 +42,7 @@ export function BackButton({
   variant = 'text',
   className = '',
   'aria-label': ariaLabel,
+  replace = false,
 }: BackButtonProps) {
   const router = useRouter();
   const t = useT();
@@ -63,8 +55,8 @@ export function BackButton({
     );
 
   const onClick = useCallback(() => {
-    navigateBack(router, fallbackHref);
-  }, [router, fallbackHref]);
+    navigateBack(router, fallbackHref, { replace });
+  }, [router, fallbackHref, replace]);
 
   if (variant === 'overlay') {
     return (

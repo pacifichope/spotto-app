@@ -7,6 +7,10 @@ import {
   occurrencesFromCreatePayload,
   type CreateEventPayload,
 } from '@/lib/createEventModel';
+import {
+  findNgWordInCreatePayload,
+  NG_WORD_ERROR_MESSAGE,
+} from '@/lib/ngWords';
 
 export type { CreateEventPayload };
 /** @deprecated CreateEventPayload を使う */
@@ -59,6 +63,16 @@ function validateCreatePayload(payload: CreateEventPayload): string | null {
   if (!payload.title.trim()) return 'タイトルを入力してください';
   if (!payload.location.trim()) return '場所を入力してください';
   if (!payload.description.trim()) return '説明を入力してください';
+  const capacity = Math.floor(Number(payload.capacity) || 0);
+  if (capacity < 1 || capacity > 1000) {
+    return '定員は1〜1000人で入力してください';
+  }
+  if (
+    !Number.isFinite(payload.latitude) ||
+    !Number.isFinite(payload.longitude)
+  ) {
+    return '活動地点を地図から選択してください';
+  }
   if (
     payload.scheduleType === 'recurring' &&
     (!payload.sessions || payload.sessions.length === 0)
@@ -73,6 +87,9 @@ function validateCreatePayload(payload: CreateEventPayload): string | null {
   }
   if (payload.priceYen > 0 && payload.priceYen < 1) {
     return '有料の場合は参加費を入力してください';
+  }
+  if (findNgWordInCreatePayload(payload)) {
+    return NG_WORD_ERROR_MESSAGE;
   }
   return null;
 }
