@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 
+import { LegalConsentCheckbox } from '@/components/LegalConsentCheckbox';
 import {
   AppleLogoMark,
   GoogleGMark,
@@ -75,6 +76,7 @@ function CheckoutConfirmInner({ event }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState('');
   const [messageTone, setMessageTone] = useState<'ok' | 'error'>('ok');
   const completingRef = useRef(false);
@@ -536,10 +538,19 @@ function CheckoutConfirmInner({ event }: Props) {
                 {t('payment.loginRequired')}
               </p>
               <div className="flex flex-col gap-2">
+                <LegalConsentCheckbox
+                  id="checkout-legal-consent"
+                  checked={agreed}
+                  disabled={busy}
+                  onChange={setAgreed}
+                />
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => void signIn('google')}
+                  disabled={busy || !agreed}
+                  onClick={() => {
+                    if (!agreed) return;
+                    void signIn('google');
+                  }}
                   className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
                 >
                   <GoogleGMark size={20} />
@@ -547,8 +558,11 @@ function CheckoutConfirmInner({ event }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => void signIn('apple')}
+                  disabled={busy || !agreed}
+                  onClick={() => {
+                    if (!agreed) return;
+                    void signIn('apple');
+                  }}
                   className={`${socialButtonClass} bg-[#111111] text-white`}
                 >
                   <AppleLogoMark size={18} color="#FFFFFF" />
@@ -556,8 +570,11 @@ function CheckoutConfirmInner({ event }: Props) {
                 </button>
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => void signIn('line')}
+                  disabled={busy || !agreed}
+                  onClick={() => {
+                    if (!agreed) return;
+                    void signIn('line');
+                  }}
                   className={`${socialButtonClass} bg-[#06C755] text-white`}
                 >
                   <LineSpeechMark size={22} color="#FFFFFF" />

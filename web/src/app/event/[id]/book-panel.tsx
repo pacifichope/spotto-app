@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 
+import { LegalConsentCheckbox } from '@/components/LegalConsentCheckbox';
 import {
   AppleLogoMark,
   GoogleGMark,
@@ -93,6 +94,7 @@ function BookControls({
   const [messageTone, setMessageTone] = useState<'ok' | 'error'>('ok');
   const [busy, setBusy] = useState(false);
   const [joined, setJoined] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     if (authUser) setUser(authUser);
@@ -309,10 +311,19 @@ function BookControls({
             </p>
           ) : null}
           <div className="flex flex-col gap-2">
+            <LegalConsentCheckbox
+              id="book-legal-consent"
+              checked={agreed}
+              disabled={busy}
+              onChange={setAgreed}
+            />
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void signIn('google')}
+              disabled={busy || !agreed}
+              onClick={() => {
+                if (!agreed) return;
+                void signIn('google');
+              }}
               className={`${socialButtonClass} bg-white text-[#12202A] ring-1 ring-[#E4EBEE]`}
             >
               <GoogleGMark size={20} />
@@ -320,8 +331,11 @@ function BookControls({
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void signIn('apple')}
+              disabled={busy || !agreed}
+              onClick={() => {
+                if (!agreed) return;
+                void signIn('apple');
+              }}
               className={`${socialButtonClass} bg-[#111111] text-white`}
             >
               <AppleLogoMark size={18} color="#FFFFFF" />
@@ -329,8 +343,11 @@ function BookControls({
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={() => void signIn('line')}
+              disabled={busy || !agreed}
+              onClick={() => {
+                if (!agreed) return;
+                void signIn('line');
+              }}
               className={`${socialButtonClass} bg-[#06C755] text-white`}
             >
               <LineSpeechMark size={22} color="#FFFFFF" />

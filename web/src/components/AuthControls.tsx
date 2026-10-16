@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { LegalConsentCheckbox } from '@/components/LegalConsentCheckbox';
 import {
   AppleLogoMark,
   GoogleGMark,
@@ -54,6 +55,7 @@ export function LoginPromptCard({
 }) {
   const { busy, error, configured, signInGoogle, signInApple, signInLine } = useAuth();
   const t = useT();
+  const [agreed, setAgreed] = useState(false);
   const [lineCallbackHint, setLineCallbackHint] = useState('');
   useEffect(() => {
     setLineCallbackHint(`${window.location.origin.replace(/\/+$/, '')}/auth/line/callback`);
@@ -67,10 +69,19 @@ export function LoginPromptCard({
       <p className="text-base font-extrabold tracking-tight">{resolvedTitle}</p>
       <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">{resolvedBody}</p>
       <div className="mt-5 flex max-w-md flex-col gap-3">
+        <LegalConsentCheckbox
+          id="login-prompt-consent"
+          checked={agreed}
+          disabled={busy}
+          onChange={setAgreed}
+        />
         <button
           type="button"
-          disabled={busy || !configured}
-          onClick={() => void signInGoogle()}
+          disabled={busy || !configured || !agreed}
+          onClick={() => {
+            if (!agreed) return;
+            void signInGoogle();
+          }}
           className={`${loginButtonClass} bg-white text-[#12202A] shadow-sm ring-1 ring-[#E4EBEE]`}
         >
           <GoogleGMark size={20} />
@@ -78,8 +89,11 @@ export function LoginPromptCard({
         </button>
         <button
           type="button"
-          disabled={busy || !configured}
-          onClick={() => void signInApple()}
+          disabled={busy || !configured || !agreed}
+          onClick={() => {
+            if (!agreed) return;
+            void signInApple();
+          }}
           className={`${loginButtonClass} bg-[#111111] text-white`}
         >
           <AppleLogoMark size={18} color="#FFFFFF" />
@@ -87,8 +101,11 @@ export function LoginPromptCard({
         </button>
         <button
           type="button"
-          disabled={busy || !configured}
-          onClick={() => void signInLine()}
+          disabled={busy || !configured || !agreed}
+          onClick={() => {
+            if (!agreed) return;
+            void signInLine();
+          }}
           className={`${loginButtonClass} bg-[#06C755] text-white`}
         >
           <LineSpeechMark size={22} color="#FFFFFF" />
