@@ -69,12 +69,6 @@ export function LoginPromptCard({
       <p className="text-base font-extrabold tracking-tight">{resolvedTitle}</p>
       <p className="mt-2 text-sm font-bold leading-6 text-[#5B6B75]">{resolvedBody}</p>
       <div className="mt-5 flex max-w-md flex-col gap-3">
-        <LegalConsentCheckbox
-          id="login-prompt-consent"
-          checked={agreed}
-          disabled={busy}
-          onChange={setAgreed}
-        />
         <button
           type="button"
           disabled={busy || !configured || !agreed}
@@ -111,6 +105,12 @@ export function LoginPromptCard({
           <LineSpeechMark size={22} color="#FFFFFF" />
           <span>{busy ? t('common.processing') : t('auth.line')}</span>
         </button>
+        <LegalConsentCheckbox
+          id="login-prompt-consent"
+          checked={agreed}
+          disabled={busy}
+          onChange={setAgreed}
+        />
       </div>
       {lineCallbackHint ? (
         <p className="mt-3 text-[11px] font-bold leading-5 text-[#8A9199]">
